@@ -184,8 +184,16 @@ test.describe('Chat UI shell', () => {
           source: 'SKILL.md'
         }
       ])
-      ipcMain.handle('runtime:skill:invoke', async (_event, input: unknown) => {
+      ipcMain.handle('runtime:skill:invoke', async (event, input: unknown) => {
         state.__mingyiSkillInvocations?.push(input)
+        const typedInput = input as { sessionId?: string }
+        if (typedInput?.sessionId) {
+          event.sender.send('runtime:session:event', {
+            type: 'run_state',
+            sessionId: typedInput.sessionId,
+            isRunning: false
+          })
+        }
       })
     })
 

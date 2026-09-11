@@ -450,7 +450,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     const unsubscribeEvent = window.api.sessions.onEvent(applyEvent)
     const unsubscribeWorkspace = window.api.workspace.onChanged((nextWorkspace) => {
       setWorkspace(nextWorkspace)
-      setSnapshots({})
       void refresh()
     })
     const unsubscribeProviders = window.api.providers.onChanged(() => {
@@ -470,7 +469,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       const selected = await window.api.workspace.select()
       if (!selected) return
       setWorkspace(selected)
-      setSnapshots({})
       await refresh()
     } catch (selectError) {
       setError(errorMessage(selectError))
@@ -506,7 +504,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       try {
         const result = await window.api.projects.open(projectId)
         setWorkspace(result.workspace)
-        setSnapshots({})
         await refresh()
         return result
       } catch (openError) {

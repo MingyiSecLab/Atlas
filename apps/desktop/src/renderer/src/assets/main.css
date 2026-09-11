@@ -4101,6 +4101,35 @@ button.tree-row {
   border: 1.5px solid #ffffff;
 }
 
+/* Sidebar section headers (tasks, spaces) */
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #86868b;
+  font-weight: 500;
+  background: transparent;
+  border: none;
+  outline: none;
+  box-shadow: none;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+
+.sidebar-section-header:hover {
+  color: #555558;
+}
+
+.sidebar-section-header:focus,
+.sidebar-section-header:focus-visible {
+  outline: none;
+}
+
 /* Sidebar task actions. */
 .sidebar-task-list {
   display: flex;
@@ -6133,6 +6162,7 @@ button.tree-row {
 
 .chat-composer {
   position: relative;
+  z-index: 2;
   width: min(100%, 720px);
   border: 1px solid #e2e2e6;
   border-radius: 14px;
@@ -8499,62 +8529,511 @@ html.dark .workspace-code-editor-statusbar {
   margin: 6px 0;
 }
 
-/* Queued Message Bar */
-.chat-queued-bar {
+/* ==========================================================================
+   assistant-ui Inspired Message Queue Component
+   ========================================================================== */
+
+.message-queue-container {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: 0 16px 8px;
-  padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  font-size: 12px;
-  animation: fadeIn 0.2s ease;
+  flex-direction: column;
+  gap: 8px;
+  width: min(100%, 720px);
+  margin: 0 auto -28px auto;
+  padding: 10px 14px 36px 14px;
+  background: rgba(255, 255, 255, 0.76);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: none;
+  border-radius: 18px 18px 0 0;
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  box-shadow:
+    0 -4px 20px -2px rgba(0, 0, 0, 0.05),
+    0 1px 3px rgba(0, 0, 0, 0.02);
+  font-size: 13px;
+  animation: messageQueueSlideIn 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: all 0.2s ease;
+  z-index: 1;
 }
 
-.chat-queued-info {
+.dark .message-queue-container {
+  background: rgba(24, 24, 27, 0.76);
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow:
+    0 -6px 24px -2px rgba(0, 0, 0, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+@keyframes messageQueueSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 顶部正在运行状态卡片 */
+.message-queue-running-card {
   display: flex;
   align-items: center;
   gap: 8px;
-  overflow: hidden;
+  padding: 6px 10px;
+  background: rgba(59, 130, 246, 0.08);
+  border: 1px solid rgba(59, 130, 246, 0.15);
+  border-radius: 9px;
 }
 
-.chat-queued-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #18181b;
-  color: #ffffff;
-  font-weight: 600;
-  font-size: 10.5px;
+.message-queue-pulse-wrapper {
+  position: relative;
+  display: flex;
+  width: 8px;
+  height: 8px;
   flex-shrink: 0;
 }
 
-.chat-queued-text {
-  color: #3f3f46;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.message-queue-pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: rgba(59, 130, 246, 0.6);
+  animation: messageQueuePing 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
-.chat-queued-cancel {
+.message-queue-pulse-dot {
+  position: relative;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #3b82f6;
+}
+
+@keyframes messageQueuePing {
+  75%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+.message-queue-running-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1d4ed8;
+}
+
+.message-queue-running-badge {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #3b82f6;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* 队列头部信息与操作 */
+.message-queue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+}
+
+.message-queue-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-queue-header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3f3f46;
+}
+
+.message-queue-header-count {
+  font-size: 11px;
+  color: #71717a;
+}
+
+.message-queue-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.message-queue-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
   background: transparent;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  color: #71717a;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.message-queue-action-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #18181b;
+}
+
+.message-queue-action-btn.is-danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+}
+
+/* 排队条目清单 */
+.message-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.message-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  border-radius: 9px;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.message-queue-item:hover {
+  background: rgba(0, 0, 0, 0.045);
+  border-color: rgba(0, 0, 0, 0.09);
+}
+
+.message-queue-item-index {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #a1a1aa;
+  width: 14px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.message-queue-item-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.message-queue-item-tag.is-skill {
+  background: rgba(168, 85, 247, 0.1);
+  color: #9333ea;
+  border: 1px solid rgba(168, 85, 247, 0.2);
+}
+
+.message-queue-item-tag.is-expert {
+  background: rgba(14, 165, 233, 0.1);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+}
+
+.message-queue-item-tag.is-attachment {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.message-queue-item-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: #27272a;
+}
+
+.message-queue-item-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.message-queue-item-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
   border: none;
+  background: transparent;
+  border-radius: 5px;
   color: #71717a;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.message-queue-item-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #18181b;
+}
+
+.message-queue-item-btn.is-steer:hover {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+.message-queue-item-btn.is-cancel:hover {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.message-queue-item-btn.is-edit:hover {
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+}
+
+/* ==========================================================================
+   Queue Prompt Edit Modal
+   ========================================================================== */
+
+.message-queue-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 2px;
-  border-radius: 4px;
-  flex-shrink: 0;
+  padding: 20px;
+  animation: messageQueueFadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.chat-queued-cancel:hover {
+@keyframes messageQueueFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.message-queue-edit-modal {
+  width: min(100%, 480px);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 18px;
+  box-shadow:
+    0 24px 48px -4px rgba(0, 0, 0, 0.2),
+    0 4px 16px -2px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: messageQueueModalPop 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes messageQueueModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.dark .message-queue-edit-modal {
+  background: #18181b;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 28px 56px -4px rgba(0, 0, 0, 0.6),
+    0 6px 20px -2px rgba(0, 0, 0, 0.3);
+}
+
+.message-queue-edit-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px 12px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.dark .message-queue-edit-header {
+  border-bottom-color: rgba(255, 255, 255, 0.06);
+}
+
+.message-queue-edit-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #18181b;
+}
+
+.dark .message-queue-edit-title {
+  color: #f4f4f5;
+}
+
+.message-queue-edit-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #71717a;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.message-queue-edit-close:hover {
   background: rgba(0, 0, 0, 0.06);
-  color: #dc2626;
+  color: #18181b;
+}
+
+.dark .message-queue-edit-close:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fafafa;
+}
+
+.message-queue-edit-body {
+  padding: 16px 18px;
+}
+
+.message-queue-edit-textarea {
+  width: 100%;
+  min-height: 120px;
+  max-height: 260px;
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: #18181b;
+  background: #fbfbfc;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.message-queue-edit-textarea:focus {
+  border-color: #3b82f6;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.dark .message-queue-edit-textarea {
+  background: #27272a;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f4f5;
+}
+
+.dark .message-queue-edit-textarea:focus {
+  border-color: #60a5fa;
+  background: #1e1e24;
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+}
+
+.message-queue-edit-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px 14px 18px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.015);
+}
+
+.dark .message-queue-edit-footer {
+  border-top-color: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.message-queue-edit-hint {
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.message-queue-edit-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.message-queue-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.message-queue-edit-btn.is-secondary {
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: transparent;
+  color: #52525b;
+}
+
+.message-queue-edit-btn.is-secondary:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #18181b;
+}
+
+.dark .message-queue-edit-btn.is-secondary {
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #a1a1aa;
+}
+
+.dark .message-queue-edit-btn.is-secondary:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fafafa;
+}
+
+.message-queue-edit-btn.is-primary {
+  border: none;
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+}
+
+.message-queue-edit-btn.is-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.message-queue-edit-btn.is-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
 }
 
 /* Send Button: Queueing State */

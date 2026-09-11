@@ -79,7 +79,10 @@ function writeGroupState(state: Record<string, boolean>): void {
 function groupTasks(
   tasks: SidebarTask[],
   projects: SidebarProject[]
-): { temporary: SidebarTask[]; byProject: Array<{ project: SidebarProject; tasks: SidebarTask[] }> } {
+): {
+  temporary: SidebarTask[]
+  byProject: Array<{ project: SidebarProject; tasks: SidebarTask[] }>
+} {
   const pathToId = new Map(
     projects.filter((project) => project.rootPath).map((project) => [project.rootPath!, project.id])
   )
@@ -221,7 +224,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         ) : (
           <>
-            <button className="sidebar-task-main" type="button" onClick={() => onSelectTask(task.id)}>
+            <button
+              className="sidebar-task-main"
+              type="button"
+              onClick={() => onSelectTask(task.id)}
+            >
               {task.isRunning ? (
                 <span
                   className="sidebar-task-status is-running"
@@ -341,7 +348,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     padding: '4px 8px',
     fontSize: '12px',
     color: '#86868b',
-    fontWeight: 500
+    fontWeight: 500,
+    background: 'transparent',
+    border: 'none',
+    outline: 'none',
+    boxShadow: 'none',
+    cursor: 'pointer',
+    textAlign: 'left',
+    width: '100%',
+    fontFamily: 'inherit'
   }
 
   return (
@@ -430,10 +445,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div>
             <button
               type="button"
-              className="app-no-drag"
+              className="sidebar-section-header app-no-drag"
               aria-expanded={!groupState['tasks']}
               onClick={() => toggleGroup('tasks')}
-              style={{ ...sectionHeaderStyle, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+              style={sectionHeaderStyle}
             >
               <span>任务 ({grouped.temporary.length})</span>
               {groupState['tasks'] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -455,10 +470,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div>
             <button
               type="button"
-              className="app-no-drag"
+              className="sidebar-section-header app-no-drag"
               aria-expanded={!groupState['spaces']}
               onClick={() => toggleGroup('spaces')}
-              style={{ ...sectionHeaderStyle, cursor: 'pointer', textAlign: 'left', width: '100%' }}
+              style={sectionHeaderStyle}
             >
               <span>空间 ({projectList.length})</span>
               {groupState['spaces'] ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -542,7 +557,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
                               fontWeight: 'inherit'
                             }}
                           >
-                            {collapsed ? <ChevronRight size={13} color="#999" /> : <ChevronDown size={13} color="#999" />}
+                            {collapsed ? (
+                              <ChevronRight size={13} color="#999" />
+                            ) : (
+                              <ChevronDown size={13} color="#999" />
+                            )}
                             <Folder size={14} color={isActive ? '#000' : '#555'} />
                             <span
                               style={{

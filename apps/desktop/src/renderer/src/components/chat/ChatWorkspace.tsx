@@ -8,6 +8,7 @@ import { PentestCreateCard } from './PentestCreateCard'
 import { AssistantMessage, ErrorMessage, UserMessage } from './MessageView'
 import type { RuntimePentestCreationIntent } from '@mingyi/runtime'
 import type { ExpertItem } from '../hub/hub-types'
+import { MessageQueue, type QueuedItem } from './MessageQueue'
 import { messageSkill, messageText, type ChatImageAttachment, type ChatTimelineItem } from './types'
 
 interface ChatWorkspaceProps {
@@ -198,26 +199,41 @@ export function ChatWorkspace({
     []
   )
 
-  const [queuedMessages, setQueuedMessages] = useState<
-    Array<{
-      id: string
-      text: string
-      attachments: ChatImageAttachment[]
-      goalMode?: boolean
-      expert?: ExpertItem
-      skill?: RuntimeSkillInfo
-    }>
-  >([])
+  const [queuedMessages, setQueuedMessages] = useState<QueuedItem[]>([])
+
+  const handleCancelQueued = useCallback((id: string) => {
+    setQueuedMessages((current) => current.filter((item) => item.id !== id))
+  }, [])
+
+  const handleSteerQueued = useCallback((id: string) => {
+    setQueuedMessages((current) => {
+      const targetIndex = current.findIndex((item) => item.id === id)
+      if (targetIndex <= 0) return current
+      const target = current[targetIndex]
+      const rest = current.filter((_, idx) => idx !== targetIndex)
+      return [target, ...rest]
+    })
+  }, [])
+
+  const handleClearQueued = useCallback(() => {
+    setQueuedMessages([])
+  }, [])
+
+  const handleEditQueued = useCallback((id: string, text: string) => {
+    setQueuedMessages((current) =>
+      current.map((item) => (item.id === id ? { ...item, text } : item))
+    )
+  }, [])
 
   const executeMessage = useCallback(
     async (payload: {
       text: string
-      attachments: ChatImageAttachment[]
+      attachments?: ChatImageAttachment[]
       goalMode?: boolean
       expert?: ExpertItem
       skill?: RuntimeSkillInfo
     }): Promise<void> => {
-      const { text, attachments, goalMode, expert, skill } = payload
+      const { text, attachments = [], goalMode, expert, skill } = payload
       const command = /^\/skill\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(text)
       const skillName = skill?.name ?? command?.[1]
       const skillArguments = skill ? text : (command?.[2]?.trim() ?? '')
@@ -405,24 +421,15 @@ export function ChatWorkspace({
           />
         </div>
       ) : null}
-      {queuedMessages.length > 0 ? (
-        <div className="chat-queued-bar" role="status" aria-label="排队中的消息">
-          <div className="chat-queued-info">
-            <span className="chat-queued-badge">排队中 ({queuedMessages.length})</span>
-            <span className="chat-queued-text">
-              {queuedMessages[0].text ||
-                (queuedMessages[0].attachments.length ? '包含附件的消息' : '')}
-            </span>
-          </div>
-          <button
-            type="button"
-            className="chat-queued-cancel"
-            onClick={() => setQueuedMessages((current) => current.slice(1))}
-          >
-            取消排队
-          </button>
-        </div>
-      ) : null}
+      <MessageQueue
+        isRunning={isStreaming}
+        runningText={isStreaming ? 'AI 正在处理当前任务，完成后将自动发送' : undefined}
+        queued={queuedMessages}
+        onCancelItem={handleCancelQueued}
+        onSteerItem={handleSteerQueued}
+        onEditItem={handleEditQueued}
+        onClearAll={handleClearQueued}
+      />
       <Composer
         value={input}
         model={model}

@@ -157,10 +157,10 @@ test.describe('Sidebar task actions', () => {
 
     // 空间组内出现归属任务（临时任务无 projectId，但 projectPath 同为 '/'，按路径归入根空间）
     // 展开按钮的 accessible name 同时包含计数文本
+    await expect(page.getByRole('button', { name: /展开空间“根空间”/ })).toContainText('根空间 (2)')
     await expect(
-      page.getByRole('button', { name: /展开空间“根空间”/ })
-    ).toContainText('根空间 (2)')
-    await expect(page.locator('.sidebar-task-title').filter({ hasText: '空间内任务' })).toBeVisible()
+      page.locator('.sidebar-task-title').filter({ hasText: '空间内任务' })
+    ).toBeVisible()
     await expect(page.locator('.sidebar-task-title').filter({ hasText: '临时任务' })).toBeVisible()
 
     // 空间组 hover 的 + 创建携带 projectId 的新任务（回到主页待输入）
