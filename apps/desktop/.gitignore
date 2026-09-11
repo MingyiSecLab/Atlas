@@ -1,0 +1,8 @@
+node_modules
+dist
+out
+playwright-report
+test-results
+.DS_Store
+.eslintcache
+*.log*

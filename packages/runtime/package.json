@@ -1,0 +1,36 @@
+{
+  "name": "@mingyi/runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Shared local Mastra harness runtime for Mingyi applications",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@mastra/code-sdk": "1.5.3",
+    "@mastra/core": "1.63.2",
+    "yaml": "^2.9.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^2.0.0"
+  }
+}

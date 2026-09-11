@@ -1,0 +1,36 @@
+# Reference projects used for design and implementation research
+/tests/
+
+# Closed-source commercial project; lives in its own private repository
+/packages/ptcore/
+
+# Orphaned tests referencing a nonexistent root src/; pending relocation to ptcore
+/test/
+
+# Development-stage documentation and changelog (publish later)
+/docs/**/*.md
+/CHANGELOG.md
+
+# Local agent settings
+.claude/settings.local.json
+.workbuddy/
+.zcode/
+
+# Desktop build and test artifacts
+apps/desktop/out/
+playwright-report/
+test-results/
+.mingyi/
+
+# Operating system metadata
+.DS_Store
+
+# Workspace dependencies and generated output
+node_modules/
+packages/*/dist/
+coverage/
+
+# Local runtime/provider configuration
+.env
+.env.*
+!.env.example

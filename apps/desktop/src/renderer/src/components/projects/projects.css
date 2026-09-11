@@ -1,0 +1,110 @@
+/* ==========================================================================
+   Projects（项目空间）Layout & Cards
+   对齐「专家 · 技能 · 连接器」Mac Native 紧凑卡片网格规范
+   ========================================================================== */
+
+.projects-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #fafafc;
+  color: #18181b;
+  position: relative;
+}
+
+.projects-content-scroll {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 48px 24px 32px 24px;
+}
+
+.projects-container {
+  max-width: 100%;
+  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ── 项目卡片网格（对齐 .connector-card-grid / .hub-cards-grid） ── */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  width: 100%;
+  padding-top: 4px;
+}
+
+/* ── 项目卡片 ── */
+.projects-card {
+  position: relative;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.projects-card.is-active {
+  border-color: #a1a1aa;
+  background-color: #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+}
+
+.projects-card.is-active:hover {
+  border-color: #71717a;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.projects-card-avatar {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.projects-card-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #71717a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 行内重命名与确认交互 ── */
+.projects-inline-editor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.projects-inline-input {
+  width: 110px;
+  height: 24px;
+  box-sizing: border-box;
+  padding: 0 6px;
+  font-size: 12px;
+  color: #18181b;
+  background: #ffffff;
+  border: 1px solid #d4d4d8;
+  border-radius: 5px;
+  outline: none;
+  transition: border-color 0.14s ease;
+}
+
+.projects-inline-input:focus {
+  border-color: #18181b;
+  box-shadow: 0 0 0 1px rgba(24, 24, 27, 0.12);
+}
+
+.projects-inline-confirm {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.projects-confirm-hint {
+  font-size: 11px;
+  font-weight: 500;
+  color: #b91c1c;
+  white-space: nowrap;
+}

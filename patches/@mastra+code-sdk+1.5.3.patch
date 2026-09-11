@@ -1,0 +1,122 @@
+diff --git a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
+index 15ffc67..04bb793 100644
+--- a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
++++ b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
+@@ -11,6 +11,11 @@ export type MastraCodeCustomProvider = {
+     url: string;
+     apiKey?: string;
+     models?: string[];
++    /**
++     * Mingyi patch (protocol selection): wire protocol of the endpoint.
++     * Defaults to `openai-chat` when omitted.
++     */
++    protocol?: 'openai-chat' | 'openai-responses' | 'anthropic';
+ };
+ export type MastraCodeGatewayOptions = {
+     mastraGatewayBaseUrl: string;
+diff --git a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
+index e3c5b50..0aa56c7 100644
+--- a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
++++ b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
+@@ -305,12 +305,31 @@ var MastraCodeGateway = class MastraCodeGateway extends MastraModelGateway {
+ 	}
+ 	resolveLanguageModel(args) {
+ 		const customProvider = this.#getCustomProviders().find((provider) => args.providerId === getCustomProviderId(provider.name));
+-		if (customProvider) return createOpenAICompatible({
+-			name: args.providerId,
+-			baseURL: customProvider.url,
+-			apiKey: args.apiKey,
+-			headers: args.headers
+-		}).chatModel(args.modelId);
++		if (customProvider) {
++			// Mingyi patch (protocol selection): let custom providers choose the
++			// wire protocol — default remains OpenAI-compatible chat completions.
++			if (customProvider.protocol === "openai-responses") {
++				return createOpenAI({
++					name: args.providerId,
++					baseURL: customProvider.url,
++					apiKey: args.apiKey,
++					headers: args.headers
++				}).responses(args.modelId);
++			}
++			if (customProvider.protocol === "anthropic") {
++				return createAnthropic({
++					apiKey: args.apiKey,
++					baseURL: customProvider.url,
++					headers: args.headers
++				})(args.modelId);
++			}
++			return createOpenAICompatible({
++				name: args.providerId,
++				baseURL: customProvider.url,
++				apiKey: args.apiKey,
++				headers: args.headers
++			}).chatModel(args.modelId);
++		}
+ 		if (args.providerId === "github-copilot") return githubCopilotProvider(args.modelId, {
+ 			headers: args.headers,
+ 			authStorage: this.#credentials
+diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js b/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
+index d9dd796..b8df0ae 100644
+--- a/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
++++ b/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
+@@ -4,13 +4,21 @@ import { getCustomProviderId } from "./settings.js";
+ * Pure `GlobalSettings` mutation helpers for custom OpenAI-compatible
+ * providers. Shared by the TUI `/custom-providers` command and the web
+ * settings routes — no UI dependencies.
++*
++* Mingyi patch (protocol selection): custom providers may declare which wire
++* protocol the endpoint speaks — `openai-chat` (default), `openai-responses`
++* or `anthropic`. Unknown values are dropped so old settings files keep
++* loading unchanged.
+ */
++const CUSTOM_PROVIDER_PROTOCOLS = ["openai-chat", "openai-responses", "anthropic"];
+ function normalizeProvider(input) {
++	const protocol = input.protocol;
+ 	return {
+ 		name: input.name.trim(),
+ 		url: input.url.trim(),
+ 		apiKey: input.apiKey?.trim() || void 0,
+-		models: [...new Set(input.models.map((model) => model.trim()).filter(Boolean))]
++		models: [...new Set(input.models.map((model) => model.trim()).filter(Boolean))],
++		...(CUSTOM_PROVIDER_PROTOCOLS.includes(protocol) ? { protocol } : {})
+ 	};
+ }
+ function upsertCustomProviderInSettings(settings, provider, previousProviderId) {
+diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
+index 60a3305..db19f45 100644
+--- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
++++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
+@@ -20,6 +20,13 @@ export interface CustomProviderSetting {
+     url: string;
+     apiKey?: string;
+     models: string[];
++    /**
++     * Mingyi patch (protocol selection): wire protocol of the endpoint.
++     * `openai-chat` (default) — OpenAI Chat Completions via openai-compatible;
++     * `openai-responses` — OpenAI Responses API;
++     * `anthropic` — Anthropic Messages API.
++     */
++    protocol?: 'openai-chat' | 'openai-responses' | 'anthropic';
+ }
+ /** Storage backend type. */
+ export type StorageBackend = 'libsql' | 'pg';
+diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
+index 9896444..37247bb 100644
+--- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
++++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
+@@ -273,11 +273,13 @@ function parseCustomProviders(rawProviders) {
+ 			return model;
+ 		}))].filter((model) => model.length > 0) : [];
+ 		const apiKey = typeof candidate.apiKey === "string" && candidate.apiKey.trim().length > 0 ? candidate.apiKey.trim() : void 0;
++		const protocol = candidate.protocol;
+ 		parsedProviders.push({
+ 			name,
+ 			url,
+ 			...apiKey ? { apiKey } : {},
+-			models
++			models,
++			...(protocol === "openai-chat" || protocol === "openai-responses" || protocol === "anthropic" ? { protocol } : {})
+ 		});
+ 	}
+ 	return parsedProviders;

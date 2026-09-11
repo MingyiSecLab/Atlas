@@ -1,0 +1,20 @@
+{
+  "name": "mingyi",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/desktop",
+    "packages/runtime"
+  ],
+  "scripts": {
+    "postinstall": "patch-package",
+    "build": "npm run build -w @mingyi/runtime && npm run build -w mingyi-app",
+    "typecheck": "npm run typecheck -w mingyi-app",
+    "test": "npm run test -w mingyi-app",
+    "lint": "npm run lint -w mingyi-app",
+    "dev": "npm run build -w @mingyi/runtime && npm run dev -w mingyi-app"
+  },
+  "devDependencies": {
+    "patch-package": "^8.0.1"
+  }
+}
