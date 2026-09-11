@@ -11,8 +11,8 @@
 /docs/**/*.md
 /CHANGELOG.md
 
-# Local agent settings
-.claude/settings.local.json
+# Local agent settings and workspace state
+.claude/
 .workbuddy/
 .zcode/
 
