@@ -25,6 +25,7 @@
   "dependencies": {
     "@mastra/code-sdk": "1.5.3",
     "@mastra/core": "1.63.2",
+    "@mastra/libsql": "1.22.2",
     "yaml": "^2.9.0",
     "zod": "^4.4.3"
   },

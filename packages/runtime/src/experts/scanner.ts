@@ -97,17 +97,13 @@ export function expertsDirectory(workspacePath: string, configDirName?: string):
 }
 
 /**
- * 扫描 `<workspace>/<configDir>/agents/*.md`，把每个合法文件映射为一个专家与其 mode。
- * 单个文件损坏只产出 warning，不阻断其余专家和启动流程。
+ * 扫描单个专家目录，返回合法专家列表；坏文件以 warning 形式上报，不阻断扫描。
  */
-export function scanExpertModes(options: {
-  workspacePath: string
-  configDirName?: string
-}): RuntimeExpertScanResult & { modes: AgentControllerMode[] } {
-  const directory = expertsDirectory(options.workspacePath, options.configDirName)
-  const warnings: string[] = []
-  if (!existsSync(directory)) return { experts: [], warnings, modes: [] }
-
+function scanExpertsFromDirectory(
+  directory: string,
+  warnings: string[]
+): RuntimeExpertDefinition[] {
+  if (!existsSync(directory)) return []
   const experts: RuntimeExpertDefinition[] = []
   for (const fileName of readdirSync(directory).sort()) {
     if (!fileName.toLowerCase().endsWith('.md')) continue
@@ -125,6 +121,36 @@ export function scanExpertModes(options: {
       continue
     }
     experts.push(expert)
+  }
+  return experts
+}
+
+/**
+ * 扫描 `<workspace>/<configDir>/agents/*.md`，把每个合法文件映射为一个专家与其 mode。
+ * `userDirectory` 提供时同时扫描用户级目录（如 ~/.atlas/agents）；slug 冲突时工作区优先。
+ * 单个文件损坏只产出 warning，不阻断其余专家和启动流程。
+ */
+export function scanExpertModes(options: {
+  workspacePath: string
+  configDirName?: string
+  userDirectory?: string
+}): RuntimeExpertScanResult & { modes: AgentControllerMode[] } {
+  const warnings: string[] = []
+  const workspaceExperts = scanExpertsFromDirectory(
+    expertsDirectory(options.workspacePath, options.configDirName),
+    warnings
+  )
+  const seen = new Set(workspaceExperts.map((expert) => expert.slug))
+  let experts = workspaceExperts
+  if (options.userDirectory) {
+    for (const expert of scanExpertsFromDirectory(options.userDirectory, warnings)) {
+      if (seen.has(expert.slug)) {
+        warnings.push(`${expert.slug}.md: skipped — workspace-level expert with same slug wins`)
+        continue
+      }
+      seen.add(expert.slug)
+      experts = [...experts, expert]
+    }
   }
   return { experts, warnings, modes: experts.map(expertToMode) }
 }
@@ -147,28 +173,49 @@ export function serializeExpertDefinition(input: RuntimeExpertSaveInput): { file
   return { fileName: `${slug}.md`, content }
 }
 
-/** 将专家文件写入 `<workspace>/<configDir>/agents/`；mode 注册需要重建 runtime 后生效。 */
+/**
+ * 将专家文件写入 `<workspace>/<configDir>/agents/`（scope='workspace'，默认）或
+ * 用户级目录（scope='user'，需提供 userDirectory）；mode 注册需要重建 runtime 后生效。
+ */
 export function writeExpertFile(
-  options: { workspacePath: string; configDirName?: string },
+  options: { workspacePath: string; configDirName?: string; userDirectory?: string },
   input: RuntimeExpertSaveInput
 ): { path: string; slug: string; requiresRestart: boolean } {
   const { fileName, content } = serializeExpertDefinition(input)
-  const directory = expertsDirectory(options.workspacePath, options.configDirName)
+  const directory =
+    input.scope === 'user' && options.userDirectory
+      ? options.userDirectory
+      : expertsDirectory(options.workspacePath, options.configDirName)
   mkdirSync(directory, { recursive: true })
   const path = join(directory, fileName)
   writeFileSync(path, content, 'utf8')
   return { path, slug: fileName.slice(0, -3), requiresRestart: true }
 }
 
-/** 删除专家文件；slug 必须是 kebab-case，防路径逃逸。mode 注销同样需要重建 runtime。 */
+/**
+ * 删除专家文件；slug 必须是 kebab-case，防路径逃逸。工作区文件不存在时回退删除
+ * 用户级目录中的同名文件。mode 注销同样需要重建 runtime。
+ */
 export function deleteExpertFile(
-  options: { workspacePath: string; configDirName?: string },
+  options: { workspacePath: string; configDirName?: string; userDirectory?: string },
   slug: string
 ): { removed: boolean; requiresRestart: boolean } {
   const normalized = slug.toLowerCase().replace(/^expert:/, '')
   if (!SLUG_PATTERN.test(normalized)) throw new Error(`Invalid expert slug: ${slug}.`)
-  const path = join(expertsDirectory(options.workspacePath, options.configDirName), `${normalized}.md`)
-  if (!existsSync(path)) return { removed: false, requiresRestart: false }
-  unlinkSync(path)
-  return { removed: true, requiresRestart: true }
+  const workspacePath = join(
+    expertsDirectory(options.workspacePath, options.configDirName),
+    `${normalized}.md`
+  )
+  if (existsSync(workspacePath)) {
+    unlinkSync(workspacePath)
+    return { removed: true, requiresRestart: true }
+  }
+  if (options.userDirectory) {
+    const userPath = join(options.userDirectory, `${normalized}.md`)
+    if (existsSync(userPath)) {
+      unlinkSync(userPath)
+      return { removed: true, requiresRestart: true }
+    }
+  }
+  return { removed: false, requiresRestart: false }
 }

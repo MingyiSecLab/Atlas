@@ -3,6 +3,7 @@ import {
   ChevronDown,
   Copy,
   FileCode,
+  ListChecks,
   Search,
   ShieldCheck,
   Terminal,
@@ -50,6 +51,8 @@ export function ToolHeader({
         return <Search size={14} className="aui-tool-type-icon is-search" />
       case 'security':
         return <ShieldCheck size={14} className="aui-tool-type-icon is-security" />
+      case 'task':
+        return <ListChecks size={14} className="aui-tool-type-icon is-task" />
       case 'general':
       default:
         return <Wrench size={14} className="aui-tool-type-icon is-general" />

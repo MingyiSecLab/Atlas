@@ -189,3 +189,65 @@ describe('controller config integration', () => {
     expect((config.modes ?? []).some((mode) => mode.id.startsWith('expert:'))).toBe(false)
   })
 })
+
+describe('user-level agents directory', () => {
+  function tempUserDir(): string {
+    return tempWorkspace()
+  }
+
+  function writeUserExpert(userDir: string, fileName: string, content: string): void {
+    mkdirSync(userDir, { recursive: true })
+    writeFileSync(join(userDir, fileName), content, 'utf8')
+  }
+
+  it('merges user-level experts into the scan and prefers workspace on slug conflict', () => {
+    const workspace = tempWorkspace()
+    const userDir = tempUserDir()
+    writeExpert(workspace, 'security-auditor.md', VALID_EXPERT)
+    writeUserExpert(userDir, 'security-auditor.md', VALID_EXPERT)
+    writeUserExpert(
+      userDir,
+      'senior-fullstack-architect.md',
+      `---
+name: 全栈架构师
+description: 用户级通用架构人设。
+---
+你是资深全栈架构师。`
+    )
+
+    const result = scanExpertModes({ workspacePath: workspace, userDirectory: userDir })
+    expect(result.experts.map((expert) => expert.slug)).toEqual([
+      'security-auditor',
+      'senior-fullstack-architect'
+    ])
+    expect(result.warnings).toEqual([
+      'security-auditor.md: skipped — workspace-level expert with same slug wins'
+    ])
+    // 工作区来源的安全专家未被用户级同名文件覆盖
+    expect(result.experts[0]!.sourcePath).toBe(
+      join(workspace, '.mastracode', 'agents', 'security-auditor.md')
+    )
+  })
+
+  it('writes scope=user experts into the user directory', () => {
+    const workspace = tempWorkspace()
+    const userDir = tempUserDir()
+    const service = createRuntimeExpertService({ workspacePath: workspace, userDirectory: userDir })
+    const saved = service.save({
+      name: '全栈架构师',
+      description: '用户级通用架构人设。',
+      instructions: '你是资深全栈架构师。',
+      slug: 'senior-fullstack-architect',
+      scope: 'user'
+    })
+    expect(saved.path).toBe(join(userDir, 'senior-fullstack-architect.md'))
+    expect(service.list().map((expert) => expert.slug)).toContain('senior-fullstack-architect')
+
+    // 删除时工作区不存在同名文件则回退用户级目录
+    expect(service.delete('senior-fullstack-architect')).toEqual({
+      removed: true,
+      requiresRestart: true
+    })
+    expect(service.list()).toEqual([])
+  })
+})

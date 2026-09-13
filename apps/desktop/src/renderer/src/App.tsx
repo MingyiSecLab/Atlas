@@ -443,6 +443,7 @@ export const App: React.FC = () => {
               >
                 {currentTaskId ? (
                   <ChatWorkspace
+                    key={currentTaskId}
                     taskId={currentTaskId}
                     taskTitle={currentTask?.title}
                     isSidebarCollapsed={isSidebarCollapsed}

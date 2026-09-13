@@ -2,7 +2,6 @@ import React from 'react'
 import {
   Edit3,
   Trash2,
-  Copy,
   Sparkles,
   Layers,
   Code2,
@@ -22,7 +21,7 @@ interface ExpertCardGridProps {
   onStartChat: (expert: ExpertItem) => void
   onEditExpert: (expert: ExpertItem) => void
   onDeleteExpert: (expertId: string) => void
-  onCloneExpert: (expert: ExpertItem) => void
+  onCloneExpert?: (expert: ExpertItem) => void
 }
 
 function getExpertAvatar(expert: ExpertItem): { icon: React.ReactNode; bg: string } {
@@ -79,7 +78,7 @@ export const ExpertCardGrid: React.FC<ExpertCardGridProps> = ({
   onStartChat,
   onEditExpert,
   onDeleteExpert,
-  onCloneExpert
+  onCloneExpert: _onCloneExpert
 }) => {
   const query = searchQuery.trim().toLowerCase()
 
@@ -125,53 +124,32 @@ export const ExpertCardGrid: React.FC<ExpertCardGridProps> = ({
         </div>
 
         <div className="connector-card-action" onClick={(e) => e.stopPropagation()}>
-          {expert.isCustom ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <button
-                type="button"
-                className="connector-connect-btn"
-                title="编辑角色"
-                onClick={() => onEditExpert(expert)}
-              >
-                <Edit3 size={13} />
-              </button>
-              <button
-                type="button"
-                className="connector-connect-btn"
-                title="删除角色"
-                onClick={() => onDeleteExpert(expert.id)}
-              >
-                <Trash2 size={13} />
-              </button>
-              <button
-                type="button"
-                className="connector-connect-btn is-active"
-                title="立即召唤开启对话"
-                onClick={() => onStartChat(expert)}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <button
-                type="button"
-                className="connector-connect-btn"
-                title="以此为模板创建自定义专家"
-                onClick={() => onCloneExpert(expert)}
-              >
-                <Copy size={13} />
-              </button>
-              <button
-                type="button"
-                className="connector-connect-btn is-active"
-                title="立即召唤开启对话"
-                onClick={() => onStartChat(expert)}
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              type="button"
+              className="connector-connect-btn"
+              title="编辑角色"
+              onClick={() => onEditExpert(expert)}
+            >
+              <Edit3 size={13} />
+            </button>
+            <button
+              type="button"
+              className="connector-connect-btn"
+              title="删除角色"
+              onClick={() => onDeleteExpert(expert.id)}
+            >
+              <Trash2 size={13} />
+            </button>
+            <button
+              type="button"
+              className="connector-connect-btn is-active"
+              title="立即召唤开启对话"
+              onClick={() => onStartChat(expert)}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
         </div>
       </div>
     )

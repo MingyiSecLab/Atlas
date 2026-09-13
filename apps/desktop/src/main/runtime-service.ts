@@ -616,7 +616,7 @@ export function registerRuntimeService(runtimeManager: DesktopRuntimeManager): (
     return runtime.sessions.update(request)
   })
   ipcMain.handle(RUNTIME_IPC.sessionDelete, async (event, input: unknown) => {
-    const runtime = await runtimeForSession(event, input)
+    const runtime = await getRuntime(event.sender)
     await runtime.sessions.delete(sessionId(input))
   })
   ipcMain.handle(RUNTIME_IPC.sessionSendMessage, async (event, input: unknown) => {

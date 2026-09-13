@@ -1,9 +1,8 @@
 import {
   AlertCircle,
-  CheckCircle2,
-  ChevronDown,
-  Clock,
+  ChevronRight,
   FileCode,
+  ListChecks,
   Loader2,
   Search,
   ShieldCheck,
@@ -16,9 +15,9 @@ import { DefaultToolUI } from './DefaultToolUI'
 import { FileOpToolUI } from './FileOpToolUI'
 import { PentestToolUI } from './PentestToolUI'
 import { SearchToolUI } from './SearchToolUI'
+import { TaskToolUI } from './TaskToolUI'
 import { TerminalToolUI } from './TerminalToolUI'
-import { ToolStatusBadge } from './ToolStatusBadge'
-import type { ToolGroupStep } from './types'
+import { formatElapsedMs, type ToolGroupStep } from './types'
 
 interface ToolGroupTimelineProps {
   steps: ToolGroupStep[]
@@ -26,10 +25,9 @@ interface ToolGroupTimelineProps {
 }
 
 export function ToolGroupTimeline({ steps }: ToolGroupTimelineProps): React.ReactNode {
-  // 默认记录哪些 step 被单独展开了
+  // 默认展开正在运行或报错的步骤
   const [expandedSteps, setExpandedSteps] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {}
-    // 如果有正在运行或失败的步骤，默认展开该步骤
     steps.forEach((step) => {
       if (step.toolBlock.status === 'running' || step.toolBlock.status === 'error') {
         initial[step.id] = true
@@ -45,32 +43,27 @@ export function ToolGroupTimeline({ steps }: ToolGroupTimelineProps): React.Reac
     }))
   }
 
-  const getStepIcon = (step: ToolGroupStep): React.ReactNode => {
+  const getStepMiniIcon = (step: ToolGroupStep): React.ReactNode => {
     const status = step.toolBlock.status
     if (status === 'running') {
-      return <Loader2 size={13} className="aui-step-status-icon is-running aui-tool-spinner" />
+      return <Loader2 size={13} className="aui-trace-item-icon is-running aui-tool-spinner" />
     }
     if (status === 'error' || status === 'denied') {
-      return <AlertCircle size={13} className="aui-step-status-icon is-error" />
+      return <AlertCircle size={13} className="aui-trace-item-icon is-error" />
     }
-    if (status === 'success') {
-      return <CheckCircle2 size={13} className="aui-step-status-icon is-success" />
-    }
-    return <Clock size={13} className="aui-step-status-icon is-pending" />
-  }
-
-  const getCategoryMiniIcon = (category: string): React.ReactNode => {
-    switch (category) {
+    switch (step.parsed.category) {
       case 'terminal':
-        return <Terminal size={12} className="aui-step-cat-icon is-terminal" />
+        return <Terminal size={13} className="aui-trace-item-icon is-terminal" />
       case 'file_op':
-        return <FileCode size={12} className="aui-step-cat-icon is-file" />
+        return <FileCode size={13} className="aui-trace-item-icon is-file" />
       case 'search':
-        return <Search size={12} className="aui-step-cat-icon is-search" />
+        return <Search size={13} className="aui-trace-item-icon is-search" />
       case 'security':
-        return <ShieldCheck size={12} className="aui-step-cat-icon is-security" />
+        return <ShieldCheck size={13} className="aui-trace-item-icon is-security" />
+      case 'task':
+        return <ListChecks size={13} className="aui-trace-item-icon is-task" />
       default:
-        return <Wrench size={12} className="aui-step-cat-icon is-general" />
+        return <Wrench size={13} className="aui-trace-item-icon is-general" />
     }
   }
 
@@ -84,6 +77,8 @@ export function ToolGroupTimeline({ steps }: ToolGroupTimelineProps): React.Reac
         return <SearchToolUI block={step.toolBlock} parsed={step.parsed} />
       case 'security':
         return <PentestToolUI block={step.toolBlock} parsed={step.parsed} />
+      case 'task':
+        return <TaskToolUI block={step.toolBlock} parsed={step.parsed} />
       case 'general':
       default:
         return <DefaultToolUI block={step.toolBlock} parsed={step.parsed} />
@@ -91,86 +86,92 @@ export function ToolGroupTimeline({ steps }: ToolGroupTimelineProps): React.Reac
   }
 
   return (
-    <div className="aui-group-timeline">
-      {steps.map((step, idx) => {
+    <div className="aui-trace-list">
+      {steps.map((step) => {
         const isExpanded = Boolean(expandedSteps[step.id])
-        const isLast = idx === steps.length - 1
         const hasContent = Boolean(
           step.toolBlock.input || step.toolBlock.output || step.precedingReasoning
         )
+        const isError = step.toolBlock.status === 'error' || step.toolBlock.status === 'denied'
+        const isRunning = step.toolBlock.status === 'running'
+
+        // 获取单行摘要信息（优先主参数/命令，次之报错原因或输出摘要）
+        const summaryText = isError && step.toolBlock.output
+          ? step.toolBlock.output.slice(0, 80).replace(/\n/g, ' ')
+          : step.parsed.primaryParam || step.toolBlock.summary || ''
 
         return (
           <div
             key={step.id}
-            className={`aui-timeline-item status-${step.toolBlock.status} ${isExpanded ? 'is-expanded' : ''} ${isLast ? 'is-last' : ''}`}
+            className={`aui-trace-item status-${step.toolBlock.status} ${isExpanded ? 'is-expanded' : ''}`}
           >
-            {/* 时间线轴线与左侧状态圆点 */}
-            <div className="aui-timeline-axis">
-              <div className="aui-timeline-node">{getStepIcon(step)}</div>
-              {!isLast ? <div className="aui-timeline-line" /> : null}
-            </div>
+            {/* 单行紧凑 Header（参考 assistant-ui ToolTraceCard / ToolErrorCard） */}
+            <div
+              className={`aui-trace-header ${hasContent ? 'is-clickable' : ''}`}
+              onClick={hasContent ? () => toggleStep(step.id) : undefined}
+              role="button"
+              tabIndex={hasContent ? 0 : undefined}
+              onKeyDown={(e) => {
+                if (hasContent && (e.key === 'Enter' || e.key === ' ')) {
+                  e.preventDefault()
+                  toggleStep(step.id)
+                }
+              }}
+            >
+              <div className="aui-trace-header-main">
+                <span className="aui-trace-icon-slot">{getStepMiniIcon(step)}</span>
 
-            {/* 步骤主体内容 */}
-            <div className="aui-timeline-content">
-              {/* 步骤条 Header */}
-              <div
-                className={`aui-timeline-header ${hasContent ? 'is-clickable' : ''}`}
-                onClick={hasContent ? () => toggleStep(step.id) : undefined}
-                role="button"
-                tabIndex={hasContent ? 0 : undefined}
-                onKeyDown={(e) => {
-                  if (hasContent && (e.key === 'Enter' || e.key === ' ')) {
-                    e.preventDefault()
-                    toggleStep(step.id)
-                  }
-                }}
-              >
-                <div className="aui-timeline-header-left">
-                  <span className="aui-step-cat-wrapper">
-                    {getCategoryMiniIcon(step.parsed.category)}
+                <span className={`aui-trace-name ${isError ? 'is-error' : ''}`}>
+                  {step.toolBlock.name}
+                </span>
+
+                {summaryText ? (
+                  <span
+                    className={`aui-trace-summary ${isError ? 'is-error' : ''}`}
+                    title={summaryText}
+                  >
+                    {summaryText}
                   </span>
-                  <span className="aui-step-display-name">{step.parsed.displayName}</span>
-                  <span className="aui-step-code-name">{step.toolBlock.name}</span>
-
-                  {step.parsed.primaryParam ? (
-                    <span className="aui-step-param-pill" title={step.parsed.primaryParam}>
-                      {step.parsed.primaryParam}
-                    </span>
-                  ) : null}
-                </div>
-
-                <div className="aui-timeline-header-right">
-                  <ToolStatusBadge status={step.toolBlock.status} />
-                  {hasContent ? (
-                    <span className={`aui-step-chevron ${isExpanded ? 'is-expanded' : ''}`}>
-                      <ChevronDown size={13} />
-                    </span>
-                  ) : null}
-                </div>
+                ) : null}
               </div>
 
-              {/* 展开的步骤详情 */}
-              {isExpanded && hasContent ? (
-                <div className="aui-timeline-step-body">
-                  {/* 步骤前思考过程（如果有） */}
-                  {step.precedingReasoning ? (
-                    <div className="aui-step-reasoning-callout">
-                      <div className="aui-step-reasoning-title">
-                        <Sparkles size={11} />
-                        <span>步骤思路</span>
-                      </div>
-                      <div className="aui-step-reasoning-text">{step.precedingReasoning}</div>
-                    </div>
-                  ) : null}
+              <div className="aui-trace-header-meta">
+                {step.toolBlock.elapsedMs !== undefined && !isRunning ? (
+                  <span className="aui-trace-duration">
+                    {formatElapsedMs(step.toolBlock.elapsedMs)}
+                  </span>
+                ) : null}
 
-                  {/* 工具具体 UI 视图 */}
-                  <div className="aui-step-tool-render">{renderStepBody(step)}</div>
-                </div>
-              ) : null}
+                {hasContent ? (
+                  <span className={`aui-trace-chevron ${isExpanded ? 'is-expanded' : ''}`}>
+                    <ChevronRight size={13} />
+                  </span>
+                ) : null}
+              </div>
             </div>
+
+            {/* 展开内容 */}
+            {isExpanded && hasContent ? (
+              <div className="aui-trace-content">
+                {/* 思考过程 */}
+                {step.precedingReasoning ? (
+                  <div className="aui-trace-reasoning">
+                    <div className="aui-trace-reasoning-header">
+                      <Sparkles size={11} />
+                      <span>思考思路</span>
+                    </div>
+                    <div className="aui-trace-reasoning-body">{step.precedingReasoning}</div>
+                  </div>
+                ) : null}
+
+                {/* 工具详情主体 */}
+                <div className="aui-trace-body">{renderStepBody(step)}</div>
+              </div>
+            ) : null}
           </div>
         )
       })}
     </div>
   )
 }
+

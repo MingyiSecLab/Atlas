@@ -14,5 +14,15 @@ export { createHttpRequestTool } from './http-request.js'
 export { createTestEndpointVariationsTool } from './testEndpointVariations.js'
 export { createKaliSandboxTools, KALI_SANDBOX_LOCAL_TARGET } from './kali-sandbox.js'
 export type { KaliSandboxToolOptions } from './kali-sandbox.js'
+export {
+  createDetectSandboxTool,
+  detectSandboxEnvironment,
+  formatDetectSandboxReport
+} from './detect-sandbox.js'
+export type {
+  DetectSandboxDiagnostic,
+  DetectSandboxToolOptions,
+  SandboxStatusLevel
+} from './detect-sandbox.js'
 export { createSecurityMastraTools } from './mastra-adapters.js'
 

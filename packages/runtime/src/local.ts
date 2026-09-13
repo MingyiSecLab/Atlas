@@ -1,5 +1,5 @@
 import { bootLocalAgentController, wireSessionConcerns } from '@mastra/code-sdk'
-import { resolve } from 'node:path'
+import { join, resolve } from 'node:path'
 import { resolvePaths } from './paths.js'
 import { createControllerConfig } from './mastra/controller.js'
 import { createRuntimeModelService, initializeRuntimeModelService } from './models/service.js'
@@ -65,16 +65,19 @@ export async function createLocalRuntime(
 
   const stateSearch = createRuntimeStateSearchService()
   // pentestDataDir 提供时启用 engagement 快照与证据内容的跨重启持久化。
+  // blobsDir 提供时原始证据分流到 <blobsDir>/evidence/（终端大日志、抓包等大文件统一走 blobs）。
   const pentestDataDir = config.pentestDataDir
     ? resolve(config.pentestDataDir)
     : undefined
+  const blobsDir = config.blobsDir ? resolve(config.blobsDir) : undefined
+  const evidenceDir = blobsDir ? join(blobsDir, 'evidence') : pentestDataDir
   const pentest = createRuntimePentestService({
     stateSearch,
     ...(pentestDataDir
-      ? {
-          store: createFilePentestStore({ directory: pentestDataDir }),
-          evidenceStore: createFilePentestEvidenceStore({ directory: pentestDataDir })
-        }
+      ? { store: createFilePentestStore({ directory: pentestDataDir }) }
+      : {}),
+    ...(evidenceDir
+      ? { evidenceStore: createFilePentestEvidenceStore({ directory: evidenceDir }) }
       : {})
   })
 
@@ -94,6 +97,8 @@ export async function createLocalRuntime(
     models: config.models,
     extraTools: config.extraTools,
     disabledTools: config.disabledTools,
+    ...(config.vector ? { vector: config.vector } : {}),
+    ...(config.userAgentsDir ? { userAgentsDir: config.userAgentsDir } : {}),
     observationalMemory: config.observationalMemory,
     pentestService: pentest,
     ...(sandbox ? { sandbox } : {})
@@ -135,11 +140,13 @@ export async function createLocalRuntime(
     configDir: controllerConfig.configDir
   })
   const om = createRuntimeOmService({ controller, defaultSession: session })
-  // 工作区专家文件服务（<configDir>/agents/*.md 的扫描与写回）；mode 注册发生在
-  // Controller 构造时（createControllerConfig 内扫描），save 后需重连工作区生效。
+  // 工作区专家文件服务（<configDir>/agents/*.md 的扫描与写回；userAgentsDir 提供时
+  // 同时合并用户级目录）；mode 注册发生在 Controller 构造时（createControllerConfig
+  // 内扫描），save 后需重连工作区生效。
   const experts = createRuntimeExpertService({
     workspacePath: paths.workspacePath,
-    configDirName: controllerConfig.configDir
+    configDirName: controllerConfig.configDir,
+    ...(config.userAgentsDir ? { userDirectory: config.userAgentsDir } : {})
   })
   // projectsDataDir 提供时启用项目空间登记的跨重启持久化（<dir>/projects.json）。
   const projects = createRuntimeProjectService({

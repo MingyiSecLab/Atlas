@@ -42,4 +42,4 @@ Playwright 测试文件使用 `*.spec.ts`，Vitest 测试文件使用 `*.test.ts
 
 ## 提交与 Pull Request 指南
 
-仓库目前还没有提交历史。请使用简洁的 Conventional Commits 格式，例如 `feat(runtime): add provider model resolution` 或 `fix(desktop): restore terminal focus`。Pull Request 应说明行为变化和架构影响，关联对应 issue 或任务，列出验证命令；涉及 renderer 的变更需附截图。禁止提交密钥，并在 `.env.example` 中记录新增环境变量。
+仓库目前还没有提交历史。请使用简洁的 Conventional Commits 格式，例如 `feat(runtime): add provider model resolution` 或 `fix(desktop): restore terminal focus`。Pull Request 应说明行为变化和架构影响，关联对应 issue 或任务，列出验证命令；涉及 renderer 的变更需附截图。禁止提交密钥；新增环境变量需在 `CLAUDE.md` 的「环境变量」一节记录（应用不加载 `.env` 文件）。

@@ -1,6 +1,6 @@
 import type { ChatBlock, ReasoningBlock, ToolBlock } from '../types'
 
-export type ToolCategory = 'terminal' | 'file_op' | 'search' | 'security' | 'general'
+export type ToolCategory = 'terminal' | 'file_op' | 'search' | 'security' | 'task' | 'general'
 
 export interface ParsedToolCall {
   category: ToolCategory
@@ -37,6 +37,18 @@ export interface ToolGroupSummary {
   runningStepName?: string
   categoryPills: string[]
   headline: string
+  /** 已结算步骤的耗时总和（毫秒）；0 表示无计时数据 */
+  totalElapsedMs: number
+}
+
+/** 耗时格式化：<1s 毫秒，<60s 一位小数秒，≥60s "2m 30s" */
+export function formatElapsedMs(ms: number): string {
+  if (ms < 1000) return `${ms}ms`
+  const seconds = ms / 1000
+  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  const minutes = Math.floor(seconds / 60)
+  const rest = Math.round(seconds - minutes * 60)
+  return rest > 0 ? `${minutes}m ${rest}s` : `${minutes}m`
 }
 
 /**
@@ -74,6 +86,28 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
   const name = block.name.toLowerCase()
   const args = safeParseJson(block.input)
   const isJsonArgs = args !== null
+
+  // 0. 内置任务跟踪工具（task_write/update/complete/check）→ checklist
+  if (
+    name === 'task_write' ||
+    name === 'task_update' ||
+    name === 'task_complete' ||
+    name === 'task_check'
+  ) {
+    return {
+      category: 'task',
+      displayName:
+        name === 'task_write'
+          ? '更新任务清单'
+          : name === 'task_check'
+            ? '检查任务状态'
+            : name === 'task_complete'
+              ? '完成任务'
+              : '更新任务',
+      parsedArgs: args,
+      isJsonArgs
+    }
+  }
 
   // 1. 终端/命令行类别 (run_command, kali_exec, bash, exec, etc.)
   if (
@@ -270,6 +304,7 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
   })
 
   // 生成 Headline 文案
+  const totalElapsedMs = steps.reduce((sum, step) => sum + (step.toolBlock.elapsedMs ?? 0), 0)
   let headline = ''
   if (isRunning) {
     headline = runningStepName
@@ -279,6 +314,9 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
     headline = `已执行 ${totalCount} 个步骤 (${successCount} 成功, ${errorCount} 失败)`
   } else {
     headline = `已完成 ${totalCount} 个步骤`
+  }
+  if (!isRunning && totalElapsedMs > 0) {
+    headline += ` · ${formatElapsedMs(totalElapsedMs)}`
   }
 
   return {
@@ -290,7 +328,8 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
     runningIndex,
     runningStepName,
     categoryPills,
-    headline
+    headline,
+    totalElapsedMs
   }
 }
 

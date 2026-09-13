@@ -1,15 +1,28 @@
 import { ChevronDown } from 'lucide-react'
-import type { RuntimeSkillInfo } from '@mingyi/runtime'
+import { ThreadPrimitive, useAui, useAuiState } from '@assistant-ui/react'
+import type { ThreadMessage } from '@assistant-ui/react'
+import type {
+  RuntimePentestCreationIntent,
+  RuntimeSessionEvent,
+  RuntimeSessionMessage,
+  RuntimeSessionSnapshot,
+  RuntimeSkillInfo
+} from '@mingyi/runtime'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useWorkspace } from '../../state/WorkspaceProvider'
 import { Composer } from './Composer'
 import { AccessRequestCard } from './AccessRequestCard'
 import { PentestCreateCard } from './PentestCreateCard'
 import { AssistantMessage, ErrorMessage, UserMessage } from './MessageView'
-import type { RuntimePentestCreationIntent } from '@mingyi/runtime'
 import type { ExpertItem } from '../hub/hub-types'
 import { MessageQueue, type QueuedItem } from './MessageQueue'
-import { messageSkill, messageText, type ChatImageAttachment, type ChatTimelineItem } from './types'
+import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
+import {
+  partsToChatBlocks,
+  readAssistantMetadata,
+  runtimeMessageToThreadMessageLike
+} from './runtime/converter'
+import { SessionChatProvider, type SessionChatBoot } from './runtime/SessionChatProvider'
 
 interface ChatWorkspaceProps {
   taskId: string
@@ -40,35 +53,75 @@ function mergePentestIntent(
   }
 }
 
-function getMinimapItemPreview(item: ChatTimelineItem): { title: string; text: string } {
+interface MinimapItem {
+  id: string
+  role: 'user' | 'assistant' | 'error'
+  timestamp?: string
+  blocks: ChatBlock[]
+  attachmentCount: number
+  modelName?: string
+  content?: string
+}
+
+function formatTimestamp(value: string | Date): string {
+  try {
+    const date = typeof value === 'string' ? new Date(value) : value
+    return date.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit'
+    })
+  } catch {
+    return '刚刚'
+  }
+}
+
+function minimapItemFromMessage(message: ThreadMessage): MinimapItem {
+  const metadata = readAssistantMetadata(message)
+  return {
+    id: metadata.runtimeMessageId ?? message.id,
+    role: message.role === 'user' ? 'user' : 'assistant',
+    timestamp: formatTimestamp(message.createdAt),
+    blocks: partsToChatBlocks(message.content),
+    attachmentCount: message.content.filter((part) => part.type === 'image').length,
+    ...(metadata.modelName ? { modelName: metadata.modelName } : {})
+  }
+}
+
+function getMinimapItemPreview(item: MinimapItem): { title: string; text: string } {
   if (item.role === 'error') {
     return { title: '错误', text: item.content || '发生错误' }
   }
   const roleTitle = item.role === 'user' ? '用户' : item.modelName || '助手'
-  const text = messageText(item).trim()
+  const text = item.blocks
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text)
+    .join('\n')
+    .trim()
   if (text) {
     return { title: roleTitle, text: text.length > 180 ? `${text.slice(0, 180)}…` : text }
   }
-  const skill = messageSkill(item)
+  const skill = item.blocks.find(
+    (block): block is Extract<ChatBlock, { type: 'skill' }> => block.type === 'skill'
+  )
   if (skill) {
     return {
       title: roleTitle,
       text: `技能: /${skill.name}${skill.arguments ? ` ${skill.arguments}` : ''}`
     }
   }
-  const toolBlock = item.blocks?.find((b) => b?.type === 'tool')
-  if (toolBlock && 'name' in toolBlock) {
+  const toolBlock = item.blocks.find((block) => block?.type === 'tool')
+  if (toolBlock && toolBlock.type === 'tool') {
     return { title: roleTitle, text: `工具调用: ${toolBlock.name}` }
   }
-  const reasoningBlock = item.blocks?.find((b) => b?.type === 'reasoning')
-  if (reasoningBlock && 'text' in reasoningBlock && reasoningBlock.text) {
+  const reasoningBlock = item.blocks.find((block) => block?.type === 'reasoning')
+  if (reasoningBlock && reasoningBlock.type === 'reasoning' && reasoningBlock.text) {
     return {
       title: roleTitle,
       text: `思考: ${reasoningBlock.text.slice(0, 120)}…`
     }
   }
-  if (item.attachments?.length) {
-    return { title: roleTitle, text: `[包含 ${item.attachments.length} 个附件]` }
+  if (item.attachmentCount > 0) {
+    return { title: roleTitle, text: `[包含 ${item.attachmentCount} 个附件]` }
   }
   return { title: roleTitle, text: '无文本内容' }
 }
@@ -77,7 +130,7 @@ function ConversationMinimap({
   items,
   visible
 }: {
-  items: ChatTimelineItem[]
+  items: MinimapItem[]
   visible: boolean
 }): React.ReactNode {
   if (!visible) return null
@@ -117,29 +170,90 @@ function ConversationMinimap({
   )
 }
 
+/** sessions.get 快照 → boot（历史 hydrate + 运行中消息的 resume 种子） */
+function buildBoot(snapshot: RuntimeSessionSnapshot): SessionChatBoot {
+  const overlay = new Map<string, 'waiting_approval' | 'denied'>()
+  for (const request of snapshot.accessRequests ?? []) {
+    if (request?.toolCallId) overlay.set(request.toolCallId, 'waiting_approval')
+  }
+  const messages = Array.isArray(snapshot.messages) ? snapshot.messages : []
+  let history = messages
+  let resumeSeed: RuntimeSessionMessage[] | undefined
+  if (snapshot.isRunning) {
+    const last = messages[messages.length - 1]
+    if (last?.role === 'assistant') {
+      history = messages.slice(0, -1)
+      resumeSeed = [last]
+    }
+  }
+  return {
+    messages: history.map((message) => runtimeMessageToThreadMessageLike(message, overlay)),
+    isRunning: snapshot.isRunning,
+    ...(resumeSeed ? { resumeSeed, resumeOverlay: overlay } : {}),
+    accessRequests: snapshot.accessRequests ?? []
+  }
+}
+
 export function ChatWorkspace({
   taskId,
   isSidebarCollapsed = false
 }: ChatWorkspaceProps): React.ReactNode {
-  const {
-    snapshots,
-    modelIds,
-    modes,
-    loadSession,
-    updateSession,
-    sendMessage: appendMessage,
-    invokeSkill,
-    respondToAccessRequest,
-    abortSession
-  } = useWorkspace()
+  const [boot, setBoot] = useState<SessionChatBoot | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    window.api.sessions
+      .get(taskId)
+      .then((snapshot) => {
+        if (!cancelled) setBoot(buildBoot(snapshot))
+      })
+      .catch(() => {
+        if (!cancelled) setBoot({ messages: [], isRunning: false, accessRequests: [] })
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [taskId])
+
+  if (!boot) {
+    return <section className="chat-workspace" aria-busy="true" />
+  }
+
+  return (
+    <SessionChatProvider sessionId={taskId} boot={boot}>
+      <ChatWorkspaceInner
+        taskId={taskId}
+        isSidebarCollapsed={isSidebarCollapsed}
+        initialAccessRequests={boot.accessRequests}
+      />
+    </SessionChatProvider>
+  )
+}
+
+function ChatWorkspaceInner({
+  taskId,
+  isSidebarCollapsed,
+  initialAccessRequests
+}: {
+  taskId: string
+  isSidebarCollapsed: boolean
+  initialAccessRequests: SessionChatBoot['accessRequests']
+}): React.ReactNode {
+  const { snapshots, modelIds, modes, updateSession, respondToAccessRequest, abortSession } =
+    useWorkspace()
   const snapshot = snapshots[taskId]
-  const timeline = useMemo(() => snapshot?.timeline ?? [], [snapshot])
+  const aui = useAui()
+  const messages = useAuiState((s) => s.thread.messages)
+  const isRunning = useAuiState((s) => s.thread.isRunning)
+
   const [input, setInput] = useState('')
   const [selectedSkill, setSelectedSkill] = useState<RuntimeSkillInfo | undefined>()
   const [pentestIntent, setPentestIntent] = useState<RuntimePentestCreationIntent | null>(null)
   const [pentestIntentBusy, setPentestIntentBusy] = useState(false)
   const [pentestIntentError, setPentestIntentError] = useState<string | null>(null)
   const [showScrollButton, setShowScrollButton] = useState(false)
+  const [accessRequests, setAccessRequests] = useState(initialAccessRequests)
+  const [errorItems, setErrorItems] = useState<ChatError[]>([])
   const workspaceRef = useRef<HTMLElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerHeightRef = useRef(112)
@@ -149,13 +263,32 @@ export function ChatWorkspace({
   const model = snapshot?.modelId ?? '未选择模型'
   const permission = snapshot?.permissionProfileId ?? 'Pentest'
   const modeOptions = useMemo(() => modes.map((m) => m.name), [modes])
-  const isStreaming = snapshot?.isRunning ?? false
-  const accessRequests = snapshot?.accessRequests ?? []
+  const isStreaming = isRunning
   const activeAccessRequest = accessRequests[0]
 
+  // 审批请求与错误事件由本组件独立订阅（不进入消息流）
   useEffect(() => {
-    if (!snapshot || !snapshot.loaded) void loadSession(taskId)
-  }, [loadSession, snapshot, taskId])
+    const unsubscribe = window.api.sessions.onEvent((event: RuntimeSessionEvent) => {
+      if (event.type === 'session_changed') return
+      if (event.sessionId !== taskId) return
+      if (event.type === 'access_request') {
+        setAccessRequests((current) => [
+          ...current.filter((request) => request.toolCallId !== event.request.toolCallId),
+          event.request
+        ])
+      } else if (event.type === 'access_request_resolved') {
+        setAccessRequests((current) =>
+          current.filter((request) => request.toolCallId !== event.toolCallId)
+        )
+      } else if (event.type === 'error') {
+        setErrorItems((current) => [
+          ...current,
+          { id: `error-${crypto.randomUUID()}`, role: 'error', content: event.message }
+        ])
+      }
+    })
+    return unsubscribe
+  }, [taskId])
 
   const scrollConversationToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
     const element = scrollRef.current
@@ -166,7 +299,7 @@ export function ChatWorkspace({
   useEffect(() => {
     if (!shouldFollowRef.current) return
     window.requestAnimationFrame(() => scrollConversationToBottom())
-  }, [scrollConversationToBottom, timeline])
+  }, [scrollConversationToBottom, messages, errorItems])
 
   const updateDistanceFromBottom = useCallback(() => {
     const element = scrollRef.current
@@ -226,13 +359,13 @@ export function ChatWorkspace({
   }, [])
 
   const executeMessage = useCallback(
-    async (payload: {
+    (payload: {
       text: string
       attachments?: ChatImageAttachment[]
       goalMode?: boolean
       expert?: ExpertItem
       skill?: RuntimeSkillInfo
-    }): Promise<void> => {
+    }): void => {
       const { text, attachments = [], goalMode, expert, skill } = payload
       const command = /^\/skill\/([^\s]+)(?:\s+([\s\S]*))?$/.exec(text)
       const skillName = skill?.name ?? command?.[1]
@@ -240,46 +373,72 @@ export function ChatWorkspace({
       if (!skillName && !text && attachments.length === 0) return
       shouldFollowRef.current = true
 
+      const imageParts = attachments.map((attachment) => ({
+        type: 'image' as const,
+        image: attachment.url,
+        filename: attachment.name
+      }))
+
       if (skillName) {
-        await invokeSkill({
-          sessionId: taskId,
-          skillName,
-          arguments: skillArguments,
-          attachments
+        aui.thread.append({
+          role: 'user',
+          content: [
+            ...imageParts,
+            {
+              type: 'data' as const,
+              name: 'skill',
+              data: {
+                type: 'skill',
+                name: skillName,
+                ...(skillArguments ? { arguments: skillArguments } : {})
+              }
+            }
+          ],
+          metadata: {
+            custom: { skillInvocation: { name: skillName, arguments: skillArguments } }
+          }
         })
-      } else {
-        await appendMessage({
-          sessionId: taskId,
-          text,
-          attachments,
-          goalMode,
-          expertPrompt: expert?.systemPrompt,
-          expertName: expert?.name
-        })
-        if (attachments.length === 0 && (pentestIntent || isExplicitPentestCreationIntent(text))) {
-          setPentestIntentBusy(true)
-          setPentestIntentError(null)
-          try {
-            const intent = await window.api.pentest.parseIntent(text, pentestIntent ?? undefined)
+        return
+      }
+
+      aui.thread.append({
+        role: 'user',
+        content: [...imageParts, ...(text ? [{ type: 'text' as const, text }] : [])],
+        metadata: {
+          custom: {
+            ...(goalMode ? { goalMode: true } : {}),
+            ...(expert?.systemPrompt ? { expertPrompt: expert.systemPrompt } : {}),
+            ...(expert?.name ? { expertName: expert.name } : {})
+          }
+        }
+      })
+
+      if (attachments.length === 0 && (pentestIntent || isExplicitPentestCreationIntent(text))) {
+        setPentestIntentBusy(true)
+        setPentestIntentError(null)
+        void window.api.pentest
+          .parseIntent(text, pentestIntent ?? undefined)
+          .then((intent) => {
             if (intent.wantsEngagement) {
               setPentestIntent((current) => mergePentestIntent(current, intent))
             }
-          } catch (cause) {
+          })
+          .catch((cause: unknown) => {
             setPentestIntentError(cause instanceof Error ? cause.message : String(cause))
-          } finally {
+          })
+          .finally(() => {
             setPentestIntentBusy(false)
-          }
-        }
+          })
       }
     },
-    [appendMessage, invokeSkill, pentestIntent, taskId]
+    [aui, pentestIntent]
   )
 
   const sendMessage = useCallback(
-    async (
+    (
       attachments: ChatImageAttachment[],
       options?: { goalMode?: boolean; expert?: ExpertItem }
-    ): Promise<void> => {
+    ): void => {
       const text = input.trim()
       if (!selectedSkill && !text && attachments.length === 0) return
 
@@ -301,18 +460,13 @@ export function ChatWorkspace({
 
       setInput('')
       setSelectedSkill(undefined)
-      try {
-        await executeMessage({
-          text,
-          attachments,
-          goalMode: options?.goalMode,
-          expert: options?.expert,
-          skill: selectedSkill
-        })
-      } catch {
-        setInput(text)
-        if (selectedSkill) setSelectedSkill(selectedSkill)
-      }
+      executeMessage({
+        text,
+        attachments,
+        goalMode: options?.goalMode,
+        expert: options?.expert,
+        skill: selectedSkill
+      })
     },
     [executeMessage, input, isStreaming, selectedSkill]
   )
@@ -327,9 +481,7 @@ export function ChatWorkspace({
         if (current.length === 0) return current
         const [nextMessage, ...rest] = current
         window.requestAnimationFrame(() => {
-          void executeMessage(nextMessage).catch(() => {
-            // 忽略排队自动执行非阻塞异常
-          })
+          executeMessage(nextMessage)
         })
         return rest
       })
@@ -339,121 +491,132 @@ export function ChatWorkspace({
   const isPentestMode = permission.toLowerCase() === 'pentest'
   const isAuditMode = permission.toLowerCase() === 'audit'
 
+  const minimapItems = useMemo(() => {
+    const items = messages.map(minimapItemFromMessage)
+    for (const error of errorItems) {
+      items.push({
+        id: error.id,
+        role: 'error',
+        blocks: [],
+        attachmentCount: 0,
+        content: error.content
+      })
+    }
+    return items
+  }, [messages, errorItems])
+
   return (
-    <section
-      ref={workspaceRef}
-      className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
-    >
-      <ConversationMinimap items={timeline} visible={isSidebarCollapsed} />
-      <div ref={scrollRef} className="chat-scroll" onScroll={updateDistanceFromBottom}>
-        <div className="chat-timeline" data-markdown-scroll-container>
-          {timeline.map((item) => {
-            if (!item) return null
-            if (item.role === 'error') return <ErrorMessage key={item.id} error={item} />
-            if (item.role === 'user') return <UserMessage key={item.id} message={item} />
-            return <AssistantMessage key={item.id} message={item} />
-          })}
-          {isStreaming && (!timeline.length || timeline[timeline.length - 1]?.role === 'user') ? (
-            <AssistantMessage
-              key="pending-assistant-stream"
-              message={{
-                id: 'pending-assistant-stream',
-                role: 'assistant',
-                isStreaming: true,
-                blocks: [],
-                timestamp: '刚刚',
-                modelName: model !== '未选择模型' ? model : undefined
-              }}
-            />
-          ) : null}
-          {pentestIntentBusy ? (
-            <p className="chat-pentest-intent-loading">正在生成评估草稿…</p>
-          ) : null}
-          {pentestIntentError ? (
-            <p className="chat-pentest-intent-error" role="alert">
-              {pentestIntentError}
-            </p>
-          ) : null}
-          {pentestIntent ? (
-            <PentestCreateCard
-              intent={pentestIntent}
-              onDismiss={() => {
-                setPentestIntent(null)
-                setPentestIntentError(null)
-              }}
-              onConfirm={async (draft) => {
-                await window.api.pentest.create(draft)
-                setPentestIntent(null)
-                setPentestIntentError(null)
-              }}
-            />
-          ) : null}
-          <div className="chat-bottom-anchor" />
+    <ThreadPrimitive.Root asChild>
+      <section
+        ref={workspaceRef}
+        className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
+      >
+        <ConversationMinimap items={minimapItems} visible={isSidebarCollapsed} />
+        <div ref={scrollRef} className="chat-scroll" onScroll={updateDistanceFromBottom}>
+          <ThreadPrimitive.ViewportProvider>
+            <div className="chat-timeline" data-markdown-scroll-container>
+              <ThreadPrimitive.Messages>
+                {({ message }) =>
+                  message.role === 'user' ? (
+                    <UserMessage message={message} />
+                  ) : (
+                    <AssistantMessage message={message} />
+                  )
+                }
+              </ThreadPrimitive.Messages>
+              {errorItems.map((error) => (
+                <ErrorMessage key={error.id} error={error} />
+              ))}
+              {pentestIntentBusy ? (
+                <p className="chat-pentest-intent-loading">正在生成评估草稿…</p>
+              ) : null}
+              {pentestIntentError ? (
+                <p className="chat-pentest-intent-error" role="alert">
+                  {pentestIntentError}
+                </p>
+              ) : null}
+              {pentestIntent ? (
+                <PentestCreateCard
+                  intent={pentestIntent}
+                  onDismiss={() => {
+                    setPentestIntent(null)
+                    setPentestIntentError(null)
+                  }}
+                  onConfirm={async (draft) => {
+                    await window.api.pentest.create(draft)
+                    setPentestIntent(null)
+                    setPentestIntentError(null)
+                  }}
+                />
+              ) : null}
+              <div className="chat-bottom-anchor" />
+            </div>
+          </ThreadPrimitive.ViewportProvider>
         </div>
-      </div>
-      {showScrollButton && !activeAccessRequest ? (
-        <button
-          className="chat-scroll-bottom"
-          type="button"
-          aria-label="滚动到底部"
-          title="滚动到底部"
-          onClick={() => {
-            shouldFollowRef.current = true
-            scrollConversationToBottom('smooth')
+        {showScrollButton && !activeAccessRequest ? (
+          <button
+            className="chat-scroll-bottom"
+            type="button"
+            aria-label="滚动到底部"
+            title="滚动到底部"
+            onClick={() => {
+              shouldFollowRef.current = true
+              scrollConversationToBottom('smooth')
+            }}
+          >
+            <ChevronDown size={16} />
+          </button>
+        ) : null}
+        {activeAccessRequest ? (
+          <div className="chat-approval-dock" data-testid="chat-approval-dock">
+            <AccessRequestCard
+              key={activeAccessRequest.toolCallId}
+              request={activeAccessRequest}
+              pendingCount={accessRequests.length}
+              onRespond={(approved) =>
+                respondToAccessRequest({
+                  sessionId: taskId,
+                  toolCallId: activeAccessRequest.toolCallId,
+                  approved
+                })
+              }
+            />
+          </div>
+        ) : null}
+        <MessageQueue
+          isRunning={isStreaming}
+          runningText={isStreaming ? 'AI 正在处理当前任务，完成后将自动发送' : undefined}
+          queued={queuedMessages}
+          onCancelItem={handleCancelQueued}
+          onSteerItem={handleSteerQueued}
+          onEditItem={handleEditQueued}
+          onClearAll={handleClearQueued}
+        />
+        <Composer
+          value={input}
+          model={model}
+          modelOptions={modelIds}
+          permission={permission}
+          modeOptions={modeOptions}
+          sessionId={taskId}
+          selectedSkill={selectedSkill}
+          tokenUsage={snapshot?.tokenUsage}
+          queuedCount={queuedMessages.length}
+          onSkillSelect={setSelectedSkill}
+          onSkillClear={() => setSelectedSkill(undefined)}
+          isStreaming={isStreaming}
+          onChange={setInput}
+          onModelChange={(modelId) => {
+            void updateSession({ sessionId: taskId, modelId })
           }}
-        >
-          <ChevronDown size={16} />
-        </button>
-      ) : null}
-      {activeAccessRequest ? (
-        <div className="chat-approval-dock" data-testid="chat-approval-dock">
-          <AccessRequestCard
-            key={activeAccessRequest.toolCallId}
-            request={activeAccessRequest}
-            pendingCount={accessRequests.length}
-            onRespond={(approved) =>
-              respondToAccessRequest({
-                sessionId: taskId,
-                toolCallId: activeAccessRequest.toolCallId,
-                approved
-              })
-            }
-          />
-        </div>
-      ) : null}
-      <MessageQueue
-        isRunning={isStreaming}
-        runningText={isStreaming ? 'AI 正在处理当前任务，完成后将自动发送' : undefined}
-        queued={queuedMessages}
-        onCancelItem={handleCancelQueued}
-        onSteerItem={handleSteerQueued}
-        onEditItem={handleEditQueued}
-        onClearAll={handleClearQueued}
-      />
-      <Composer
-        value={input}
-        model={model}
-        modelOptions={modelIds}
-        permission={permission}
-        modeOptions={modeOptions}
-        sessionId={taskId}
-        selectedSkill={selectedSkill}
-        tokenUsage={snapshot?.tokenUsage}
-        queuedCount={queuedMessages.length}
-        onSkillSelect={setSelectedSkill}
-        onSkillClear={() => setSelectedSkill(undefined)}
-        isStreaming={isStreaming}
-        onChange={setInput}
-        onModelChange={(modelId) => {
-          void updateSession({ sessionId: taskId, modelId })
-        }}
-        onPermissionChange={(permissionProfileId) => {
-          void updateSession({ sessionId: taskId, permissionProfileId })
-        }}
-        onHeightChange={updateComposerHeight}
-        onSend={(attachments, options) => void sendMessage(attachments, options)}
-        onStop={() => void abortSession(taskId)}
-      />
-    </section>
+          onPermissionChange={(permissionProfileId) => {
+            void updateSession({ sessionId: taskId, permissionProfileId })
+          }}
+          onHeightChange={updateComposerHeight}
+          onSend={(attachments, options) => sendMessage(attachments, options)}
+          onStop={() => void abortSession(taskId)}
+        />
+      </section>
+    </ThreadPrimitive.Root>
   )
 }

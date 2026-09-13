@@ -7,7 +7,7 @@
 ## 架构定位
 
 * **桌面端为唯一大脑**：所有模型推理、会话规划、状态空间（Facts/Intents 图）与用户交互均在 Mingyi 桌面端完成；
-* **沙箱为纯执行环境**：移除了容器内套娃的 Claude Code / Codex 等 Agent CLI，容器以常驻进程挂起，通过 Docker API / `docker exec` 受控接收桌面端下发的各项安全指令。
+* **沙箱为纯执行环境**：容器以常驻进程挂起，通过 Docker API / `docker exec` 受控接收桌面端下发的各项安全指令。
 
 ---
 

@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow } from 'electron'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -8,20 +9,28 @@ import { DesktopRuntimeManager } from './runtime-manager'
 import { registerRuntimeService } from './runtime-service'
 import { registerTerminalService, watchTerminalOwner } from './terminal-service'
 import { registerFileService } from './file-service'
-import { registerEnvironmentService } from './environment-service'
+
+// 应用级数据统一落盘 ~/.atlas（desktop 动态计算，无需 .env 配置）：
+//   atlas.db（SQLite：任务/会话历史/消息流/状态机）、vectors.db（向量记忆与检索索引）、
+//   observability.duckdb（Trace）、auth.json（Provider 凭证）、settings.json（全局设置）、
+//   agents/（用户级专家）、projects/（项目登记）、blobs/（大文件分流）、pentest/（engagement 快照）。
+// 以下均为 code-sdk 原生环境变量，必须在 runtime 首次 boot 之前设置；
+// 用 ||= 保留外部显式设置（调试用途），正常使用零配置。
+const atlasHome = join(homedir(), '.atlas')
+process.env.MASTRA_APP_DATA_DIR ||= atlasHome
+process.env.MASTRA_DB_PATH ||= join(atlasHome, 'atlas.db')
+process.env.MASTRA_OBSERVABILITY_DB_PATH ||= join(atlasHome, 'observability.duckdb')
 
 let disposeTerminalService = (): void => undefined
 let disposeProviderService = (): void => undefined
 let disposeRuntimeService = (): void => undefined
 let disposePentestService = (): void => undefined
 let disposeFileService = (): void => undefined
-let disposeEnvironmentService = (): void => undefined
-const runtimeManager = new DesktopRuntimeManager(process.env.MINGYI_WORKSPACE_PATH)
+const runtimeManager = new DesktopRuntimeManager(process.env.MINGYI_WORKSPACE_PATH, atlasHome)
 let shutdownStarted = false
 let servicesStopped = false
 
 async function shutdownServices(): Promise<void> {
-  disposeEnvironmentService()
   disposeFileService()
   disposeProviderService()
   disposeRuntimeService()
@@ -94,12 +103,11 @@ app
       optimizer.watchWindowShortcuts(window)
     })
 
-    disposeTerminalService = registerTerminalService()
+    disposeTerminalService = registerTerminalService(join(atlasHome, 'blobs'))
     disposeProviderService = registerProviderService(runtimeManager)
     disposeRuntimeService = registerRuntimeService(runtimeManager)
     disposePentestService = registerPentestService(runtimeManager)
     disposeFileService = registerFileService(runtimeManager)
-    disposeEnvironmentService = registerEnvironmentService(runtimeManager)
 
     if (process.platform === 'darwin' && app.dock) {
       app.dock.setIcon(icon)

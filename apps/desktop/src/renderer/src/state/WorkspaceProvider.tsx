@@ -1,9 +1,7 @@
 import type {
   RuntimeSessionEvent,
-  RuntimeSessionMessage,
   RuntimeSessionSnapshot,
   RuntimeSessionSummary as RuntimeSummary,
-  RuntimeAccessRequest,
   RuntimeTokenUsage
 } from '@mingyi/runtime'
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
@@ -13,18 +11,6 @@ import type {
   DesktopWorkspaceInfo,
   RuntimeModeInfo
 } from '../../../shared/runtime-ipc'
-import type {
-  ChatImageAttachment,
-  ChatMessage,
-  ChatTimelineItem,
-  ImageMimeType
-} from '../components/chat/types'
-import {
-  createOptimisticSkillMessage,
-  createOptimisticUserMessage,
-  mergeTimelineMessage
-} from './chat-timeline'
-import { parseSkillActivation } from '../components/chat/skills/skill-activation'
 
 export interface SessionSummary {
   id: string
@@ -40,11 +26,11 @@ export interface SessionSummary {
   tokenUsage?: RuntimeTokenUsage
 }
 
-export interface SessionSnapshot extends SessionSummary {
-  timeline: ChatTimelineItem[]
-  accessRequests: RuntimeAccessRequest[]
-  loaded: boolean
-}
+/**
+ * WorkspaceProvider 现在只承载 Shell 级状态（工作区/项目/模型/模式/会话摘要）。
+ * 消息 timeline、审批状态与乐观消息合并已迁移到
+ * components/chat/runtime/（assistant-ui LocalRuntime）。
+ */
 
 interface CreateSessionInput {
   title?: string
@@ -61,165 +47,79 @@ interface UpdateSessionInput {
   permissionProfileId?: string
 }
 
-interface SendMessageInput {
+export interface SendMessageInput {
   sessionId: string
   text: string
-  attachments?: ChatImageAttachment[]
+  attachments?: Array<{ name: string; mimeType: string; url: string }>
   goalMode?: boolean
   expertPrompt?: string
   expertName?: string
 }
 
-interface InvokeSkillInput {
+export interface InvokeSkillInput {
   sessionId: string
   skillName: string
   arguments: string
-  attachments?: ChatImageAttachment[]
+  attachments?: Array<{ name: string; mimeType: string; url: string }>
 }
 
-interface RespondAccessRequestInput {
+export interface RespondAccessRequestInput {
   sessionId: string
   toolCallId: string
   approved: boolean
 }
 
-interface WorkspaceContextValue {
+export interface WorkspaceContextValue {
   workspace: DesktopWorkspaceInfo | null
   projects: DesktopProjectInfo[]
   isLoading: boolean
   error: string | null
-  clearError(): void
   modelIds: string[]
   modes: RuntimeModeInfo[]
   sessions: SessionSummary[]
-  snapshots: Record<string, SessionSnapshot>
-  selectWorkspace(): Promise<void>
-  reloadProjects(): Promise<void>
-  createProject(input: { rootPath: string; name?: string }): Promise<DesktopProjectInfo>
-  openProject(projectId: string): Promise<DesktopProjectOpenResult>
-  renameProject(projectId: string, name: string): Promise<void>
-  removeProject(projectId: string): Promise<void>
-  loadSession(sessionId: string): Promise<SessionSnapshot>
-  createSession(input: CreateSessionInput): Promise<SessionSnapshot>
-  updateSession(input: UpdateSessionInput): Promise<void>
-  deleteSession(sessionId: string): Promise<void>
-  sendMessage(input: SendMessageInput): Promise<void>
-  invokeSkill(input: InvokeSkillInput): Promise<void>
-  respondToAccessRequest(input: RespondAccessRequestInput): Promise<void>
-  abortSession(sessionId: string): Promise<void>
+  snapshots: Record<string, SessionSummary>
+  clearError: () => void
+  selectWorkspace: () => Promise<void>
+  reloadProjects: () => Promise<void>
+  createProject: (input: { rootPath: string; name?: string }) => Promise<DesktopProjectInfo>
+  openProject: (projectId: string) => Promise<DesktopProjectOpenResult>
+  renameProject: (projectId: string, name: string) => Promise<void>
+  removeProject: (projectId: string) => Promise<void>
+  loadSession: (sessionId: string) => Promise<SessionSummary>
+  createSession: (input: CreateSessionInput) => Promise<SessionSummary>
+  updateSession: (input: UpdateSessionInput) => Promise<void>
+  deleteSession: (sessionId: string) => Promise<void>
+  sendMessage: (input: SendMessageInput) => Promise<void>
+  invokeSkill: (input: InvokeSkillInput) => Promise<void>
+  respondToAccessRequest: (input: RespondAccessRequestInput) => Promise<void>
+  abortSession: (sessionId: string) => Promise<void>
 }
-
-const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 const DEFAULT_MODES: RuntimeModeInfo[] = [
-  { id: 'pentest', name: 'Pentest', description: '安全渗透测试与授权证据采集' },
-  { id: 'audit', name: 'Audit', description: '代码质量与安全审计审查' }
+  { id: 'pentest', name: 'Pentest', description: '渗透测试' },
+  { id: 'audit', name: 'Audit', description: '安全审计' }
 ]
 
-let cachedModes: RuntimeModeInfo[] = DEFAULT_MODES
-
-function permissionFromMode(modeId?: string): string {
-  if (!modeId) return 'Pentest'
-  const matched = cachedModes.find((m) => m.id.toLowerCase() === modeId.toLowerCase())
-  if (matched?.name) return matched.name
-  if (modeId === 'pentest') return 'Pentest'
-  if (modeId === 'audit') return 'Audit'
-  return modeId.charAt(0).toUpperCase() + modeId.slice(1)
+const PERMISSION_BY_MODE: Record<string, string> = {
+  pentest: 'Pentest',
+  audit: 'Audit'
 }
 
-function modeIdFromPermission(permission?: string): string | undefined {
-  if (!permission) return undefined
-  const matched = cachedModes.find(
-    (m) =>
-      m.name.toLowerCase() === permission.toLowerCase() ||
-      m.id.toLowerCase() === permission.toLowerCase()
-  )
-  if (matched?.id) return matched.id
-  if (permission.toLowerCase() === 'pentest') return 'pentest'
-  if (permission.toLowerCase() === 'audit') return 'audit'
-  return permission.toLowerCase()
+const MODE_BY_PERMISSION: Record<string, string> = {
+  Pentest: 'pentest',
+  Audit: 'audit'
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+function permissionFromMode(modeId: string | null | undefined): string {
+  return (modeId && PERMISSION_BY_MODE[modeId]) || 'Pentest'
 }
 
-function isImageMimeType(value: string): value is ImageMimeType {
-  return (
-    value === 'image/jpeg' ||
-    value === 'image/png' ||
-    value === 'image/gif' ||
-    value === 'image/webp'
-  )
+function modeIdFromPermission(permissionProfileId: string | undefined): string | undefined {
+  return permissionProfileId ? MODE_BY_PERMISSION[permissionProfileId] : undefined
 }
 
-function formatTimestamp(value: unknown): string {
-  try {
-    const date = value ? new Date(value as string | number | Date) : new Date()
-    if (Number.isNaN(date.getTime())) return '刚刚'
-    return date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return '刚刚'
-  }
-}
-
-function runtimeMessage(message: RuntimeSessionMessage, isStreaming = false): ChatMessage {
-  const attachments = Array.isArray(message.attachments)
-    ? message.attachments.flatMap((attachment) =>
-        isImageMimeType(attachment.mediaType)
-          ? [
-              {
-                id: attachment.id,
-                name: attachment.name,
-                mimeType: attachment.mediaType,
-                sizeBytes: attachment.sizeBytes ?? 0,
-                url: attachment.dataUrl
-              }
-            ]
-          : []
-      )
-    : []
-
-  const rawBlocks = Array.isArray(message.blocks) ? message.blocks : []
-  const blocks = rawBlocks.map((block) => {
-    if (!block || typeof block !== 'object') {
-      return { type: 'text' as const, text: String(block ?? '') }
-    }
-    if (block.type === 'text') {
-      const text = typeof block.text === 'string' ? block.text : ''
-      const skill = message.role === 'user' ? parseSkillActivation(text) : undefined
-      return skill ?? { type: 'text' as const, text }
-    }
-    if (block.type === 'reasoning') {
-      return {
-        type: 'reasoning' as const,
-        text: typeof block.text === 'string' ? block.text : '',
-        isStreaming
-      }
-    }
-    return {
-      type: 'tool' as const,
-      id: block.id,
-      name: block.name || 'tool',
-      ...(block.input ? { input: block.input } : {}),
-      ...(block.output ? { output: block.output } : {}),
-      status: block.status || 'success'
-    }
-  })
-
-  return {
-    id: message.id,
-    role: message.role,
-    blocks,
-    ...(attachments.length ? { attachments } : {}),
-    timestamp: formatTimestamp(message.createdAt),
-    ...(message.role === 'assistant'
-      ? { isStreaming, ...(message.modelName ? { modelName: message.modelName } : {}) }
-      : {})
-  }
+function errorMessage(cause: unknown): string {
+  return cause instanceof Error ? cause.message : String(cause)
 }
 
 function sessionSummary(summary: RuntimeSummary): SessionSummary {
@@ -238,77 +138,18 @@ function sessionSummary(summary: RuntimeSummary): SessionSummary {
   }
 }
 
-function setToolStatus(
-  timeline: ChatTimelineItem[],
-  toolCallId: string,
-  status: 'waiting_approval' | 'running' | 'denied'
-): ChatTimelineItem[] {
-  return timeline.map((item) =>
-    item.role === 'assistant'
-      ? {
-          ...item,
-          blocks: (item.blocks ?? []).map((block) =>
-            block.type === 'tool' && block.id === toolCallId ? { ...block, status } : block
-          )
-        }
-      : item
-  )
-}
-
-function sessionSnapshot(snapshot: RuntimeSessionSnapshot): SessionSnapshot {
-  const rawMessages = Array.isArray(snapshot?.messages) ? snapshot.messages : []
-  let timeline: ChatTimelineItem[] = rawMessages.map((message) => runtimeMessage(message))
-  const accessRequests = Array.isArray(snapshot?.accessRequests) ? snapshot.accessRequests : []
-  for (const request of accessRequests) {
-    if (request?.toolCallId) {
-      timeline = setToolStatus(timeline, request.toolCallId, 'waiting_approval')
-    }
-  }
-  return {
-    ...sessionSummary(snapshot),
-    timeline,
-    accessRequests,
-    loaded: true
-  }
-}
-
-function placeholder(summary: RuntimeSummary): SessionSnapshot {
-  return { ...sessionSummary(summary), timeline: [], accessRequests: [], loaded: false }
-}
-
-function summaryFromSnapshot(snapshot: SessionSnapshot): SessionSummary {
-  return {
-    id: snapshot.id,
-    title: snapshot.title,
-    pinned: snapshot.pinned,
-    createdAt: snapshot.createdAt,
-    updatedAt: snapshot.updatedAt,
-    modelId: snapshot.modelId,
-    permissionProfileId: snapshot.permissionProfileId,
-    isRunning: snapshot.isRunning,
-    ...(snapshot.projectId ? { projectId: snapshot.projectId } : {}),
-    ...(snapshot.projectPath ? { projectPath: snapshot.projectPath } : {}),
-    ...(snapshot.tokenUsage ? { tokenUsage: snapshot.tokenUsage } : {})
-  }
-}
-
-function sortSessions(sessions: SessionSummary[]): SessionSummary[] {
-  return [...sessions].sort((first, second) => {
-    const pinned = Number(second.pinned) - Number(first.pinned)
-    return pinned || second.updatedAt.localeCompare(first.updatedAt)
-  })
-}
-
 function dataUrlPayload(url: string): string {
   const comma = url.indexOf(',')
   if (!url.startsWith('data:') || comma < 0) throw new Error('Invalid attachment data URL.')
   return url.slice(comma + 1)
 }
 
+const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
+
 export function WorkspaceProvider({ children }: { children: React.ReactNode }): React.ReactNode {
   const [workspace, setWorkspace] = useState<DesktopWorkspaceInfo | null>(null)
   const [projects, setProjects] = useState<DesktopProjectInfo[]>([])
-  const [snapshots, setSnapshots] = useState<Record<string, SessionSnapshot>>({})
+  const [snapshots, setSnapshots] = useState<Record<string, SessionSummary>>({})
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [modelIds, setModelIds] = useState<string[]>([])
@@ -322,82 +163,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
           ...current,
           [event.session.id]: existing
             ? { ...existing, ...sessionSummary(event.session) }
-            : placeholder(event.session)
+            : sessionSummary(event.session)
         }
       }
       const snapshot = current[event.sessionId]
       if (!snapshot) return current
-      if (event.type === 'message') {
-        const mapped = runtimeMessage(
-          event.message,
-          event.phase !== 'end' && event.message.role === 'assistant'
-        )
-        return {
-          ...current,
-          [event.sessionId]: {
-            ...snapshot,
-            loaded: true,
-            updatedAt: new Date().toISOString(),
-            timeline: mergeTimelineMessage(snapshot.timeline, mapped)
-          }
-        }
-      }
-      if (event.type === 'access_request') {
-        const requests = snapshot.accessRequests.filter(
-          (request) => request.toolCallId !== event.request.toolCallId
-        )
-        return {
-          ...current,
-          [event.sessionId]: {
-            ...snapshot,
-            accessRequests: [...requests, event.request],
-            timeline: setToolStatus(snapshot.timeline, event.request.toolCallId, 'waiting_approval')
-          }
-        }
-      }
-      if (event.type === 'access_request_resolved') {
-        return {
-          ...current,
-          [event.sessionId]: {
-            ...snapshot,
-            accessRequests: snapshot.accessRequests.filter(
-              (request) => request.toolCallId !== event.toolCallId
-            ),
-            timeline: setToolStatus(
-              snapshot.timeline,
-              event.toolCallId,
-              event.approved ? 'running' : 'denied'
-            )
-          }
-        }
-      }
       if (event.type === 'run_state') {
         return {
           ...current,
-          [event.sessionId]: {
-            ...snapshot,
-            isRunning: event.isRunning,
-            timeline: event.isRunning
-              ? snapshot.timeline
-              : snapshot.timeline.map((item) =>
-                  item.role === 'assistant' ? { ...item, isStreaming: false } : item
-                )
-          }
-        }
-      }
-      if (event.type === 'error') {
-        const message: ChatTimelineItem = {
-          id: `error-${crypto.randomUUID()}`,
-          role: 'error',
-          content: event.message
-        }
-        return {
-          ...current,
-          [event.sessionId]: {
-            ...snapshot,
-            isRunning: false,
-            timeline: [...snapshot.timeline, message]
-          }
+          [event.sessionId]: { ...snapshot, isRunning: event.isRunning }
         }
       }
       return current
@@ -422,16 +196,14 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       setWorkspace(nextWorkspace)
       setProjects(nextProjects)
       setModelIds(models.filter((model) => model.hasApiKey).map((model) => model.id))
-      const resolvedModes = availableModes?.length ? availableModes : DEFAULT_MODES
-      cachedModes = resolvedModes
-      setModes(resolvedModes)
+      setModes(availableModes?.length ? availableModes : DEFAULT_MODES)
       setSnapshots((current) =>
         Object.fromEntries(
           summaries.map((summary) => [
             summary.id,
             current[summary.id]
               ? { ...current[summary.id], ...sessionSummary(summary) }
-              : placeholder(summary)
+              : sessionSummary(summary)
           ])
         )
       )
@@ -538,9 +310,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     [reloadProjects]
   )
 
-  const loadSession = useCallback(async (sessionId: string): Promise<SessionSnapshot> => {
+  const loadSession = useCallback(async (sessionId: string): Promise<SessionSummary> => {
     try {
-      const next = sessionSnapshot(await window.api.sessions.get(sessionId))
+      const next = sessionSummary(await window.api.sessions.get(sessionId))
       setSnapshots((current) => ({ ...current, [sessionId]: next }))
       return next
     } catch (loadError) {
@@ -549,19 +321,18 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
     }
   }, [])
 
-  const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionSnapshot> => {
+  const createSession = useCallback(async (input: CreateSessionInput): Promise<SessionSummary> => {
     setError(null)
     const modeId = modeIdFromPermission(input.permissionProfileId)
     const modelId = input.modelId?.includes('/') ? input.modelId : undefined
     try {
-      const next = sessionSnapshot(
-        await window.api.sessions.create({
-          ...(input.title ? { title: input.title } : {}),
-          ...(modelId ? { modelId } : {}),
-          ...(modeId ? { modeId } : {}),
-          ...(input.projectId ? { projectId: input.projectId } : {})
-        })
-      )
+      const created = await window.api.sessions.create({
+        ...(input.title ? { title: input.title } : {}),
+        ...(modelId ? { modelId } : {}),
+        ...(modeId ? { modeId } : {}),
+        ...(input.projectId ? { projectId: input.projectId } : {})
+      })
+      const next = sessionSummary(created as RuntimeSessionSnapshot)
       setSnapshots((current) => ({ ...current, [next.id]: next }))
       return next
     } catch (createError) {
@@ -588,7 +359,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
           ...current,
           [input.sessionId]: existing
             ? { ...existing, ...sessionSummary(next) }
-            : sessionSnapshot(next)
+            : sessionSummary(next)
         }
       })
     } catch (updateError) {
@@ -614,18 +385,15 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   const sendMessage = useCallback(async (input: SendMessageInput): Promise<void> => {
     setError(null)
-    const optimisticMessage = createOptimisticUserMessage(input.text, input.attachments)
     setSnapshots((current) => {
       const snapshot = current[input.sessionId]
       if (!snapshot) return current
-      const updatedAt = new Date().toISOString()
       return {
         ...current,
         [input.sessionId]: {
           ...snapshot,
           isRunning: true,
-          updatedAt,
-          timeline: mergeTimelineMessage(snapshot.timeline, optimisticMessage)
+          updatedAt: new Date().toISOString()
         }
       }
     })
@@ -665,11 +433,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
 
   const invokeSkill = useCallback(async (input: InvokeSkillInput): Promise<void> => {
     setError(null)
-    const optimisticMessage = createOptimisticSkillMessage(
-      input.skillName,
-      input.arguments,
-      input.attachments
-    )
     setSnapshots((current) => {
       const snapshot = current[input.sessionId]
       if (!snapshot) return current
@@ -678,8 +441,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
         [input.sessionId]: {
           ...snapshot,
           isRunning: true,
-          updatedAt: new Date().toISOString(),
-          timeline: mergeTimelineMessage(snapshot.timeline, optimisticMessage)
+          updatedAt: new Date().toISOString()
         }
       }
     })
@@ -738,7 +500,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
   }, [])
 
   const sessions = useMemo(
-    () => sortSessions(Object.values(snapshots).map(summaryFromSnapshot)),
+    () =>
+      [...Object.values(snapshots)].sort((first, second) => {
+        const pinned = Number(second.pinned) - Number(first.pinned)
+        return pinned || second.updatedAt.localeCompare(first.updatedAt)
+      }),
     [snapshots]
   )
 

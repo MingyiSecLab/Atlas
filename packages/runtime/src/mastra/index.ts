@@ -8,6 +8,7 @@
 
 export { createControllerConfig } from './controller.js'
 export type { ControllerConfigOptions } from './controller.js'
+export { createRuntimeVectorStore } from './vector.js'
 
 // 导出 Observational Memory 配置
 export { applyOmConfigToInitialState } from './observational-memory.js'

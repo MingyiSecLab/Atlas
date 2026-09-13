@@ -1,5 +1,11 @@
 export type SettingsPage =
-  'general' | 'terminal' | 'notifications' | 'providers' | 'connectors' | 'memory' | 'environment'
+  | 'general'
+  | 'terminal'
+  | 'notifications'
+  | 'providers'
+  | 'connectors'
+  | 'memory'
+  | 'acknowledgements'
 
 export interface SettingsPreferences {
   defaultModel: string

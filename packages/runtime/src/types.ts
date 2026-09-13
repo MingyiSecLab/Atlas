@@ -50,6 +50,15 @@ export interface LocalRuntimeConfig {
   /** 禁用的工具列表 */
   disabledTools?: string[]
 
+  /** 自定义向量库实例；提供后 code-sdk 跳过默认 mastra-vectors.db 的创建 */
+  vector?: MastraCodeConfig['vector']
+
+  /** 用户级专家目录（如 ~/.atlas/agents）；与工作区 <configDir>/agents/ 合并扫描，工作区同名优先 */
+  userAgentsDir?: string
+
+  /** 大文件分流目录（blobs）；提供后 pentest 原始证据写入 <dir>/evidence/ 而非 pentest 数据目录 */
+  blobsDir?: string
+
   /**
    * Pentest 持久化目录；提供后 engagement 快照与证据内容跨进程重启保留
    * （`<dir>/engagements/*.json` 与受限证据文件）。

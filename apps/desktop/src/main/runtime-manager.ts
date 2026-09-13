@@ -1,4 +1,4 @@
-import { createLocalRuntime } from '@mingyi/runtime'
+import { createLocalRuntime, createRuntimeVectorStore } from '@mingyi/runtime'
 import type { LocalRuntimeInstance } from '@mingyi/runtime'
 import { app } from 'electron'
 import { join, resolve } from 'node:path'
@@ -23,7 +23,9 @@ export class DesktopRuntimeManager {
   getPentestDataDir(): string {
     const override = process.env.MINGYI_PENTEST_DATA_DIR
     if (override) return resolve(override)
-    return this.dataRoot ?? join(this.workspacePath, '.mingyi', 'pentest')
+    return this.dataRoot
+      ? join(this.dataRoot, 'pentest')
+      : join(this.workspacePath, '.mingyi', 'pentest')
   }
 
   /** 项目空间登记的持久化目录（跨应用重启保留）。 */
@@ -55,6 +57,17 @@ export class DesktopRuntimeManager {
         workspacePath: this.workspacePath,
         pentestDataDir: this.getPentestDataDir(),
         projectsDataDir: this.getProjectsDataDir(),
+        // atlas 数据根（~/.atlas）：settings.json / 用户级 agents / 向量库 / blobs 分流
+        ...(this.dataRoot
+          ? {
+              vector: createRuntimeVectorStore({
+                url: `file:${join(this.dataRoot, 'vectors.db')}`
+              }),
+              settingsPath: join(this.dataRoot, 'settings.json'),
+              userAgentsDir: join(this.dataRoot, 'agents'),
+              blobsDir: join(this.dataRoot, 'blobs')
+            }
+          : {}),
         ...(this.getSandboxConfig() ? { sandbox: this.getSandboxConfig() } : {})
       })
       this.runtimePromise = runtimePromise

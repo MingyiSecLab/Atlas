@@ -1,77 +1,108 @@
-import { Check, Copy, Terminal } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Copy, Loader2 } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import type { ToolBlock } from '../types'
 import { HighlightedCode } from '../HighlightedCode'
-import type { ParsedToolCall } from './types'
+import { formatElapsedMs, type ParsedToolCall } from './types'
 
 interface TerminalToolUIProps {
   block: ToolBlock
   parsed: ParsedToolCall
 }
 
+/** 超过该行数的输出默认折叠 */
+const COLLAPSE_LINE_THRESHOLD = 14
+
+/** best-effort：从输出 JSON 解析退出码 */
+function parseExitCode(output: string): number | undefined {
+  const trimmed = output.trim()
+  if (!trimmed.startsWith('{')) return undefined
+  try {
+    const parsed = JSON.parse(trimmed) as Record<string, unknown>
+    for (const key of ['exitCode', 'exit_code', 'code']) {
+      const value = parsed[key]
+      if (typeof value === 'number') return value
+    }
+  } catch {
+    // 忽略非 JSON
+  }
+  return undefined
+}
+
 export function TerminalToolUI({ block, parsed }: TerminalToolUIProps): React.ReactNode {
-  const [copiedOutput, setCopiedOutput] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [expanded, setExpanded] = useState(false)
   const cmd = parsed.command || block.input || ''
   const output = block.output || ''
-  const cwd = (parsed.parsedArgs?.Cwd as string) || (parsed.parsedArgs?.cwd as string)
-  const isKali = block.name === 'kali_exec'
+  const isRunning = block.status === 'running'
+  const isError = block.status === 'error'
+  const exitCode = useMemo(() => (isError ? parseExitCode(output) : undefined), [isError, output])
+  const outputLineCount = useMemo(
+    () => (output ? output.split('\n').length : 0),
+    [output]
+  )
+  const collapsible = !expanded && outputLineCount > COLLAPSE_LINE_THRESHOLD
 
-  const handleCopy = (): void => {
-    if (!output) return
-    navigator.clipboard.writeText(output).then(() => {
-      setCopiedOutput(true)
-      setTimeout(() => setCopiedOutput(false), 1500)
+  const handleCopy = (textToCopy: string): void => {
+    if (!textToCopy) return
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
     })
   }
 
   return (
-    <div className="aui-terminal-container">
-      {/* macOS Terminal Window Titlebar */}
-      <div className="aui-terminal-titlebar">
-        <div className="aui-terminal-window-dots">
-          <span className="dot dot-close" />
-          <span className="dot dot-minimize" />
-          <span className="dot dot-maximize" />
-        </div>
-        <div className="aui-terminal-title">
-          <Terminal size={12} />
-          <span>
-            {isKali ? 'kali-linux' : 'terminal'}
-            {cwd ? ` · ${cwd.split('/').pop() || cwd}` : ''}
-          </span>
-        </div>
-        {output ? (
-          <button
-            type="button"
-            className="aui-terminal-copy-btn"
-            onClick={handleCopy}
-            title={copiedOutput ? '已复制' : '复制终端输出'}
-          >
-            {copiedOutput ? <Check size={11} /> : <Copy size={11} />}
-            <span>{copiedOutput ? '已复制' : '复制'}</span>
-          </button>
-        ) : (
-          <div style={{ width: 48 }} />
-        )}
-      </div>
-
-      {/* Terminal Command Line */}
+    <div className="aui-terminal-clean-container">
+      {/* 命令行 PARAMETERS / COMMAND */}
       {cmd ? (
-        <div className="aui-terminal-command-line">
-          <span className="aui-terminal-prompt">$</span>
-          <span className="aui-terminal-command-text">{cmd}</span>
+        <div className="aui-trace-section">
+          <div className="aui-trace-label">COMMAND</div>
+          <div className="aui-terminal-cmd-box">
+            <span className="aui-terminal-prompt">$</span>
+            <code className="aui-terminal-cmd-code">{cmd}</code>
+            <button
+              type="button"
+              className="aui-trace-copy-btn"
+              onClick={() => handleCopy(cmd)}
+              title={copied ? '已复制' : '复制命令'}
+            >
+              {copied ? <Check size={12} className="is-success" /> : <Copy size={12} />}
+            </button>
+          </div>
         </div>
       ) : null}
 
-      {/* Terminal Output */}
+      {/* 执行结果 OUTPUT */}
       {output ? (
-        <div className="aui-terminal-output">
-          <HighlightedCode code={output} language="shell" />
+        <div className="aui-trace-section">
+          <div className="aui-trace-label">
+            <span>OUTPUT</span>
+            {exitCode !== undefined ? (
+              <span className="aui-trace-sublabel text-destructive">exit {exitCode}</span>
+            ) : null}
+            {!isRunning && block.elapsedMs !== undefined ? (
+              <span className="aui-trace-sublabel">{formatElapsedMs(block.elapsedMs)}</span>
+            ) : null}
+          </div>
+
+          <div
+            className={`aui-terminal-output-box ${isError ? 'is-error' : ''} ${collapsible ? 'is-clamped' : ''}`}
+          >
+            <HighlightedCode code={output} language="shell" />
+            {collapsible ? (
+              <button
+                type="button"
+                className="aui-terminal-expand-btn"
+                onClick={() => setExpanded(true)}
+              >
+                展开全部 {outputLineCount} 行
+              </button>
+            ) : null}
+          </div>
         </div>
-      ) : block.status === 'running' ? (
+      ) : isRunning ? (
         <div className="aui-terminal-running-hint">
-          <span className="aui-terminal-cursor-blink">▋</span>
-          <span>命令执行中...</span>
+          <Loader2 size={13} className="aui-tool-spinner" />
+          <span>正在执行命令...</span>
         </div>
       ) : (
         <div className="aui-terminal-empty-hint">
@@ -81,3 +112,4 @@ export function TerminalToolUI({ block, parsed }: TerminalToolUIProps): React.Re
     </div>
   )
 }
+

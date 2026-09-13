@@ -1,0 +1,196 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag 版本号 (例如 v0.1.0)'
+        required: true
+        default: 'v0.1.0'
+      release_title:
+        description: 'Release 标题 (留空则默认为 Atlas <Tag>)'
+        required: false
+        default: ''
+      draft:
+        description: '发布为草稿 Draft (推荐：便于先核验产物再正式公开)'
+        type: boolean
+        default: false
+      prerelease:
+        description: '标记为预发布测试版 (Pre-release)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            target: '--mac --arm64 --x64'
+          - os: windows-latest
+            platform: win
+            target: '--win --x64'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build Runtime package
+        run: npm run build -w @mingyi/runtime
+
+      - name: Build Desktop application
+        run: npm run build -w mingyi-app
+
+      - name: Package with electron-builder
+        shell: bash
+        run: |
+          cd apps/desktop
+          npx electron-builder ${{ matrix.target }} --publish never
+
+      - name: Prepare build artifacts (macOS)
+        if: matrix.platform == 'mac'
+        shell: bash
+        run: |
+          mkdir -p dist-artifacts
+          cp apps/desktop/dist/*.dmg dist-artifacts/ 2>/dev/null || true
+          cp apps/desktop/dist/*.zip dist-artifacts/ 2>/dev/null || true
+          ls -lh dist-artifacts/
+
+      - name: Prepare build artifacts (Windows)
+        if: matrix.platform == 'win'
+        shell: bash
+        run: |
+          mkdir -p dist-artifacts
+          cp apps/desktop/dist/*.exe dist-artifacts/ 2>/dev/null || true
+          cp apps/desktop/dist/*.zip dist-artifacts/ 2>/dev/null || true
+          ls -lh dist-artifacts/
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: atlas-artifacts-${{ matrix.platform }}
+          path: dist-artifacts/*
+          if-no-files-found: error
+          retention-days: 2
+
+  publish:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all-artifacts
+
+      - name: Flatten and verify artifacts
+        shell: bash
+        run: |
+          mkdir -p release-files
+          find all-artifacts -type f -exec mv -f {} release-files/ \;
+          cd release-files
+          echo "=== Release Files ==="
+          ls -lh
+          echo "=== Generating SHA256SUMS.txt ==="
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Determine tag and title
+        id: get_tag
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag_name }}"
+          if [ -z "$TAG" ]; then
+            TAG="v0.1.0"
+          fi
+          TITLE="${{ github.event.inputs.release_title }}"
+          if [ -z "$TITLE" ]; then
+            TITLE="Atlas $TAG"
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
+
+      - name: Generate release notes
+        shell: bash
+        run: |
+          cat << 'EOF' > release_body.md
+          ## 🚀 Atlas 发布公告
+
+          欢迎下载使用 **Atlas**（Mingyi 开源智能安全测试与评估桌面端）！
+
+          ### 📦 安装包文件说明
+
+          | 平台 | 文件名 | 适用架构与说明 |
+          | :--- | :--- | :--- |
+          | **macOS (Apple Silicon)** | `Atlas-*-mac-arm64.dmg` | 适用于 M1/M2/M3/M4 系列芯片 |
+          | **macOS (Intel)** | `Atlas-*-mac-x64.dmg` | 适用于 Intel 芯片 Mac |
+          | **macOS (免安装包)** | `Atlas-*-mac-*.zip` | 便携压缩包 |
+          | **Windows (amd64 安装包)** | `Atlas-*-win-x64-setup.exe` | 适用于 64 位 Windows 系统 (amd64 / x64) |
+          | **Windows (amd64 便携包)** | `Atlas-*-win-x64.zip` | 免安装绿色便携包 |
+
+          > [!TIP]
+          > 所有安装包的 SHA-256 校验和见下文及附件 `SHA256SUMS.txt`。
+
+          ---
+
+          ### 🔒 系统安装与运行说明
+
+          #### macOS 安装说明
+          - 下载对应架构的 `.dmg` 文件打开，将 `Atlas` 拖入 `Applications` 目录；
+          - 若首次打开出现 **“无法打开，因为无法验证开发者”** 提示：
+            1. 打开系统【设置】->【隐私与安全性】；
+            2. 在页面底部点击【仍要打开】即可；
+            3. 或在终端执行：`sudo xattr -rd com.apple.quarantine /Applications/Atlas.app`
+
+          #### Windows 安装说明
+          - 下载 `Atlas-*-win-x64-setup.exe` 并运行安装程序；
+          - 若出现 Windows SmartScreen 提示，点击 **“更多信息”** -> **“仍要运行”** 即可正常安装启动。
+
+          ---
+
+          ### 🛡️ 安全沙箱运行建议 (Kali Sandbox)
+          为发挥完整的渗透测试与安全工具能力（nmap、nuclei、sqlmap 等），推荐启动配套的 Kali 沙箱环境：
+          ```bash
+          # 启动沙箱容器
+          docker run -d --name mingyi-sandbox --network host --cap-add=NET_RAW --cap-add=NET_ADMIN -v $(pwd)/datas/sandbox_workspace:/home/kali/workspace mingyi-sandbox:latest
+          ```
+          启动后，Atlas 内置安全 Agent 即可通过 `kali_exec` 等工具执行隔离测试。
+
+          ---
+
+          ### 🤝 社区贡献与致谢
+          感谢所有为 Atlas 提交 Issue、PR 和反馈安全建议的贡献者！
+          - 主项目仓库：[MingyiSecLab/Atlas](https://github.com/MingyiSecLab/Atlas)
+          - 详细贡献与版本发布规范请参见 [版本发布与贡献指南](https://github.com/MingyiSecLab/Atlas/blob/main/docs/release-guide.md)。
+          EOF
+
+      - name: Publish to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.get_tag.outputs.tag }}
+          name: ${{ steps.get_tag.outputs.title }}
+          body_path: release_body.md
+          files: release-files/*
+          draft: ${{ github.event.inputs.draft }}
+          prerelease: ${{ github.event.inputs.prerelease }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

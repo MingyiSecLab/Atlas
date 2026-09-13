@@ -26,6 +26,25 @@ interface HubWorkspaceProps {
   onTryConnector?: (connectorName: string) => void
 }
 
+const STORAGE_DELETED_BUILTINS = 'atlas_deleted_builtin_experts'
+
+function getDeletedBuiltinIds(): string[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_DELETED_BUILTINS)
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+
+function saveDeletedBuiltinIds(ids: string[]): void {
+  try {
+    localStorage.setItem(STORAGE_DELETED_BUILTINS, JSON.stringify(ids))
+  } catch {
+    // ignore
+  }
+}
+
 export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
   activeTab,
   searchQuery,
@@ -36,9 +55,12 @@ export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
   onTrySkill,
   onTryConnector
 }) => {
-  // Custom & System Experts State（自定义专家持久化在工作区磁盘，经 IPC 读写）
+  // Custom & System Experts State（自定义专家持久化在工作区磁盘，内置专家可由用户删除隐藏）
   const [customExperts, setCustomExperts] = useState<ExpertItem[]>([])
-  const [systemExperts] = useState<ExpertItem[]>(SYSTEM_BUILTIN_EXPERTS)
+  const [deletedBuiltinIds, setDeletedBuiltinIds] = useState<string[]>(getDeletedBuiltinIds)
+  const visibleSystemExperts = SYSTEM_BUILTIN_EXPERTS.filter(
+    (e) => !deletedBuiltinIds.includes(e.id)
+  )
 
   // Modals state
   const [selectedExpert, setSelectedExpert] = useState<ExpertItem | null>(null)
@@ -122,8 +144,13 @@ export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
   const handleSaveExpert = (savedExpert: ExpertItem): void => {
     void (async () => {
       try {
+        // 若编辑的是系统预置角色，保存到工作区的同时将原内置预置项自动隐藏，避免列表重复
+        if (expertToEdit && expertToEdit.id.startsWith('builtin_')) {
+          const updated = Array.from(new Set([...deletedBuiltinIds, expertToEdit.id]))
+          saveDeletedBuiltinIds(updated)
+          setDeletedBuiltinIds(updated)
+        }
         const saved = await window.api.experts.save(expertItemToSaveInput(savedExpert))
-        // mode 注册需工作区重连；列表以磁盘扫描结果为准
         await reloadExperts()
         if (saved.requiresRestart) {
           console.info(
@@ -137,14 +164,28 @@ export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
   }
 
   const handleDeleteExpert = (expertId: string): void => {
+    // 若是系统预置专家，存入本地删除名单并从视图中隐藏
+    if (expertId.startsWith('builtin_')) {
+      const updated = Array.from(new Set([...deletedBuiltinIds, expertId]))
+      saveDeletedBuiltinIds(updated)
+      setDeletedBuiltinIds(updated)
+      if (selectedExpert?.id === expertId) setSelectedExpert(null)
+      return
+    }
     void (async () => {
       try {
         await window.api.experts.delete(expertId)
         await reloadExperts()
+        if (selectedExpert?.id === expertId) setSelectedExpert(null)
       } catch (error) {
         console.error('删除专家失败：', error)
       }
     })()
+  }
+
+  const handleResetBuiltinExperts = (): void => {
+    saveDeletedBuiltinIds([])
+    setDeletedBuiltinIds([])
   }
 
   const isModalVisible = isEditModalOpen || (isMyItemsOpen && activeTab === 'expert')
@@ -153,16 +194,49 @@ export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
     <div className="hub-root">
       <div className="hub-content-scroll">
         {activeTab === 'expert' && (
-          <ExpertCardGrid
-            customExperts={customExperts}
-            systemExperts={systemExperts}
-            searchQuery={searchQuery}
-            onSelectExpert={(expert) => setSelectedExpert(expert)}
-            onStartChat={(expert) => onStartChatWithExpert(expert)}
-            onEditExpert={handleEditExpert}
-            onDeleteExpert={handleDeleteExpert}
-            onCloneExpert={handleCloneExpert}
-          />
+          <>
+            {deletedBuiltinIds.length > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '6px 12px',
+                  marginBottom: '12px',
+                  borderRadius: '6px',
+                  backgroundColor: '#f4f4f5',
+                  fontSize: '12px',
+                  color: '#71717a'
+                }}
+              >
+                <span>已隐藏 {deletedBuiltinIds.length} 个预置专家角色</span>
+                <button
+                  type="button"
+                  onClick={handleResetBuiltinExperts}
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: '#2563eb',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    fontWeight: 500
+                  }}
+                >
+                  恢复全部预置专家
+                </button>
+              </div>
+            )}
+            <ExpertCardGrid
+              customExperts={customExperts}
+              systemExperts={visibleSystemExperts}
+              searchQuery={searchQuery}
+              onSelectExpert={(expert) => setSelectedExpert(expert)}
+              onStartChat={(expert) => onStartChatWithExpert(expert)}
+              onEditExpert={handleEditExpert}
+              onDeleteExpert={handleDeleteExpert}
+              onCloneExpert={handleCloneExpert}
+            />
+          </>
         )}
 
         {activeTab === 'skill' && (
@@ -188,6 +262,8 @@ export const HubWorkspace: React.FC<HubWorkspaceProps> = ({
         expert={selectedExpert}
         onClose={() => setSelectedExpert(null)}
         onStartChat={onStartChatWithExpert}
+        onEdit={handleEditExpert}
+        onDelete={handleDeleteExpert}
       />
 
       {/* Create / Edit Expert Modal */}

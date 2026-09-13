@@ -392,14 +392,33 @@ export function createRuntimeSessionService({
 
     delete: async (sessionIdInput) => {
       const sessionId = requiredId(sessionIdInput)
-      const session = await ensureSession(sessionId)
-      session.abort()
-      await session.thread.delete({ threadId: sessionId })
       const current = materialized.get(sessionId)
-      current?.unsubscribe()
-      materialized.delete(sessionId)
+      if (current) {
+        current.session.abort()
+        try {
+          await current.session.thread.delete({ threadId: sessionId })
+        } catch {
+          // Ignore if already deleted
+        }
+        current.unsubscribe()
+        materialized.delete(sessionId)
+      }
+      let targetResourceId = resourceId
+      try {
+        const thread = await defaultSession.thread.getById({ threadId: sessionId })
+        if (thread?.resourceId) {
+          targetResourceId = thread.resourceId
+        }
+      } catch {
+        // Keep fallback targetResourceId
+      }
+      try {
+        await defaultSession.thread.delete?.({ threadId: sessionId })
+      } catch {
+        // Ignore storage deletion errors for already removed threads
+      }
       await controller.deleteSession({
-        resourceId,
+        resourceId: targetResourceId,
         scope: `${SESSION_SCOPE_PREFIX}${sessionId}`
       })
     },

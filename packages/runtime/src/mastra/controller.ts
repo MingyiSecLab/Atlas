@@ -26,6 +26,10 @@ export interface ControllerConfigOptions {
   models?: RuntimeModelConfig;
   extraTools?: MastraCodeConfig['extraTools'];
   disabledTools?: string[];
+  /** 自定义向量库实例（注入后 code-sdk 跳过默认 mastra-vectors.db 的创建） */
+  vector?: MastraCodeConfig['vector'];
+  /** 用户级专家目录（~/.atlas/agents）；与工作区 <configDir>/agents/ 合并，工作区同名优先 */
+  userAgentsDir?: string;
   /** Observational Memory 配置；省略时沿用 SDK 默认行为 */
   observationalMemory?: RuntimeObservationalMemoryConfig;
   /** 渗透测试服务实例（供安全工具适配层自动关联任务黑板） */
@@ -57,10 +61,12 @@ export function createControllerConfig(
   // 自定义 modes（未显式传入时默认使用全量 modes）
   const modes = applyModelConfigToModes(options.modes ?? allModes, options.models);
 
-  // 工作区专家文件（<configDir>/agents/*.md）扫描为专家 modes；坏文件跳过并告警
+  // 工作区专家文件（<configDir>/agents/*.md）扫描为专家 modes；坏文件跳过并告警。
+  // userAgentsDir 提供时同时扫描用户级目录（工作区同名优先）。
   const expertScan = scanExpertModes({
     workspacePath: options.workspacePath,
     configDirName: options.configDir,
+    ...(options.userAgentsDir ? { userDirectory: options.userAgentsDir } : {}),
   });
   for (const warning of expertScan.warnings) {
     process.stderr.write(
@@ -103,6 +109,11 @@ export function createControllerConfig(
   // 禁用工具
   if (options.disabledTools && options.disabledTools.length > 0) {
     config.disabledTools = options.disabledTools;
+  }
+
+  // 自定义向量库（注入后跳过 SDK 默认 mastra-vectors.db）
+  if (options.vector) {
+    config.vector = options.vector;
   }
 
   // Observational Memory 旋钮写入 initialState（显式配置优先于 settings 播种）

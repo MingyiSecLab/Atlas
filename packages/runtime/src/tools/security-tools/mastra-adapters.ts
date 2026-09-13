@@ -4,6 +4,7 @@ import { isTargetInScope } from '../../pentest/scope.js'
 import {
   createCrawlAuthenticatedTool,
   createDetectAuthSchemeTool,
+  createDetectSandboxTool,
   createDocumentAppTool,
   createDocumentEndpointTool,
   createExtractJsEndpointsTool,
@@ -477,31 +478,58 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     }
   })
 
-  // 10-16. Kali 沙箱工具（仅当宿主注入 sandbox adapter 时注册）
+  // 10. detect_sandbox_environment
+  const rawDetectSandbox = createDetectSandboxTool()
+  const detectSandboxTool = createTool({
+    id: 'detect_sandbox_environment',
+    description:
+      '检测宿主机 Docker 环境与 mingyi-sandbox 渗透测试沙箱容器的就绪状态。' +
+      '在执行需要专业渗透测试工具（nmap、nuclei、sqlmap 等）的任务前，使用此工具检查沙箱是否可用，' +
+      '并在环境未就绪时获取精确的启动与配置指导命令。无需输入参数。',
+    inputSchema: z.object({}).passthrough().optional(),
+    execute: async () => {
+      const context = buildDefaultContext(KALI_SANDBOX_LOCAL_TARGET, options)
+      const res = await rawDetectSandbox.execute(
+        {
+          targetRef: KALI_SANDBOX_LOCAL_TARGET,
+          toolName: 'detect_sandbox_environment',
+          arguments: {}
+        },
+        context
+      )
+      return res.output
+    }
+  })
+
+  // 11-17. Kali 沙箱工具（仅当宿主注入 sandbox adapter 时注册）
   const sandboxTools: Record<string, ReturnType<typeof createTool>> = {}
   if (options?.sandbox) {
     const rawKaliTools = createKaliSandboxTools({ adapter: options.sandbox })
-    const kaliExecRaw = rawKaliTools.find((tool) => tool.name === 'kali_exec')!
+    const execRaw = rawKaliTools.find((tool) => tool.name === 'kali_exec')!
     sandboxTools.kali_exec = createTool({
       id: 'kali_exec',
       description:
-        '在隔离的 Kali 沙箱容器内执行一条 shell 命令（nmap、nuclei、ffuf、sqlmap、impacket 等），返回 stdout/stderr 与退出码。' +
-        '沙箱内置完整 Kali 工具链、离线知识库(/home/kali/knowledges)与 PoC 库(/home/kali/pocs)；大型扫描输出建议重定向到 /home/kali/workspace 下的文件再用 kali_file_read 读取。' +
-        '参数：command (必填 shell 命令), target (必填, 本次命令操作的授权目标 host/URL), cwd (可选工作目录), timeoutMs (可选, 默认 120000)。' +
-        '命令必须停留在授权 scope 内；破坏性操作（rm -rf /、dd、drop table 等）在未启用破坏性测试时被拦截。',
+        '在隔离的 Kali 沙箱容器内执行单条 shell 命令（nmap, nuclei, ffuf, sqlmap, impacket 等）并捕获输出。' +
+        '沙箱具备完整无头 Kali 工具链、离线知识库 (/home/kali/knowledges) 与 PoC 库 (/home/kali/pocs)。' +
+        '参数：command (必填 shell 命令), target (必填授权目标引用), cwd (可选工作目录), timeoutMs (可选超时毫秒数)。',
       inputSchema: z.object({
-        command: z.string().describe('要执行的 shell 命令，例如 "nmap -sV -p 1-1000 10.0.0.5"'),
-        target: z.string().describe('本次命令操作的授权目标（host/URL/IP），必须在 scope 内'),
+        command: z.string().describe('要执行的 shell 命令'),
+        target: z.string().describe('该命令所针对的授权测试目标（IP/主机/URL/sandbox）'),
         cwd: z.string().optional().describe('容器内工作目录，默认 /home/kali/workspace'),
-        timeoutMs: z.number().optional().default(120000).describe('超时毫秒数，默认 120000')
+        timeoutMs: z.number().positive().optional().describe('超时毫秒数，默认 120000')
       }),
       execute: async (inputData) => {
         const context = buildDefaultContext(inputData.target, options)
-        const res = await kaliExecRaw.execute(
+        const res = await execRaw.execute(
           {
             targetRef: inputData.target,
             toolName: 'kali_exec',
-            arguments: { command: inputData.command, cwd: inputData.cwd, timeoutMs: inputData.timeoutMs }
+            arguments: {
+              command: inputData.command,
+              target: inputData.target,
+              ...(inputData.cwd ? { cwd: inputData.cwd } : {}),
+              ...(inputData.timeoutMs ? { timeoutMs: inputData.timeoutMs } : {})
+            }
           },
           context
         )
@@ -513,22 +541,21 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     sandboxTools.kali_session_start = createTool({
       id: 'kali_session_start',
       description:
-        '在 Kali 沙箱内启动一个持久后台会话（tmux 承载）——用于监听器(nc -k -lvp)、反弹 shell 接收器、长耗时扫描或交互式利用。' +
-        '命令在多次调用间持续运行，用 kali_session_read 轮询输出。' +
-        '参数：sessionId (必填, 自定的稳定会话名), command (必填), target (可选授权目标)。',
+        '在 Kali 沙箱内启动持久后台会话（tmux 承载），用于启动监听器、nc 反弹 shell、交互式调试等长期运行任务。' +
+        '参数：id (必填会话标识), command (必填启动命令), target (可选目标引用，默认 sandbox)。',
       inputSchema: z.object({
-        sessionId: z.string().describe('会话名，例如 "listener-4444"'),
-        command: z.string().describe('会话启动命令，例如 "nc -k -lvp 4444"'),
-        target: z.string().optional().describe('授权目标（scope 声明用）')
+        id: z.string().describe('会话唯一标识（不可包含冒号或空格）'),
+        command: z.string().describe('会话初始启动命令'),
+        target: z.string().optional().describe('关联目标引用，默认 sandbox')
       }),
       execute: async (inputData) => {
-        const targetRef = inputData.target || KALI_SANDBOX_LOCAL_TARGET
-        const context = buildDefaultContext(targetRef, options)
+        const target = inputData.target || KALI_SANDBOX_LOCAL_TARGET
+        const context = buildDefaultContext(target, options)
         const res = await sessionStartRaw.execute(
           {
-            targetRef,
+            targetRef: target,
             toolName: 'kali_session_start',
-            arguments: { sessionId: inputData.sessionId, command: inputData.command }
+            arguments: { id: inputData.id, command: inputData.command }
           },
           context
         )
@@ -540,21 +567,18 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     sandboxTools.kali_session_send = createTool({
       id: 'kali_session_send',
       description:
-        '向交互式沙箱会话键入一行输入（自动补回车），输入与 kali_exec 同样经过破坏性拦截。发送后用 kali_session_read 观察响应。' +
-        '参数：sessionId (必填), input (必填)。',
+        '向 Kali 沙箱持久会话发送一行输入命令并自动回车。参数：id (必填会话标识), input (必填输入文本)。',
       inputSchema: z.object({
-        sessionId: z.string().describe('目标会话名'),
-        input: z.string().describe('要键入的一行输入'),
-        target: z.string().optional().describe('授权目标（scope 声明用）')
+        id: z.string().describe('会话标识'),
+        input: z.string().describe('要输入的命令或数据')
       }),
       execute: async (inputData) => {
-        const targetRef = inputData.target || KALI_SANDBOX_LOCAL_TARGET
-        const context = buildDefaultContext(targetRef, options)
+        const context = buildDefaultContext(KALI_SANDBOX_LOCAL_TARGET, options)
         const res = await sessionSendRaw.execute(
           {
-            targetRef,
+            targetRef: KALI_SANDBOX_LOCAL_TARGET,
             toolName: 'kali_session_send',
-            arguments: { sessionId: inputData.sessionId, input: inputData.input }
+            arguments: { id: inputData.id, input: inputData.input }
           },
           context
         )
@@ -566,10 +590,9 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     sandboxTools.kali_session_read = createTool({
       id: 'kali_session_read',
       description:
-        '增量读取沙箱会话自上次读取以来的新输出，并报告会话是否存活。用于轮询监听器、反弹 shell 与交互式利用会话。' +
-        '参数：sessionId (必填)。',
+        '增量读取 Kali 沙箱后台会话的新增输出，并检查进程是否仍存活。参数：id (必填会话标识)。',
       inputSchema: z.object({
-        sessionId: z.string().describe('目标会话名')
+        id: z.string().describe('会话标识')
       }),
       execute: async (inputData) => {
         const context = buildDefaultContext(KALI_SANDBOX_LOCAL_TARGET, options)
@@ -577,7 +600,7 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
           {
             targetRef: KALI_SANDBOX_LOCAL_TARGET,
             toolName: 'kali_session_read',
-            arguments: { sessionId: inputData.sessionId }
+            arguments: { id: inputData.id }
           },
           context
         )
@@ -662,6 +685,7 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     document_endpoint: documentEndpointTool,
     init_pentest_engagement: initPentestEngagementTool,
     record_pentest_finding: recordPentestFindingTool,
+    detect_sandbox_environment: detectSandboxTool,
     ...sandboxTools
   }
 }

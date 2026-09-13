@@ -159,7 +159,7 @@ mingyi-tot/
 2. **优先使用 Mastra SDK API**：开发前确认 SDK 能力，避免重复造轮子
 3. **ADR 记录架构决策**：重要决策记录在 `docs/adr/runtime/`
 4. **测试不依赖个人 API Key**：应 mock 模型和网络行为
-5. **环境变量记录在 `.env.example`**：新增变量需同步更新示例文件
+5. **环境变量直接读进程环境**：应用不加载 `.env` 文件；新增变量需在本文件「环境变量」一节记录
 6. **遵循 Conventional Commits**：如 `feat(runtime): add model switching` 或 `fix(desktop): restore terminal focus`
 
 ## 文档参考
@@ -173,7 +173,7 @@ mingyi-tot/
 
 ## 环境变量
 
-参考 `.env.example`：
+通过进程环境设置（应用不读取 `.env` 文件；应用级数据布局见 `apps/desktop/src/main/index.ts` 的 `~/.atlas` 说明）：
 
 - `MINGYI_RUNTIME`: 运行时模式（`fake` 为确定性本地模式，`pi` 为真实 Agent 模式）
 - `MINGYI_WORKSPACE_ROOT`: 工作空间根路径

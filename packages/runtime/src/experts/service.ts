@@ -20,6 +20,8 @@ export interface RuntimeExpertService {
 export function createRuntimeExpertService(options: {
   workspacePath: string
   configDirName?: string
+  /** 用户级专家目录（如 ~/.atlas/agents）；扫描时与工作区目录合并，工作区同名优先 */
+  userDirectory?: string
 }): RuntimeExpertService {
   return {
     scan: () => scanExpertModes(options),

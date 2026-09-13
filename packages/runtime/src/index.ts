@@ -345,6 +345,7 @@ export type {
 // 导出 controller 配置
 export { createControllerConfig } from './mastra/index.js'
 export type { ControllerConfigOptions } from './mastra/index.js'
+export { createRuntimeVectorStore } from './mastra/index.js'
 
 // 导出 modes 和 subagents
 export {

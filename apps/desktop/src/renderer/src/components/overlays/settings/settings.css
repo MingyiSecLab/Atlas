@@ -1779,297 +1779,249 @@
 }
 
 /* ==========================================================================
-   环境状态与安全沙箱 (macOS 桌面 App 风格)
+   致谢与贡献者 (Acknowledgements & Contributors)
    ========================================================================== */
 
-.env-header-row {
+.ack-header {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 16px;
-  padding-right: 36px;
-  border-bottom: 1px solid #e8e8eb;
-  margin-bottom: 20px;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.03) 0%, rgba(244, 63, 94, 0.015) 100%);
+  border: 1px solid rgba(244, 63, 94, 0.14);
+  border-radius: 8px;
 }
 
-.env-header-text h2 {
-  margin: 0 0 4px;
+.ack-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  background: #fff1f2;
+  color: #e11d48;
+  flex-shrink: 0;
+}
+
+.ack-heart-icon {
+  color: #e11d48;
+  fill: #fecdd3;
+}
+
+.ack-header-content h2 {
+  margin: 0 0 2px;
   font-size: 13px;
   font-weight: 650;
   color: #1c1c1e;
 }
 
-.env-header-text p {
+.ack-header-content p {
   margin: 0;
-  font-size: 11px;
-  color: #8e8e93;
+  font-size: 11.5px;
+  color: #636366;
   line-height: 1.4;
 }
 
-.env-header-controls {
+.ack-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.ack-card {
   display: flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
-}
-
-.env-time-label {
-  font-size: 11px;
-  color: #aeaeb2;
-}
-
-.env-mac-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #1c1c1e;
+  padding: 10px 12px;
   background: #ffffff;
-  border: 1px solid #d1d1d6;
-  border-radius: 6px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
-  cursor: pointer;
-  transition: all 120ms ease;
-  white-space: nowrap;
-}
-
-.env-mac-button:hover:not(:disabled) {
-  background: #f2f2f7;
-  border-color: #c7c7cc;
-}
-
-.env-mac-button:active:not(:disabled) {
-  transform: scale(0.98);
-  background: #e5e5ea;
-}
-
-.env-mac-button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.env-mac-button.is-compact {
-  height: 22px;
-  padding: 0 8px;
-  font-size: 11px;
-}
-
-.env-error-note {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  margin-bottom: 16px;
-  background: #fff2f2;
-  border: 1px solid #ffcdd2;
-  border-radius: 6px;
-  color: #d32f2f;
-  font-size: 11.5px;
-}
-
-/* 状态指示器与小圆点 (macOS Status Indicator) */
-.mac-status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.mac-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.mac-dot.is-green {
-  background: #34c759;
-  box-shadow: 0 0 0 1.5px rgba(52, 199, 89, 0.2);
-}
-
-.mac-dot.is-amber {
-  background: #ff9500;
-  box-shadow: 0 0 0 1.5px rgba(255, 149, 0, 0.2);
-}
-
-.mac-dot.is-red {
-  background: #ff3b30;
-  box-shadow: 0 0 0 1.5px rgba(255, 59, 48, 0.2);
-}
-
-.mac-dot.is-gray {
-  background: #8e8e93;
-}
-
-.mac-status-label {
-  font-size: 12px;
-  color: #3a3a3c;
-  font-weight: 500;
-}
-
-.mac-tag {
-  display: inline-block;
-  padding: 2px 7px;
-  font-size: 11px;
-  font-weight: 600;
-  color: #3a3a3c;
-  background: #f2f2f7;
-  border-radius: 4px;
-}
-
-.mac-subtext {
-  font-size: 11px;
-  color: #8e8e93;
-}
-
-.mac-container-action-group {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-
-/* 渗透工具链分组卡片 (macOS Inset Grouped Table) */
-.mac-tools-group {
   border: 1px solid #e5e5ea;
   border-radius: 8px;
-  background: #ffffff;
+  box-sizing: border-box;
+  transition: all 140ms ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.ack-card:hover {
+  border-color: #d1d1d6;
+  background: #fafafa;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.ack-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #f2f2f7 0%, #e5e5ea 100%);
+  color: #3a3a3c;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+  border: 1px solid #d1d1d6;
   overflow: hidden;
 }
 
-.mac-tool-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 9px 14px;
-  min-height: 40px;
+.ack-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.mac-tool-item + .mac-tool-item {
-  border-top: 1px solid #f2f2f7;
-}
-
-.mac-tool-main {
+.ack-card-info {
   min-width: 0;
   flex: 1;
 }
 
-.mac-tool-name {
+.ack-name-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ack-name {
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 650;
   color: #1c1c1e;
+  line-height: 1.2;
 }
 
-.mac-tool-desc {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #8e8e93;
-  line-height: 1.35;
-}
-
-.mac-desc-err {
-  color: #ff3b30;
-}
-
-.mac-tool-meta {
+.ack-badge {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.ack-badge.is-founder {
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fde68a;
+}
+
+.ack-badge.is-core {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+}
+
+.ack-badge.is-security {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.ack-badge.is-community {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.ack-role {
+  display: block;
+  font-size: 10.5px;
+  color: #8e8e93;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ack-link-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 5px;
+  color: #8e8e93;
+  background: transparent;
+  text-decoration: none;
+  transition: all 120ms ease;
   flex-shrink: 0;
 }
 
-.mac-version-pill {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 11px;
-  color: #636366;
+.ack-link-btn:hover {
+  color: #007aff;
   background: #f2f2f7;
-  padding: 2px 6px;
-  border-radius: 4px;
 }
 
-.mac-empty-state {
-  padding: 20px;
-  text-align: center;
-  color: #8e8e93;
-  font-size: 12px;
+/* 加入贡献卡片 */
+.ack-join-section {
+  margin-top: 16px;
+}
+
+.ack-join-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+  background: #f9f9fb;
   border: 1px dashed #d1d1d6;
   border-radius: 8px;
 }
 
-.env-mac-button.is-primary-action {
-  font-weight: 600;
-  color: #007aff;
-  border-color: #bfe0ff;
-  background: #f0f7ff;
+.ack-join-info {
+  min-width: 0;
+  flex: 1;
 }
 
-.env-mac-button.is-primary-action:hover:not(:disabled) {
-  background: #e1effe;
-  border-color: #90c7fe;
-}
-
-.mac-inline-error-card {
-  margin-top: 10px;
-  padding: 10px 12px;
-  background: #fff5f5;
-  border: 1px solid #fed7d7;
-  border-radius: 6px;
-  font-size: 11.5px;
-}
-
-.mac-inline-error-header {
+.ack-join-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #1c1c1e;
+  margin-bottom: 2px;
 }
 
-.mac-inline-error-title {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-weight: 600;
-  color: #c53030;
+.ack-sparkle-icon {
+  color: #f59e0b;
 }
 
-.mac-copy-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 6px;
-  font-size: 10.5px;
-  border: 1px solid #feb2b2;
-  background: #ffffff;
-  border-radius: 4px;
-  color: #c53030;
-  cursor: pointer;
-}
-
-.mac-copy-btn:hover {
-  background: #fffafa;
-}
-
-.mac-inline-error-body {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+.ack-join-desc {
+  margin: 0;
   font-size: 11px;
-  color: #742a2a;
-  word-break: break-all;
-  white-space: pre-wrap;
+  color: #636366;
   line-height: 1.4;
 }
 
-.spin-icon {
-  animation: spin 1s linear infinite;
+.ack-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 550;
+  background: #ffffff;
+  border: 1px solid #d1d1d6;
+  color: #1c1c1e;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: all 120ms ease;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.ack-copy-btn:hover {
+  background: #f2f2f7;
+  border-color: #c7c7cc;
+}
+
+.ack-copy-btn:active {
+  transform: scale(0.98);
+}
+
+.ack-copied-icon {
+  color: #16a34a;
 }

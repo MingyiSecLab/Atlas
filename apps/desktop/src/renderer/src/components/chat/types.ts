@@ -29,6 +29,8 @@ export interface ToolBlock {
   outputTruncated?: boolean
   outputCaptureTruncated?: boolean
   status: ToolStatus
+  /** 执行耗时（毫秒）；仅实时流路径计算，历史消息无此数据 */
+  elapsedMs?: number
 }
 
 export interface SkillBlock {

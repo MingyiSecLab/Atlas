@@ -9,7 +9,6 @@ import {
   type TestCustomModelInput
 } from '../shared/provider-ipc'
 import { FILE_IPC } from '../shared/file-ipc'
-import { ENVIRONMENT_IPC } from '../shared/environment-ipc'
 import {
   RUNTIME_IPC,
   type DesktopPentestCreateInput,
@@ -206,11 +205,6 @@ const api = {
       ipcRenderer.on(RUNTIME_IPC.pentestEvent, handler)
       return () => ipcRenderer.removeListener(RUNTIME_IPC.pentestEvent, handler)
     }
-  },
-  environment: {
-    check: () => ipcRenderer.invoke(ENVIRONMENT_IPC.check),
-    startSandbox: () => ipcRenderer.invoke(ENVIRONMENT_IPC.startSandbox),
-    stopSandbox: () => ipcRenderer.invoke(ENVIRONMENT_IPC.stopSandbox)
   }
 }
 

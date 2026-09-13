@@ -41,6 +41,8 @@ export interface RuntimeExpertSaveInput {
   tags?: string[]
   icon?: string
   suggestedPrompts?: string[]
+  /** 写入位置：workspace（默认，<configDir>/agents/）或 user（用户级 agents/ 目录） */
+  scope?: 'user' | 'workspace'
 }
 
 export const expertFrontmatterSchema = z.object({

@@ -27,8 +27,8 @@ test.describe('Hub and Tools tab', () => {
       await page.waitForTimeout(300)
     }
 
-    // 1. Click '专家·技能·工具' in sidebar
-    const hubNav = page.locator('aside').getByText('专家·技能·连接器')
+    // 1. Click '扩展中心' in sidebar
+    const hubNav = page.locator('aside').getByText('扩展中心')
     await expect(hubNav).toBeVisible()
     await hubNav.click()
 
@@ -87,7 +87,7 @@ test.describe('Built-in skills', () => {
   test('shows the website security monitoring in connectors tab and not in skills', async () => {
     const expandSidebarBtn = page.locator('button[title="展开侧边栏"]')
     if (await expandSidebarBtn.isVisible()) await expandSidebarBtn.click()
-    await page.locator('aside').getByText('专家·技能·连接器').click()
+    await page.locator('aside').getByText('扩展中心').click()
     await page.getByRole('button', { name: '技能', exact: true }).click()
 
     // Verified: No longer in skills

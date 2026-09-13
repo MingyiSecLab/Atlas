@@ -1,7 +1,9 @@
 import type { WebContents } from 'electron'
 import { ipcMain } from 'electron'
+import { createWriteStream, mkdirSync } from 'node:fs'
+import type { WriteStream } from 'node:fs'
 import { homedir } from 'node:os'
-import { isAbsolute, resolve } from 'node:path'
+import { isAbsolute, join, resolve } from 'node:path'
 import { platform } from 'node:process'
 import { spawn } from 'node-pty'
 import type { IPty } from 'node-pty'
@@ -12,6 +14,7 @@ interface TerminalSession {
   pty: IPty
   owner: WebContents
   headless: Awaited<ReturnType<typeof createHeadlessTerminal>>
+  logStream?: WriteStream
 }
 
 export interface TerminalCreateOptions {
@@ -29,6 +32,24 @@ export interface TerminalCreateResult {
 const terminalSessions = new Map<string, TerminalSession>()
 const terminalAttempts = new Map<string, number>()
 let resttyWasm: ReturnType<typeof loadResttyWasm> | undefined
+let terminalBlobLogDir: string | undefined
+
+/**
+ * 打开终端输出分流日志（<blobs>/terminal/<id>.log，追加写）。
+ * 分流失败只影响日志，不阻断终端功能。
+ */
+function openTerminalLog(id: string): WriteStream | undefined {
+  if (!terminalBlobLogDir) return undefined
+  const safeId = id.replace(/[^a-zA-Z0-9_-]/g, '_')
+  if (!safeId) return undefined
+  try {
+    const directory = join(terminalBlobLogDir, 'terminal')
+    mkdirSync(directory, { recursive: true })
+    return createWriteStream(join(directory, `${safeId}.log`), { flags: 'a' })
+  } catch {
+    return undefined
+  }
+}
 
 function defaultShell(preferred?: string): string {
   if (preferred === 'zsh' || preferred === 'bash') return preferred
@@ -69,6 +90,7 @@ function disposeTerminal(id: string, owner?: WebContents): void {
   if (!session) return
   terminalSessions.delete(id)
   session.headless.dispose()
+  session.logStream?.end()
   session.pty.kill()
 }
 
@@ -111,11 +133,12 @@ async function createTerminal(
       cwd: workingDirectory(options.cwd),
       env: terminalEnvironment()
     })
-    terminalSessions.set(id, { pty, owner, headless })
+    terminalSessions.set(id, { pty, owner, headless, logStream: openTerminalLog(id) })
     pty.onData((data) => {
       const session = terminalSessions.get(id)
       if (!session || session.pty !== pty) return
       session.headless.write(data)
+      session.logStream?.write(data)
       const reply = session.headless.drainOutput()
       if (reply.length > 0) pty.write(reply)
       if (!owner.isDestroyed()) owner.send('terminal:data', id, data)
@@ -124,6 +147,7 @@ async function createTerminal(
       const session = terminalSessions.get(id)
       if (session?.pty === pty) {
         session.headless.dispose()
+        session.logStream?.end()
         terminalSessions.delete(id)
         if (!owner.isDestroyed()) owner.send('terminal:exit', id, { exitCode, signal })
       }
@@ -134,7 +158,12 @@ async function createTerminal(
   }
 }
 
-export function registerTerminalService(): () => void {
+/**
+ * 注册终端 IPC 服务；blobsDir 提供时终端输出同时 tee 到 <blobsDir>/terminal/<id>.log
+ * （终端大日志分流，跨会话追加）。
+ */
+export function registerTerminalService(blobsDir?: string): () => void {
+  terminalBlobLogDir = blobsDir
   ipcMain.handle(
     'terminal:create',
     (event, id: string, options?: TerminalCreateOptions): Promise<TerminalCreateResult> =>

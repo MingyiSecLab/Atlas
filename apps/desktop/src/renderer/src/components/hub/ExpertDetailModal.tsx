@@ -11,7 +11,9 @@ import {
   FileText,
   ShieldCheck,
   Cpu,
-  Bot
+  Bot,
+  Edit3,
+  Trash2
 } from 'lucide-react'
 import type { ExpertItem } from './hub-types'
 
@@ -19,6 +21,8 @@ interface ExpertDetailModalProps {
   expert: ExpertItem | null
   onClose: () => void
   onStartChat: (expert: ExpertItem, initialPrompt?: string) => void
+  onEdit?: (expert: ExpertItem) => void
+  onDelete?: (expertId: string) => void
 }
 
 function getDetailIcon(expert: ExpertItem): React.ReactNode {
@@ -45,7 +49,9 @@ function getDetailIcon(expert: ExpertItem): React.ReactNode {
 export const ExpertDetailModal: React.FC<ExpertDetailModalProps> = ({
   expert,
   onClose,
-  onStartChat
+  onStartChat,
+  onEdit,
+  onDelete
 }) => {
   if (!expert) return null
 
@@ -202,21 +208,53 @@ export const ExpertDetailModal: React.FC<ExpertDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="hub-modal-footer">
-          <button className="hub-btn-secondary" onClick={onClose}>
-            取消
-          </button>
-          <button
-            className="hub-btn-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
-            onClick={() => {
-              onStartChat(expert)
-              onClose()
-            }}
-          >
-            <MessageSquare size={13} />
-            <span>立即对话</span>
-          </button>
+        <div className="hub-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            {onDelete && (
+              <button
+                type="button"
+                className="hub-btn-secondary"
+                style={{ color: '#ef4444', borderColor: '#fca5a5' }}
+                onClick={() => {
+                  onDelete(expert.id)
+                  onClose()
+                }}
+              >
+                <Trash2 size={13} style={{ marginRight: '4px' }} />
+                <span>删除角色</span>
+              </button>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                className="hub-btn-secondary"
+                onClick={() => {
+                  onEdit(expert)
+                  onClose()
+                }}
+              >
+                <Edit3 size={13} style={{ marginRight: '4px' }} />
+                <span>编辑角色</span>
+              </button>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <button type="button" className="hub-btn-secondary" onClick={onClose}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="hub-btn-primary"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
+              onClick={() => {
+                onStartChat(expert)
+                onClose()
+              }}
+            >
+              <MessageSquare size={13} />
+              <span>立即对话</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

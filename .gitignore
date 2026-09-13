@@ -9,6 +9,8 @@
 
 # Development-stage documentation and changelog (publish later)
 /docs/**/*.md
+!/docs/release-guide.md
+!/docs/README.md
 /CHANGELOG.md
 
 # Local agent settings and workspace state

@@ -336,8 +336,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'new_task', label: '新建任务', icon: Plus, action: () => onNewTask() },
-    { id: 'expert', label: '专家·技能·连接器', icon: Sparkles },
-    { id: 'extension', label: '扩展', icon: Blocks }
+    { id: 'expert', label: '扩展中心', icon: Sparkles },
+    { id: 'extension', label: '插件', icon: Blocks }
   ]
 
   const sectionHeaderStyle: React.CSSProperties = {
