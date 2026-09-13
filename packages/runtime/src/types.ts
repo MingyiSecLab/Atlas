@@ -15,6 +15,7 @@ import type { RuntimeStateSearchService } from './state-search/types.js'
 import type { RuntimeOmService } from './om/service.js'
 import type { RuntimePentestService } from './pentest/types.js'
 import type { RuntimeProjectService } from './projects/types.js'
+import type { DockerSandboxConfig, RuntimeSandboxAdapter } from './sandbox/types.js'
 import type { RuntimeExpertService } from './experts/service.js'
 import type { RuntimeObservationalMemoryConfig } from './mastra/observational-memory.js'
 
@@ -60,6 +61,12 @@ export interface LocalRuntimeConfig {
    * （`<dir>/projects.json`）。
    */
   projectsDataDir?: string
+
+  /**
+   * Kali 沙箱配置；提供后创建 Docker 沙箱执行器并注册 kali_* 工具
+   * （kali_exec / kali_session_* / kali_file_*）。缺省不启用沙箱能力。
+   */
+  sandbox?: DockerSandboxConfig
 
   /** Observational Memory 配置；省略时沿用 Mastra Code SDK 默认行为 */
   observationalMemory?: RuntimeObservationalMemoryConfig
@@ -110,6 +117,13 @@ export interface LocalRuntimeInstance {
 
   /** 项目空间登记服务（命名目录 → 会话 workspacePath 的映射）。 */
   projects: RuntimeProjectService
+
+  /**
+   * Kali 沙箱执行器；仅在 config.sandbox 提供时存在。
+   * 生命周期说明：runtime.shutdown() 不停止容器（README 常驻语义，
+   * 工作区现场保留），需要显式停止时调用 sandbox.dispose()。
+   */
+  sandbox?: RuntimeSandboxAdapter
 
   /** 关闭运行时 */
   shutdown: () => Promise<void>

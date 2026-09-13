@@ -181,7 +181,7 @@ describe('controller config integration', () => {
     const config = createControllerConfig({ workspacePath: workspace, configDir: '.mastracode' })
     const ids = (config.modes ?? []).map((mode) => mode.id)
     expect(ids).toContain('expert:security-auditor')
-    expect(ids.indexOf('expert:security-auditor')).toBeGreaterThan(ids.indexOf('build'))
+    expect(ids.indexOf('expert:security-auditor')).toBeGreaterThan(ids.indexOf('pentest'))
   })
 
   it('produces no expert modes when the directory is absent', () => {

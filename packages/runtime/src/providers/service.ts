@@ -280,6 +280,28 @@ export function createRuntimeProviderService({
         throw new Error(`Unknown custom provider: ${id}`);
       }
       removeCustomProviderFromSettings(settings, id);
+      // 清理 models 中的残留失效配置（防止 Observational Memory 等后台服务因孤立引用报错）
+      if (settings.models) {
+        if (settings.models.observerModelOverride?.startsWith(`${id}/`)) {
+          settings.models.observerModelOverride = null;
+        }
+        if (settings.models.reflectorModelOverride?.startsWith(`${id}/`)) {
+          settings.models.reflectorModelOverride = null;
+        }
+        if (settings.models.goalJudgeModel?.startsWith(`${id}/`)) {
+          settings.models.goalJudgeModel = null;
+        }
+        if (settings.models.omModelOverride?.startsWith(`${id}/`)) {
+          settings.models.omModelOverride = null;
+        }
+        if (settings.models.modeDefaults) {
+          for (const [mode, modelId] of Object.entries(settings.models.modeDefaults)) {
+            if (modelId?.startsWith(`${id}/`)) {
+              delete settings.models.modeDefaults[mode];
+            }
+          }
+        }
+      }
       saveSettings(settings, settingsPath);
       invalidateCatalog();
     },

@@ -14,7 +14,6 @@ import { CommandPaletteModal } from './components/overlays/CommandPaletteModal'
 import { SettingsModal } from './components/overlays/SettingsModal'
 import { HubWorkspace } from './components/hub/HubWorkspace'
 import type { HubTab, ExpertItem, SkillItem } from './components/hub/hub-types'
-import { ProjectsView } from './components/projects/ProjectsView'
 import type { RuntimeSkillInfo } from '@mingyi/runtime'
 import { useWorkspace } from './state/WorkspaceProvider'
 import { readSettings } from './components/overlays/settings/persistence'
@@ -58,7 +57,6 @@ export const App: React.FC = () => {
   const [activeNavMenu, setActiveNavMenu] = useState<string>('home')
   const [hubTab, setHubTab] = useState<HubTab>('expert')
   const [hubSearchQuery, setHubSearchQuery] = useState<string>('')
-  const [projectSearchQuery, setProjectSearchQuery] = useState<string>('')
   const [isMyItemsOpen, setIsMyItemsOpen] = useState<boolean>(false)
   const [connectorConfigRequest, setConnectorConfigRequest] = useState(0)
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false)
@@ -219,7 +217,7 @@ export const App: React.FC = () => {
     const session = await createSession({
       title,
       ...(preferredModel.includes('/') ? { modelId: preferredModel } : {}),
-      permissionProfileId: mode ?? 'Build',
+      permissionProfileId: mode ?? 'Pentest',
       ...(options?.projectId ? { projectId: options.projectId } : {})
     })
     setCurrentTaskId(session.id)
@@ -320,30 +318,25 @@ export const App: React.FC = () => {
   }))
   const currentTask = tasks.find((task) => task.id === currentTaskId)
   const isHubActive = !currentTaskId && activeNavMenu === 'expert'
-  const isProjectActive = !currentTaskId && activeNavMenu === 'project'
-
-  const handleCreateProject = useCallback(async (): Promise<void> => {
+  const handlePickFolderForTask = useCallback(async (): Promise<string | null> => {
     try {
       const rootPath = await window.api.projects.pickFolder()
-      if (!rootPath) return
-      const project = await createProject({ rootPath })
+      if (!rootPath) return null
+      const existingProjects = await window.api.projects.list()
+      let project = existingProjects.find(
+        (p) => p.rootPath.replace(/[/\\]+$/, '') === rootPath.replace(/[/\\]+$/, '')
+      )
+      if (!project) {
+        project = await createProject({ rootPath })
+      }
       await openProject(project.id)
-      setActiveNavMenu('home')
+      setSelectedProjectId(project.id)
+      return project.id
     } catch (error) {
-      console.error('新建项目失败：', error)
+      console.error('选择空间目录失败：', error)
+      return null
     }
   }, [createProject, openProject])
-
-  const handleCreateProjectForTask = useCallback(async (): Promise<void> => {
-    try {
-      const rootPath = await window.api.projects.pickFolder()
-      if (!rootPath) return
-      const project = await createProject({ rootPath })
-      setSelectedProjectId(project.id)
-    } catch (error) {
-      console.error('新建项目失败：', error)
-    }
-  }, [createProject])
 
   return (
     <ErrorBoundary
@@ -400,10 +393,6 @@ export const App: React.FC = () => {
             if (hubTab === 'tool') setConnectorConfigRequest((value) => value + 1)
             else setIsMyItemsOpen(true)
           }}
-          isProjectMode={isProjectActive}
-          projectSearchQuery={projectSearchQuery}
-          onProjectSearchChange={setProjectSearchQuery}
-          onNewProject={handleCreateProject}
         />
 
         {/* Main Body below Top Header */}
@@ -422,7 +411,7 @@ export const App: React.FC = () => {
             activeMenu={activeNavMenu}
             onSelectMenu={(menuId) => {
               setActiveNavMenu(menuId)
-              if (menuId === 'expert' || menuId === 'project') {
+              if (menuId === 'expert') {
                 setCurrentTaskId(null)
               }
             }}
@@ -470,12 +459,6 @@ export const App: React.FC = () => {
                     onTrySkill={handleTrySkill}
                     onTryConnector={handleTryConnector}
                   />
-                ) : activeNavMenu === 'project' ? (
-                  <ProjectsView
-                    searchQuery={projectSearchQuery}
-                    onCreateProject={handleCreateProject}
-                    onOpened={() => setActiveNavMenu('home')}
-                  />
                 ) : (
                   <MainWorkspace
                     onSendMessage={handleSendMessage}
@@ -487,7 +470,7 @@ export const App: React.FC = () => {
                     }))}
                     selectedProjectId={selectedProjectId}
                     onSelectProject={setSelectedProjectId}
-                    onCreateProjectForTask={() => void handleCreateProjectForTask()}
+                    onPickFolder={handlePickFolderForTask}
                     runtimeError={workspaceError}
                     modelIds={modelIds}
                     onSelectWorkspace={() => void selectWorkspace()}

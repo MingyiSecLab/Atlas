@@ -129,7 +129,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [groupState, setGroupState] = useState<Record<GroupKey, boolean>>(readGroupState)
   const reducedMotion = useReducedMotion()
 
-  const projectList = projects ?? []
+  const projectList = useMemo(() => projects ?? [], [projects])
   const grouped = useMemo(() => groupTasks(tasks, projectList), [tasks, projectList])
 
   const toggleGroup = (key: GroupKey): void => {
@@ -336,7 +336,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const menuItems = [
     { id: 'new_task', label: '新建任务', icon: Plus, action: () => onNewTask() },
-    { id: 'project', label: '项目', icon: Folder },
     { id: 'expert', label: '专家·技能·连接器', icon: Sparkles },
     { id: 'extension', label: '扩展', icon: Blocks }
   ]

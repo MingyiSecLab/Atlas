@@ -9,9 +9,12 @@ import {
 } from '../models/config.js';
 import type { RuntimeModelConfig } from '../models/types.js';
 import { scanExpertModes } from '../experts/scanner.js';
+import { createSecurityMastraTools } from '../tools/security-tools/index.js';
 import { allModes } from './modes.js';
 import { applyOmConfigToInitialState } from './observational-memory.js';
 import type { RuntimeObservationalMemoryConfig } from './observational-memory.js';
+import type { RuntimePentestService } from '../pentest/types.js';
+import type { RuntimeSandboxAdapter } from '../sandbox/types.js';
 
 export interface ControllerConfigOptions {
   workspacePath: string;
@@ -25,6 +28,10 @@ export interface ControllerConfigOptions {
   disabledTools?: string[];
   /** Observational Memory 配置；省略时沿用 SDK 默认行为 */
   observationalMemory?: RuntimeObservationalMemoryConfig;
+  /** 渗透测试服务实例（供安全工具适配层自动关联任务黑板） */
+  pentestService?: RuntimePentestService;
+  /** Kali 沙箱执行器；提供后注册 kali_* 工具（kali_exec / kali_session_* / kali_file_*） */
+  sandbox?: RuntimeSandboxAdapter;
 }
 
 /**
@@ -74,9 +81,23 @@ export function createControllerConfig(
     config.subagents = subagents;
   }
 
-  // 额外工具
-  if (options.extraTools) {
-    config.extraTools = options.extraTools;
+  // 额外工具（挂载原生安全工具适配层，并合并外部额外工具）
+  const securityTools = createSecurityMastraTools({
+    workspacePath: options.workspacePath,
+    pentestService: options.pentestService,
+    ...(options.sandbox ? { sandbox: options.sandbox } : {})
+  });
+  if (typeof options.extraTools === 'function') {
+    const customFn = options.extraTools;
+    config.extraTools = async (ctx) => {
+      const res = await customFn(ctx);
+      return { ...securityTools, ...res };
+    };
+  } else {
+    config.extraTools = {
+      ...securityTools,
+      ...(options.extraTools ?? {}),
+    };
   }
 
   // 禁用工具

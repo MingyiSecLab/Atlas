@@ -1777,3 +1777,299 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ==========================================================================
+   环境状态与安全沙箱 (macOS 桌面 App 风格)
+   ========================================================================== */
+
+.env-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  padding-right: 36px;
+  border-bottom: 1px solid #e8e8eb;
+  margin-bottom: 20px;
+}
+
+.env-header-text h2 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 650;
+  color: #1c1c1e;
+}
+
+.env-header-text p {
+  margin: 0;
+  font-size: 11px;
+  color: #8e8e93;
+  line-height: 1.4;
+}
+
+.env-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.env-time-label {
+  font-size: 11px;
+  color: #aeaeb2;
+}
+
+.env-mac-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #1c1c1e;
+  background: #ffffff;
+  border: 1px solid #d1d1d6;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: all 120ms ease;
+  white-space: nowrap;
+}
+
+.env-mac-button:hover:not(:disabled) {
+  background: #f2f2f7;
+  border-color: #c7c7cc;
+}
+
+.env-mac-button:active:not(:disabled) {
+  transform: scale(0.98);
+  background: #e5e5ea;
+}
+
+.env-mac-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.env-mac-button.is-compact {
+  height: 22px;
+  padding: 0 8px;
+  font-size: 11px;
+}
+
+.env-error-note {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  background: #fff2f2;
+  border: 1px solid #ffcdd2;
+  border-radius: 6px;
+  color: #d32f2f;
+  font-size: 11.5px;
+}
+
+/* 状态指示器与小圆点 (macOS Status Indicator) */
+.mac-status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.mac-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.mac-dot.is-green {
+  background: #34c759;
+  box-shadow: 0 0 0 1.5px rgba(52, 199, 89, 0.2);
+}
+
+.mac-dot.is-amber {
+  background: #ff9500;
+  box-shadow: 0 0 0 1.5px rgba(255, 149, 0, 0.2);
+}
+
+.mac-dot.is-red {
+  background: #ff3b30;
+  box-shadow: 0 0 0 1.5px rgba(255, 59, 48, 0.2);
+}
+
+.mac-dot.is-gray {
+  background: #8e8e93;
+}
+
+.mac-status-label {
+  font-size: 12px;
+  color: #3a3a3c;
+  font-weight: 500;
+}
+
+.mac-tag {
+  display: inline-block;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #3a3a3c;
+  background: #f2f2f7;
+  border-radius: 4px;
+}
+
+.mac-subtext {
+  font-size: 11px;
+  color: #8e8e93;
+}
+
+.mac-container-action-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 渗透工具链分组卡片 (macOS Inset Grouped Table) */
+.mac-tools-group {
+  border: 1px solid #e5e5ea;
+  border-radius: 8px;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+.mac-tool-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 9px 14px;
+  min-height: 40px;
+}
+
+.mac-tool-item + .mac-tool-item {
+  border-top: 1px solid #f2f2f7;
+}
+
+.mac-tool-main {
+  min-width: 0;
+  flex: 1;
+}
+
+.mac-tool-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1c1c1e;
+}
+
+.mac-tool-desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #8e8e93;
+  line-height: 1.35;
+}
+
+.mac-desc-err {
+  color: #ff3b30;
+}
+
+.mac-tool-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.mac-version-pill {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #636366;
+  background: #f2f2f7;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.mac-empty-state {
+  padding: 20px;
+  text-align: center;
+  color: #8e8e93;
+  font-size: 12px;
+  border: 1px dashed #d1d1d6;
+  border-radius: 8px;
+}
+
+.env-mac-button.is-primary-action {
+  font-weight: 600;
+  color: #007aff;
+  border-color: #bfe0ff;
+  background: #f0f7ff;
+}
+
+.env-mac-button.is-primary-action:hover:not(:disabled) {
+  background: #e1effe;
+  border-color: #90c7fe;
+}
+
+.mac-inline-error-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #fff5f5;
+  border: 1px solid #fed7d7;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+
+.mac-inline-error-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.mac-inline-error-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  color: #c53030;
+}
+
+.mac-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+  border: 1px solid #feb2b2;
+  background: #ffffff;
+  border-radius: 4px;
+  color: #c53030;
+  cursor: pointer;
+}
+
+.mac-copy-btn:hover {
+  background: #fffafa;
+}
+
+.mac-inline-error-body {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  color: #742a2a;
+  word-break: break-all;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -1,198 +1,103 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tool } from "ai";
-import { z } from "zod";
-import type { ToolContext } from "./types";
+/**
+ * document_app: 记录安全侦察阶段发现的应用实体与技术栈信息 (read-only 观测记录)。
+ *
+ * 安全工具域成员：实现 pentest 的 RuntimePentestTool 契约，由
+ * pentest 域的 executor 与安全闸统一调度：
+ * - 纯本地侦察记录归档，无主动外网发包，不具破坏性
+ * - 产物持久化于工作区 .agents/pentest/apps/ 目录
+ * - 严格防路径逃逸（path traversal 拦截），保障只写在当前工作区内
+ */
+import { mkdir, writeFile } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
+import type { RuntimePentestTool } from '../../pentest/tools.js'
+
+const DOCUMENT_APP_DESCRIPTION = [
+  'Document an identified application asset (web application, API service, cloud resource, admin panel)',
+  'discovered during reconnaissance into the workspace pentest artifact repository.',
+  'Arguments: appName (required), appType (web_application|api|full_stack|database|cloud_resource|storage),',
+  'description (required), framework (optional), technology (optional string array),',
+  'authentication (optional), domain (optional base URL with scheme), notes (optional).'
+].join(' ')
 
 function sanitizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9-_.]/g, "_");
+  return name.toLowerCase().replace(/[^a-z0-9-_.]/g, '_')
 }
 
-/**
- * Validates that a domain string is a well-formed URL with scheme + host.
- * Returns a normalized origin string or null if invalid.
- */
-function validateDomainUrl(value: string): {
-  valid: boolean;
-  origin: string | null;
-  error: string | null;
-} {
-  const trimmed = value.trim();
+export function createDocumentAppTool(): RuntimePentestTool {
+  return {
+    name: 'document_app',
+    kind: 'read-only',
+    description: DOCUMENT_APP_DESCRIPTION,
+    async execute(command, context) {
+      const args = command.arguments ?? {}
+      const rawAppName = typeof args.appName === 'string' ? args.appName.trim() : ''
+      if (!rawAppName) {
+        throw new Error('document_app requires a non-empty appName.')
+      }
 
-  if (!trimmed.includes("://")) {
-    return {
-      valid: false,
-      origin: null,
-      error:
-        `Domain "${trimmed}" is missing a URL scheme. ` +
-        `Use a full URL with scheme (e.g., "https://${trimmed}" instead of "${trimmed}").`,
-    };
-  }
+      const appType =
+        typeof args.appType === 'string' && args.appType ? args.appType : 'web_application'
+      const description = typeof args.description === 'string' ? args.description : ''
+      const framework = typeof args.framework === 'string' ? args.framework : undefined
+      const technology = Array.isArray(args.technology)
+        ? (args.technology.filter((t): t is string => typeof t === 'string'))
+        : undefined
+      const authentication =
+        typeof args.authentication === 'string' ? args.authentication : undefined
+      const notes = typeof args.notes === 'string' ? args.notes : undefined
 
-  try {
-    const parsed = new URL(trimmed);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return {
-        valid: false,
-        origin: null,
-        error:
-          `Domain "${trimmed}" has an unsupported scheme "${parsed.protocol}". ` +
-          `Use "https://" or "http://".`,
-      };
-    }
-    if (!parsed.hostname) {
-      return {
-        valid: false,
-        origin: null,
-        error: `Domain "${trimmed}" has no hostname.`,
-      };
-    }
-    return { valid: true, origin: parsed.origin, error: null };
-  } catch {
-    return {
-      valid: false,
-      origin: null,
-      error:
-        `Domain "${trimmed}" is not a valid URL. ` +
-        `Provide a full URL (e.g., "https://example.com", "https://bucket.s3.amazonaws.com").`,
-    };
-  }
-}
-
-/**
- * Factory for the `document_app` tool.
- *
- * Documents a discovered application during attack surface analysis —
- * writes a JSON file to the session's apps directory. This tool is
- * specifically for application-level entities (web apps, APIs, admin panels,
- * services) and is designed for incremental creation via the agent log
- * persister in Console.
- */
-export function documentApp(ctx: ToolContext) {
-  const baseAppsPath = join(ctx.session.rootPath, "apps");
-
-  return tool({
-    description: `Document a discovered application during attack surface analysis.
-
-This stores a session-local reconnaissance artifact only. It does NOT create or update an application in the user's authenticated Pensar workspace. Use \`create_workspace_app\` for that mutation.
-
-Applications are top-level entities discovered during reconnaissance — web applications, APIs, admin panels, or services. Each application groups related endpoints.
-
-Use this tool to document:
-- Web applications (the main target app, internal tools, dashboards)
-- API services (REST APIs, GraphQL services)
-- Admin panels or management interfaces
-- Discovered subdomains hosting distinct applications
-- Cloud resources (S3 buckets, cloud storage, CDN origins, etc.)
-
-Do NOT use this for individual endpoints — use \`document_endpoint\` instead.
-Do NOT use this for external/third-party services (CDNs, auth providers, SaaS) unless they are cloud resources owned by the target.
-
-Each application creates a JSON file in the apps directory for tracking and analysis.`,
-    inputSchema: z.object({
-      appName: z
-        .string()
-        .describe(
-          "Unique name for the application (e.g., 'Main Web App', 'Admin API', 'api.example.com')",
-        ),
-      appType: z
-        .enum([
-          "web_application",
-          "api",
-          "full_stack",
-          "database",
-          "cloud_resource",
-          "storage",
-        ])
-        .describe("Type of application discovered"),
-      description: z
-        .string()
-        .describe(
-          "Detailed description of the application including what it is and why it's relevant",
-        ),
-      framework: z
-        .string()
-        .optional()
-        .describe(
-          "Technology framework or stack (e.g., 'Next.js', 'Express + React', 'Django')",
-        ),
-      technology: z
-        .array(z.string())
-        .optional()
-        .describe("Technology stack (e.g., ['Node.js', 'Express', 'MongoDB'])"),
-      authentication: z
-        .string()
-        .optional()
-        .describe(
-          "Authentication type if known (e.g., 'OAuth2', 'JWT', 'session-based')",
-        ),
-      notes: z
-        .string()
-        .optional()
-        .describe("Additional notes or observations about the application"),
-      domain: z
-        .string()
-        .optional()
-        .describe(
-          "Base URL / domain this application is associated with. Only provide this if you can deterministically derive it from evidence — source code, IaC, config, Known Domains list, or live discovery. " +
-            // biome-ignore lint/suspicious/noTemplateCurlyInString: literal ${stage} shown to the model as example prompt text
-            "Substituting a known environment/stage name into an IaC template IS deterministic (e.g. IaC defines '${stage}-bucket' and environments include 'production' → 'https://production-bucket.s3.amazonaws.com' is valid). " +
-            "Do NOT invent domains with no supporting evidence — if no domain can be derived, omit this field. " +
-            "Must be a full URL with scheme when provided. " +
-            "For web apps/APIs: the public URL (e.g., 'https://api.example.com'). " +
-            "For S3 buckets: 'https://{ACTUAL-BUCKET-NAME}.s3.amazonaws.com' — you MUST include the real bucket name from IaC, NOT 'https://s3.amazonaws.com'. " +
-            "For databases (RDS/Aurora): 'https://{cluster-endpoint}.rds.amazonaws.com'. " +
-            "For Redis/ElastiCache: 'https://{cluster-id}.cache.amazonaws.com'. " +
-            "For SQS queues: 'https://sqs.{region}.amazonaws.com/{account}/{queue-name}'. " +
-            "For Lambda functions: use the API Gateway or Function URL that routes to them, NOT a generic API domain. " +
-            "For CDN/CloudFront: 'https://{distribution-id}.cloudfront.net'. " +
-            "CRITICAL: each resource must have its OWN unique domain derived from its infrastructure definition — never reuse the console or API domain for unrelated resources.",
-        ),
-      toolCallDescription: z
-        .string()
-        .describe(
-          "A concise, human-readable description of what this tool call is doing",
-        ),
-    }),
-    execute: async (input) => {
-      if (input.domain) {
-        const domainCheck = validateDomainUrl(input.domain);
-        if (!domainCheck.valid) {
-          return {
-            success: false,
-            error: "invalid_domain",
-            message: domainCheck.error!,
-          };
+      let domain = typeof args.domain === 'string' ? args.domain.trim() : undefined
+      if (domain) {
+        try {
+          const parsed = new URL(domain)
+          if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+            throw new Error('Invalid domain protocol')
+          }
+          domain = parsed.origin
+        } catch {
+          throw new Error(`document_app domain must be a valid http or https URL: ${domain}`)
         }
-        input = { ...input, domain: domainCheck.origin! };
       }
 
-      if (!existsSync(baseAppsPath)) {
-        mkdirSync(baseAppsPath, { recursive: true });
+      const root = resolve(context.workspacePath)
+      const appsDir = resolve(root, '.agents', 'pentest', 'apps')
+      if (appsDir !== root && !appsDir.startsWith(root + sep)) {
+        throw new Error('Apps directory escapes the workspace root.')
       }
 
-      const sanitizedName = sanitizeName(input.appName);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const filename = `app_${sanitizedName}_${timestamp}.json`;
-      const filepath = join(baseAppsPath, filename);
+      await mkdir(appsDir, { recursive: true })
 
-      const appRecord = {
-        ...input,
-        discoveredAt: new Date().toISOString(),
-        sessionId: ctx.session.id,
-        target: ctx.session.targets[0],
-      };
+      const filename = `${sanitizeName(rawAppName)}.json`
+      const filepath = resolve(appsDir, filename)
+      if (filepath !== root && !filepath.startsWith(root + sep)) {
+        throw new Error('App record path escapes the workspace root.')
+      }
 
-      writeFileSync(filepath, JSON.stringify(appRecord, null, 2));
+      const record = {
+        appName: rawAppName,
+        appType,
+        description,
+        framework,
+        technology,
+        authentication,
+        domain,
+        notes,
+        targetRef: command.targetRef,
+        createdAt: new Date().toISOString()
+      }
+
+      await writeFile(filepath, JSON.stringify(record, null, 2), 'utf-8')
 
       return {
-        success: true,
-        appName: input.appName,
-        appType: input.appType,
-        domain: input.domain,
-        filepath,
-        message: `Application '${input.appName}' documented successfully`,
-      };
-    },
-  });
+        output: JSON.stringify({
+          success: true,
+          appName: rawAppName,
+          appType,
+          filepath,
+          message: `Application '${rawAppName}' documented successfully.`
+        }, null, 2),
+        exitCode: 0
+      }
+    }
+  }
 }

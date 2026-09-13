@@ -56,11 +56,6 @@ interface TopHeaderProps {
   hubSearchQuery?: string
   onHubSearchChange?: (query: string) => void
   onOpenMyItems?: () => void
-  /** Projects mode integration */
-  isProjectMode?: boolean
-  projectSearchQuery?: string
-  onProjectSearchChange?: (query: string) => void
-  onNewProject?: () => void
 }
 
 /** Small icon button used in the header chrome */
@@ -127,11 +122,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onSelectHubTab,
   hubSearchQuery = '',
   onHubSearchChange,
-  onOpenMyItems,
-  isProjectMode = false,
-  projectSearchQuery = '',
-  onProjectSearchChange,
-  onNewProject
+  onOpenMyItems
 }) => {
   const actionsRef = useRef<HTMLDivElement>(null)
   const [taskMenuOpen, setTaskMenuOpen] = useState(false)
@@ -516,36 +507,6 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                 <span>自定义连接器</span>
               </button>
             )}
-          </div>
-        ) : isProjectMode ? (
-          <div className="hub-header-right app-no-drag">
-            <div className="hub-header-search-wrap">
-              <Search size={14} className="hub-header-search-icon" />
-              <input
-                className="hub-header-search-input"
-                placeholder="搜索项目空间名称或路径"
-                value={projectSearchQuery}
-                onChange={(e) => onProjectSearchChange?.(e.currentTarget.value)}
-              />
-              {projectSearchQuery ? (
-                <button
-                  className="hub-header-search-clear"
-                  aria-label="清空搜索"
-                  onClick={() => onProjectSearchChange?.('')}
-                >
-                  <X size={12} />
-                </button>
-              ) : null}
-            </div>
-
-            <button
-              className="hub-header-action-btn"
-              onClick={onNewProject}
-              style={{ backgroundColor: '#18181b', color: '#ffffff' }}
-            >
-              <Plus size={13} />
-              <span>新建项目</span>
-            </button>
           </div>
         ) : null}
       </div>

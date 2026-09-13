@@ -8,17 +8,20 @@ import { DesktopRuntimeManager } from './runtime-manager'
 import { registerRuntimeService } from './runtime-service'
 import { registerTerminalService, watchTerminalOwner } from './terminal-service'
 import { registerFileService } from './file-service'
+import { registerEnvironmentService } from './environment-service'
 
 let disposeTerminalService = (): void => undefined
 let disposeProviderService = (): void => undefined
 let disposeRuntimeService = (): void => undefined
 let disposePentestService = (): void => undefined
 let disposeFileService = (): void => undefined
+let disposeEnvironmentService = (): void => undefined
 const runtimeManager = new DesktopRuntimeManager(process.env.MINGYI_WORKSPACE_PATH)
 let shutdownStarted = false
 let servicesStopped = false
 
 async function shutdownServices(): Promise<void> {
+  disposeEnvironmentService()
   disposeFileService()
   disposeProviderService()
   disposeRuntimeService()
@@ -96,6 +99,7 @@ app
     disposeRuntimeService = registerRuntimeService(runtimeManager)
     disposePentestService = registerPentestService(runtimeManager)
     disposeFileService = registerFileService(runtimeManager)
+    disposeEnvironmentService = registerEnvironmentService(runtimeManager)
 
     if (process.platform === 'darwin' && app.dock) {
       app.dock.setIcon(icon)

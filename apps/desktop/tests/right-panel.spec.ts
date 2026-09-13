@@ -84,8 +84,7 @@ test.describe('Right capability panel', () => {
         authorizationRef: 'ENG-E2E-001'
       })
     )
-    await expect(pentest.getByTestId('pentest-console')).toBeVisible()
-    await expect(pentest.getByTestId('pentest-status')).toContainText('待启动')
+    await expect(pentest.getByTestId('pentest-subtabs')).toBeVisible()
 
     // 1. Tab 1: Blackboard explore view (infinite canvas with goal anchor)
     await expect(pentest.getByTestId('pentest-subtabs')).toBeVisible()
@@ -152,7 +151,7 @@ test.describe('Right capability panel', () => {
         })
       )
     }
-    await expect(pentest.getByTestId('pentest-console')).toBeVisible({ timeout: 15_000 })
+    await expect(pentest.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
 
     const persistedIds = await page.evaluate(() => window.api.pentest.list())
     expect(persistedIds.length).toBeGreaterThan(0)
@@ -182,7 +181,7 @@ test.describe('Right capability panel', () => {
     await strip.getByRole('button', { name: '渗透', exact: true }).click()
 
     const restoredPanel = page.getByTestId('right-panel-pentest')
-    await expect(restoredPanel.getByTestId('pentest-console')).toBeVisible({ timeout: 15_000 })
+    await expect(restoredPanel.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
     await expect(restoredPanel.getByTestId('pentest-chat-onboarding')).toHaveCount(0)
     const restoredIds = await page.evaluate(() => window.api.pentest.list())
     expect(restoredIds).toEqual(persistedIds)

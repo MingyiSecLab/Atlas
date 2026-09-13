@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ProviderBridge } from '../shared/provider-ipc'
 import type { FileBridge } from '../shared/file-ipc'
+import type { EnvironmentBridge } from '../shared/environment-ipc'
 import type {
   RuntimeExpertBridge,
   RuntimeModelBridge,
@@ -38,6 +39,7 @@ interface MingyiDesktopApi {
   sessions: RuntimeSessionBridge
   mcp: RuntimeMcpBridge
   pentest: RuntimePentestBridge
+  environment: EnvironmentBridge
 }
 
 declare global {

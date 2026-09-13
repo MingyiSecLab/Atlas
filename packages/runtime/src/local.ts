@@ -18,6 +18,7 @@ import { createFileProjectStore, createMemoryProjectStore } from './projects/sto
 import { createRuntimePentestService } from './pentest/service.js'
 import { createRuntimeProjectService } from './projects/service.js'
 import { createRuntimeExpertService } from './experts/service.js'
+import { createDockerSandboxAdapter } from './sandbox/docker.js'
 import type { LocalRuntimeConfig, LocalRuntimeInstance } from './types.js'
 
 /**
@@ -62,6 +63,26 @@ export async function createLocalRuntime(
     homeDir: config.homeDir
   })
 
+  const stateSearch = createRuntimeStateSearchService()
+  // pentestDataDir 提供时启用 engagement 快照与证据内容的跨重启持久化。
+  const pentestDataDir = config.pentestDataDir
+    ? resolve(config.pentestDataDir)
+    : undefined
+  const pentest = createRuntimePentestService({
+    stateSearch,
+    ...(pentestDataDir
+      ? {
+          store: createFilePentestStore({ directory: pentestDataDir }),
+          evidenceStore: createFilePentestEvidenceStore({ directory: pentestDataDir })
+        }
+      : {})
+  })
+
+  // 1.5 Kali 沙箱执行器（可选）：提供 config.sandbox 时创建，容器按需拉起（ensure 惰性）。
+  const sandbox = config.sandbox
+    ? createDockerSandboxAdapter({ ...config.sandbox })
+    : undefined
+
   // 2. 创建 Controller 配置
   const controllerConfig = createControllerConfig({
     workspacePath: paths.workspacePath,
@@ -73,7 +94,9 @@ export async function createLocalRuntime(
     models: config.models,
     extraTools: config.extraTools,
     disabledTools: config.disabledTools,
-    observationalMemory: config.observationalMemory
+    observationalMemory: config.observationalMemory,
+    pentestService: pentest,
+    ...(sandbox ? { sandbox } : {})
   })
 
   // 3. 调用官方 API 创建 Controller 和 Session
@@ -111,26 +134,12 @@ export async function createLocalRuntime(
     projectPath: paths.workspacePath,
     configDir: controllerConfig.configDir
   })
-  const stateSearch = createRuntimeStateSearchService()
   const om = createRuntimeOmService({ controller, defaultSession: session })
   // 工作区专家文件服务（<configDir>/agents/*.md 的扫描与写回）；mode 注册发生在
   // Controller 构造时（createControllerConfig 内扫描），save 后需重连工作区生效。
   const experts = createRuntimeExpertService({
     workspacePath: paths.workspacePath,
     configDirName: controllerConfig.configDir
-  })
-  // pentestDataDir 提供时启用 engagement 快照与证据内容的跨重启持久化。
-  const pentestDataDir = config.pentestDataDir
-    ? resolve(config.pentestDataDir)
-    : undefined
-  const pentest = createRuntimePentestService({
-    stateSearch,
-    ...(pentestDataDir
-      ? {
-          store: createFilePentestStore({ directory: pentestDataDir }),
-          evidenceStore: createFilePentestEvidenceStore({ directory: pentestDataDir })
-        }
-      : {})
   })
   // projectsDataDir 提供时启用项目空间登记的跨重启持久化（<dir>/projects.json）。
   const projects = createRuntimeProjectService({
@@ -158,6 +167,9 @@ export async function createLocalRuntime(
     pentest,
     experts,
     projects,
+    // 沙箱容器保持常驻（README 语义：现场与证据保留，ensure 幂等复用）；
+    // 需要显式停止时由宿主调用 sandbox.dispose()。
+    ...(sandbox ? { sandbox } : {}),
     shutdown: async () => {
       if (shutdownStarted) return
       shutdownStarted = true

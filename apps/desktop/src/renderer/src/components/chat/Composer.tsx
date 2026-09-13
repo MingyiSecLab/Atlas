@@ -26,7 +26,7 @@ import type { ExpertItem } from '../hub/hub-types'
 import { formatTokenCount, getModelContextLimit } from './token-counter'
 import { ModelBrandIcon } from '../common/ModelBrandIcon'
 
-const AGENT_MODES = ['Build', 'Plan', 'Fast', 'Pentest', 'Audit']
+const AGENT_MODES = ['Pentest', 'Audit']
 
 type ReasoningEffort = 'high' | 'medium' | 'low' | 'off'
 

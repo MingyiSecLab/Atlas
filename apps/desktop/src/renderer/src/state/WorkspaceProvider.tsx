@@ -88,6 +88,7 @@ interface WorkspaceContextValue {
   projects: DesktopProjectInfo[]
   isLoading: boolean
   error: string | null
+  clearError(): void
   modelIds: string[]
   modes: RuntimeModeInfo[]
   sessions: SessionSummary[]
@@ -111,9 +112,6 @@ interface WorkspaceContextValue {
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null)
 
 const DEFAULT_MODES: RuntimeModeInfo[] = [
-  { id: 'build', name: 'Build', description: '代码实现与构建模式' },
-  { id: 'plan', name: 'Plan', description: '任务规划与架构分析' },
-  { id: 'fast', name: 'Fast', description: '极速响应与简短问答' },
   { id: 'pentest', name: 'Pentest', description: '安全渗透测试与授权证据采集' },
   { id: 'audit', name: 'Audit', description: '代码质量与安全审计审查' }
 ]
@@ -121,12 +119,9 @@ const DEFAULT_MODES: RuntimeModeInfo[] = [
 let cachedModes: RuntimeModeInfo[] = DEFAULT_MODES
 
 function permissionFromMode(modeId?: string): string {
-  if (!modeId) return 'Build'
+  if (!modeId) return 'Pentest'
   const matched = cachedModes.find((m) => m.id.toLowerCase() === modeId.toLowerCase())
   if (matched?.name) return matched.name
-  if (modeId === 'plan') return 'Plan'
-  if (modeId === 'fast') return 'Fast'
-  if (modeId === 'build') return 'Build'
   if (modeId === 'pentest') return 'Pentest'
   if (modeId === 'audit') return 'Audit'
   return modeId.charAt(0).toUpperCase() + modeId.slice(1)
@@ -140,9 +135,6 @@ function modeIdFromPermission(permission?: string): string | undefined {
       m.id.toLowerCase() === permission.toLowerCase()
   )
   if (matched?.id) return matched.id
-  if (permission.toLowerCase() === 'plan') return 'plan'
-  if (permission.toLowerCase() === 'fast') return 'fast'
-  if (permission.toLowerCase() === 'build') return 'build'
   if (permission.toLowerCase() === 'pentest') return 'pentest'
   if (permission.toLowerCase() === 'audit') return 'audit'
   return permission.toLowerCase()
@@ -410,6 +402,10 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       }
       return current
     })
+  }, [])
+
+  const clearError = useCallback((): void => {
+    setError(null)
   }, [])
 
   const refresh = useCallback(async (): Promise<void> => {
@@ -756,6 +752,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       modes,
       sessions,
       snapshots,
+      clearError,
       selectWorkspace,
       reloadProjects,
       createProject,
@@ -780,6 +777,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }): 
       modes,
       sessions,
       snapshots,
+      clearError,
       selectWorkspace,
       reloadProjects,
       createProject,

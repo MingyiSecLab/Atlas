@@ -96,7 +96,60 @@ function assertInScope(url: URL, scope: readonly string[]): void {
   }
 }
 
-export function createHttpRequestTool(): RuntimePentestTool {
+function parseSetCookieHeaders(headers: Headers): Array<{ name: string; value: string }> {
+  const rawList: string[] =
+    typeof (headers as unknown as { getSetCookie?: () => string[] }).getSetCookie === 'function'
+      ? (headers as unknown as { getSetCookie: () => string[] }).getSetCookie()
+      : [headers.get('set-cookie')].filter((s): s is string => Boolean(s))
+
+  const results: Array<{ name: string; value: string }> = []
+  for (const item of rawList) {
+    const firstPart = item.split(';')[0]?.trim()
+    if (!firstPart) continue
+    const eqIdx = firstPart.indexOf('=')
+    if (eqIdx > 0) {
+      const name = firstPart.slice(0, eqIdx).trim()
+      const value = firstPart.slice(eqIdx + 1).trim()
+      if (name) {
+        results.push({ name, value })
+      }
+    }
+  }
+  return results
+}
+
+function parseCookieHeader(cookieHeader: string | undefined): Map<string, string> {
+  const map = new Map<string, string>()
+  if (!cookieHeader) return map
+  for (const pair of cookieHeader.split(';')) {
+    const trimmed = pair.trim()
+    if (!trimmed) continue
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx > 0) {
+      const name = trimmed.slice(0, eqIdx).trim()
+      const value = trimmed.slice(eqIdx + 1).trim()
+      if (name) {
+        map.set(name, value)
+      }
+    }
+  }
+  return map
+}
+
+function serializeCookieMap(map: Map<string, string>): string {
+  return Array.from(map.entries())
+    .map(([k, v]) => `${k}=${v}`)
+    .join('; ')
+}
+
+export interface HttpRequestToolOptions {
+  /** 域名/主机名维度的持久化 Cookie 存储，省略时由工具实例自动创建并在多次调用中共享 */
+  cookieJar?: Map<string, Map<string, string>>
+}
+
+export function createHttpRequestTool(options?: HttpRequestToolOptions): RuntimePentestTool {
+  const cookieJar = options?.cookieJar ?? new Map<string, Map<string, string>>()
+
   return {
     name: 'http_request',
     kind: 'active',
@@ -109,7 +162,7 @@ export function createHttpRequestTool(): RuntimePentestTool {
       if (!ALLOWED_METHODS.has(method)) {
         throw new Error(`http_request does not support method: ${method}.`)
       }
-      const headers = parseHeaders(args.headers)
+      const baseHeaders = parseHeaders(args.headers) ?? {}
       const body = stringArgument(args.body)
       if (body !== undefined && body.length > MAX_REQUEST_BODY_BYTES) {
         throw new Error(`http_request body exceeds the ${MAX_REQUEST_BODY_BYTES} byte cap.`)
@@ -124,14 +177,59 @@ export function createHttpRequestTool(): RuntimePentestTool {
       // 覆盖整条重定向链的单次超时；executor 的 withToolTimeout 之外再兜一层
       const signal = AbortSignal.any([context.signal, AbortSignal.timeout(timeoutMs)])
 
+      const explicitCookieKey = Object.keys(baseHeaders).find(k => k.toLowerCase() === 'cookie')
+      const explicitCookieStr = explicitCookieKey ? baseHeaders[explicitCookieKey] : undefined
+
+      function getEffectiveCookieString(host: string): string | undefined {
+        const stored = cookieJar.get(host)
+        const explicit = parseCookieHeader(explicitCookieStr)
+        const merged = new Map<string, string>()
+        if (stored) {
+          for (const [k, v] of stored.entries()) {
+            merged.set(k, v)
+          }
+        }
+        for (const [k, v] of explicit.entries()) {
+          merged.set(k, v)
+        }
+        return merged.size > 0 ? serializeCookieMap(merged) : undefined
+      }
+
+      function updateHostCookies(host: string, newCookies: Array<{ name: string; value: string }>) {
+        if (newCookies.length === 0) return
+        let map = cookieJar.get(host)
+        if (!map) {
+          map = new Map()
+          cookieJar.set(host, map)
+        }
+        for (const { name, value } of newCookies) {
+          map.set(name, value)
+        }
+      }
+
+      function buildHopHeaders(host: string): Record<string, string> {
+        const headers: Record<string, string> = { ...baseHeaders }
+        const cookieStr = getEffectiveCookieString(host)
+        if (cookieStr) {
+          if (explicitCookieKey && explicitCookieKey !== 'Cookie') {
+            delete headers[explicitCookieKey]
+          }
+          headers['Cookie'] = cookieStr
+        } else if (explicitCookieKey) {
+          delete headers[explicitCookieKey]
+        }
+        return headers
+      }
+
       let currentUrl = url
       let currentMethod = method
       let currentBody = body
+      let currentHeaders = buildHopHeaders(currentUrl.host)
 
       for (let hop = 0; ; hop++) {
         assertInScope(currentUrl, context.scope)
         assertHttpActionAllowed(
-          { method: currentMethod, url: currentUrl.toString(), body: currentBody, headers },
+          { method: currentMethod, url: currentUrl.toString(), body: currentBody, headers: currentHeaders },
           { allowDestructive: context.allowDestructive }
         )
 
@@ -139,7 +237,7 @@ export function createHttpRequestTool(): RuntimePentestTool {
         try {
           response = await fetch(currentUrl, {
             method: currentMethod,
-            headers,
+            headers: currentHeaders,
             body: currentMethod === 'GET' || currentMethod === 'HEAD' ? undefined : currentBody,
             redirect: 'manual',
             signal
@@ -154,6 +252,9 @@ export function createHttpRequestTool(): RuntimePentestTool {
           }
           throw error
         }
+
+        const setCookies = parseSetCookieHeaders(response.headers)
+        updateHostCookies(currentUrl.host, setCookies)
 
         const location = response.headers.get('location')
         const isRedirect = response.status >= 300 && response.status < 400 && location !== null
@@ -172,6 +273,7 @@ export function createHttpRequestTool(): RuntimePentestTool {
           currentBody = undefined
         }
         currentUrl = nextUrl
+        currentHeaders = buildHopHeaders(currentUrl.host)
       }
     }
   }

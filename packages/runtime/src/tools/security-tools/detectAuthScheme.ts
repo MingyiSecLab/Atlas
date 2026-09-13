@@ -1,191 +1,221 @@
-import { tool } from "ai";
-import { z } from "zod";
-import { targetFetch } from "../../../http/targetHeaders";
-import { resolverSessionFromCtx } from "./scopeGuard";
-import type { ToolContext } from "./types";
-
 /**
- * Factory for the `detect_auth_scheme` tool.
+ * detect_auth_scheme: 分析目标端点以识别其认证机制与防护屏障 (active)。
  *
- * Analyses an endpoint to identify the authentication mechanism in use
- * (form-based, HTTP Basic, Bearer, API key, OAuth, etc.) and detects
- * barriers like CAPTCHA or rate limiting.
+ * 安全工具域成员：实现 pentest 的 RuntimePentestTool 契约，由
+ * pentest 域的 executor 与安全闸统一调度：
+ * - 发起探测前经 isTargetInScope 校验 scope
+ * - 纯观测型 HTTP GET 请求，不发起暴力破解，不携带敏感数据
+ * - 识别 Basic / Bearer / 表单登录 / OAuth / JSON API 鉴权，以及 CAPTCHA / 频控屏障
  */
-export function detectAuthScheme(ctx: ToolContext) {
-  return tool({
-    description: `Analyze an endpoint to detect authentication scheme.
+import { isTargetInScope } from '../../pentest/scope.js'
+import type { RuntimePentestTool } from '../../pentest/tools.js'
 
-Identifies:
-- Form-based login (username/password fields)
-- HTTP Basic/Digest Auth (WWW-Authenticate header)
-- Bearer Token / JWT requirements
-- API Key authentication (X-API-Key, etc.)
-- OAuth2 flows
-- Custom authentication schemes
+const MAX_BODY_BYTES = 128 * 1024
 
-Also detects auth barriers (CAPTCHA, MFA) that block automated auth.
+const DETECT_AUTH_DESCRIPTION = [
+  'Analyze an endpoint to detect authentication schemes (Basic, Bearer, HTML form, JSON API, OAuth)',
+  'and identify barriers such as CAPTCHA or rate limiting.',
+  'Arguments: url (or endpoint, defaults to targetRef). Target must remain inside authorized scope.'
+].join(' ')
 
-Returns detected scheme and required fields for authentication.`,
-    inputSchema: z.object({
-      endpoint: z.string().describe("URL to analyze for auth scheme"),
-      toolCallDescription: z
-        .string()
-        .describe("A concise description of what this tool call is doing"),
-    }),
-    execute: async ({ endpoint }) => {
-      try {
-        const response = await targetFetch(
-          resolverSessionFromCtx(ctx),
-          endpoint,
-          {
-            method: "GET",
-            redirect: "manual",
-            signal: ctx.abortSignal,
-          },
-        );
-
-        const body = await response.text();
-        const bodyLower = body.toLowerCase();
-
-        // Detect auth barriers
-        const barrier = detectBarrier(bodyLower, response.status);
-        if (barrier) {
-          return { success: true, scheme: undefined, barrier };
-        }
-
-        // Check WWW-Authenticate header
-        const wwwAuth = response.headers.get("www-authenticate");
-        if (wwwAuth) {
-          if (wwwAuth.toLowerCase().includes("basic")) {
-            return {
-              success: true,
-              scheme: {
-                method: "basic",
-                endpoint,
-                fields: {},
-              },
-            };
-          }
-          if (wwwAuth.toLowerCase().includes("bearer")) {
-            return {
-              success: true,
-              scheme: {
-                method: "bearer",
-                endpoint,
-                fields: {},
-              },
-            };
-          }
-        }
-
-        // Check for redirect to login page
-        if (response.status >= 300 && response.status < 400) {
-          const location = response.headers.get("location") || "";
-          if (/login|signin|auth/i.test(location)) {
-            return {
-              success: true,
-              scheme: {
-                method: "form",
-                endpoint: location,
-                browserRequired: true,
-                fields: {},
-              },
-            };
-          }
-        }
-
-        // Check for HTML login form
-        if (
-          bodyLower.includes('type="password"') ||
-          bodyLower.includes("type='password'")
-        ) {
-          const fields: Record<string, string> = {};
-          // Detect username field
-          const usernameMatch = body.match(
-            /name=['"]?(username|user|email|login|user_name)['"]?/i,
-          );
-          if (usernameMatch) fields.usernameField = usernameMatch[1];
-
-          // Detect password field
-          const passwordMatch = body.match(
-            /name=['"]?(password|pass|passwd)['"]?/i,
-          );
-          if (passwordMatch) fields.passwordField = passwordMatch[1];
-
-          // Detect CSRF
-          const csrfMatch = body.match(
-            /name=['"]?(csrf|_csrf|csrfmiddlewaretoken|_token|authenticity_token)['"]?\s+value=['"]?([^'"]+)['"]?/i,
-          );
-          const csrfRequired = !!csrfMatch;
-
-          // SPA detection
-          const isSPA =
-            bodyLower.includes("react") ||
-            bodyLower.includes("angular") ||
-            bodyLower.includes("vue") ||
-            bodyLower.includes("__next");
-
-          return {
-            success: true,
-            scheme: {
-              method: "form",
-              endpoint,
-              fields,
-              csrfRequired,
-              csrfToken: csrfMatch?.[2],
-              browserRequired: isSPA,
-            },
-          };
-        }
-
-        // Check for 401 JSON response
-        if (response.status === 401) {
-          return {
-            success: true,
-            scheme: {
-              method: "json",
-              endpoint,
-              fields: {},
-            },
-          };
-        }
-
-        return {
-          success: true,
-          scheme: undefined,
-          message: `No clear auth scheme detected at ${endpoint} (status: ${response.status})`,
-        };
-      } catch (error: unknown) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        return {
-          success: false,
-          error: errorMsg,
-        };
-      }
-    },
-  });
+function normalizeUrl(rawUrl: string): URL {
+  let url: URL
+  try {
+    url = new URL(rawUrl)
+  } catch {
+    throw new Error(`detect_auth_scheme requires a valid URL, got: ${rawUrl}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('detect_auth_scheme requires an http or https URL.')
+  }
+  url.username = ''
+  url.password = ''
+  url.hash = ''
+  return url
 }
 
 function detectBarrier(
   bodyLower: string,
-  statusCode: number,
+  statusCode: number
 ): { type: string; details: string } | null {
   if (
-    bodyLower.includes("captcha") ||
-    bodyLower.includes("recaptcha") ||
-    bodyLower.includes("hcaptcha") ||
-    bodyLower.includes("g-recaptcha")
+    bodyLower.includes('captcha') ||
+    bodyLower.includes('recaptcha') ||
+    bodyLower.includes('hcaptcha') ||
+    bodyLower.includes('g-recaptcha') ||
+    bodyLower.includes('cf-turnstile') ||
+    bodyLower.includes('turnstile')
   ) {
-    return { type: "captcha", details: "CAPTCHA detected on login form" };
+    return { type: 'captcha', details: 'CAPTCHA barrier detected on page.' }
   }
 
   if (
     statusCode === 429 ||
-    bodyLower.includes("rate limit") ||
-    bodyLower.includes("too many")
+    bodyLower.includes('rate limit') ||
+    bodyLower.includes('too many requests')
   ) {
-    return { type: "rate_limit", details: "Rate limiting detected" };
+    return { type: 'rate_limit', details: 'Rate limiting or throttling detected.' }
   }
 
-  return null;
+  return null
+}
+
+export function createDetectAuthSchemeTool(): RuntimePentestTool {
+  return {
+    name: 'detect_auth_scheme',
+    kind: 'active',
+    description: DETECT_AUTH_DESCRIPTION,
+    timeoutMs: 15_000,
+    async execute(command, context) {
+      const args = command.arguments ?? {}
+      const rawUrl =
+        (typeof args.url === 'string' && args.url) ||
+        (typeof args.endpoint === 'string' && args.endpoint) ||
+        command.targetRef
+
+      if (!rawUrl) {
+        throw new Error('detect_auth_scheme requires a valid endpoint URL.')
+      }
+
+      const targetUrl = normalizeUrl(rawUrl)
+      if (!isTargetInScope(targetUrl.toString(), context.scope)) {
+        throw new Error(`Target is outside authorized scope: ${targetUrl.toString()}`)
+      }
+
+      const response = await fetch(targetUrl.toString(), {
+        method: 'GET',
+        redirect: 'manual',
+        headers: { 'user-agent': 'mingyi-auth-detector/0.1' }
+      })
+
+      const buffer = await response.arrayBuffer()
+      const body = new TextDecoder('utf-8', { fatal: false }).decode(
+        buffer.slice(0, MAX_BODY_BYTES)
+      )
+      const bodyLower = body.toLowerCase()
+
+      const barrier = detectBarrier(bodyLower, response.status)
+
+      // 1. WWW-Authenticate header
+      const wwwAuth = response.headers.get('www-authenticate')
+      if (wwwAuth) {
+        const lowerAuth = wwwAuth.toLowerCase()
+        if (lowerAuth.includes('basic')) {
+          return {
+            output: JSON.stringify({
+              success: true,
+              endpoint: targetUrl.toString(),
+              status: response.status,
+              scheme: { method: 'basic', header: wwwAuth },
+              barrier
+            }, null, 2),
+            exitCode: 0
+          }
+        }
+        if (lowerAuth.includes('bearer')) {
+          return {
+            output: JSON.stringify({
+              success: true,
+              endpoint: targetUrl.toString(),
+              status: response.status,
+              scheme: { method: 'bearer', header: wwwAuth },
+              barrier
+            }, null, 2),
+            exitCode: 0
+          }
+        }
+      }
+
+      // 2. Redirect to login
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get('location') || ''
+        if (/login|signin|auth|oauth/i.test(location)) {
+          return {
+            output: JSON.stringify({
+              success: true,
+              endpoint: targetUrl.toString(),
+              status: response.status,
+              scheme: {
+                method: 'redirect_form',
+                loginLocation: location,
+                browserRequired: true
+              },
+              barrier
+            }, null, 2),
+            exitCode: 0
+          }
+        }
+      }
+
+      // 3. HTML login form
+      if (
+        bodyLower.includes('type="password"') ||
+        bodyLower.includes("type='password'")
+      ) {
+        const fields: Record<string, string> = {}
+        const userMatch = body.match(
+          /name=['"]?(username|user|email|login|user_name|account)['"]?/i
+        )
+        if (userMatch) fields.usernameField = userMatch[1] ?? ''
+
+        const passMatch = body.match(/name=['"]?(password|pass|passwd|pwd)['"]?/i)
+        if (passMatch) fields.passwordField = passMatch[1] ?? ''
+
+        const csrfMatch = body.match(
+          /name=['"]?(csrf|_csrf|csrfmiddlewaretoken|_token|authenticity_token)['"]?\s+value=['"]?([^'"]+)['"]?/i
+        )
+        const isSPA =
+          bodyLower.includes('react') ||
+          bodyLower.includes('vue') ||
+          bodyLower.includes('angular') ||
+          bodyLower.includes('__next')
+
+        return {
+          output: JSON.stringify({
+            success: true,
+            endpoint: targetUrl.toString(),
+            status: response.status,
+            scheme: {
+              method: 'form',
+              fields,
+              csrfRequired: Boolean(csrfMatch),
+              csrfToken: csrfMatch?.[2],
+              browserRequired: isSPA
+            },
+            barrier
+          }, null, 2),
+          exitCode: 0
+        }
+      }
+
+      // 4. JSON 401 / 403 API response
+      if (response.status === 401 || response.status === 403) {
+        return {
+          output: JSON.stringify({
+            success: true,
+            endpoint: targetUrl.toString(),
+            status: response.status,
+            scheme: {
+              method: 'json_api',
+              status: response.status
+            },
+            barrier
+          }, null, 2),
+          exitCode: 0
+        }
+      }
+
+      return {
+        output: JSON.stringify({
+          success: true,
+          endpoint: targetUrl.toString(),
+          status: response.status,
+          scheme: null,
+          message: `No explicit authentication scheme detected at ${targetUrl.toString()}`,
+          barrier
+        }, null, 2),
+        exitCode: 0
+      }
+    }
+  }
 }

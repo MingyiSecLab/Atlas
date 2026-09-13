@@ -114,14 +114,55 @@ export {
   assertHttpActionAllowed,
   classifyCommandAction,
   classifyHttpRequest,
+  createCrawlAuthenticatedTool,
+  createDetectAuthSchemeTool,
+  createDocumentAppTool,
+  createDocumentEndpointTool,
   createExtractJsEndpointsTool,
   createHttpProbeTool,
+  createHttpRequestTool,
   createTcpConnectTool,
+  createTestEndpointVariationsTool,
   createWorkspaceReadTextTool,
   DEFAULT_PENTEST_TOOLS,
   DestructiveActionError,
   isTargetInScope
 } from './pentest/index.js'
+export { createSecurityMastraTools } from './tools/security-tools/index.js'
+export {
+  createKaliSandboxTools,
+  KALI_SANDBOX_LOCAL_TARGET
+} from './tools/security-tools/index.js'
+
+// Kali 沙箱执行层（SPI + docker CLI 实现 + mock）
+export {
+  createDockerSandboxAdapter,
+  createMockSandboxAdapter,
+  createSpawnDockerRunner,
+  buildExecScript,
+  sanitizeSessionName,
+  shquote,
+  truncateOutput,
+  DEFAULT_SANDBOX_IMAGE,
+  DEFAULT_SANDBOX_WORKSPACE
+} from './sandbox/index.js'
+export type {
+  DockerSandboxConfig,
+  DockerSandboxOptions,
+  MockSandboxAdapter,
+  MockSandboxCall,
+  MockSandboxOptions,
+  RuntimeSandboxAdapter,
+  SandboxDockerRunner,
+  SandboxExecOptions,
+  SandboxExecResult,
+  SandboxProcessResult,
+  SandboxSessionChunk,
+  SandboxSessionInfo,
+  SandboxState,
+  SandboxStatus
+} from './sandbox/index.js'
+
 export type {
   DestructiveAuthorization,
   DestructiveClassification,
@@ -310,11 +351,9 @@ export {
   defaultModes,
   customModes,
   allModes,
-  buildMode,
-  planMode,
-  fastMode,
   pentestMode,
   auditMode,
+  ATLAS_BRAND_PREAMBLE,
   customSubagents,
   securityAuditorSubagent,
   testGeneratorSubagent,

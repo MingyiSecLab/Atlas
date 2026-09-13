@@ -9629,3 +9629,1558 @@ html.dark .workspace-code-editor-statusbar {
 .dark .main-workspace-dropdown-divider {
   background-color: rgba(255, 255, 255, 0.08);
 }
+
+/* ==========================================================================
+   assistant-ui Inspired Tool Call Components
+   ========================================================================== */
+
+.aui-tool-card {
+  margin: 8px 0;
+  border-radius: 11px;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 4px 12px rgba(0, 0, 0, 0.02);
+  overflow: hidden;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.dark .aui-tool-card {
+  border-color: rgba(255, 255, 255, 0.09);
+  background: rgba(28, 28, 31, 0.75);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.2),
+    0 6px 16px rgba(0, 0, 0, 0.25);
+}
+
+.aui-tool-card:hover {
+  border-color: rgba(0, 0, 0, 0.16);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.04),
+    0 6px 18px rgba(0, 0, 0, 0.04);
+}
+
+.dark .aui-tool-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.3),
+    0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.aui-tool-card.status-running {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+.dark .aui-tool-card.status-running {
+  border-color: rgba(59, 130, 246, 0.45);
+}
+
+.aui-tool-card.status-error {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+
+.dark .aui-tool-card.status-error {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+
+/* Tool Header */
+.aui-tool-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.aui-tool-header.is-clickable {
+  cursor: pointer;
+}
+
+.aui-tool-header.is-clickable:hover {
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.dark .aui-tool-header.is-clickable:hover {
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.aui-tool-header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.aui-tool-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.aui-tool-type-icon.is-terminal {
+  color: #2563eb;
+}
+
+.dark .aui-tool-type-icon.is-terminal {
+  color: #60a5fa;
+}
+
+.aui-tool-type-icon.is-file {
+  color: #059669;
+}
+
+.dark .aui-tool-type-icon.is-file {
+  color: #34d399;
+}
+
+.aui-tool-type-icon.is-search {
+  color: #7c3aed;
+}
+
+.dark .aui-tool-type-icon.is-search {
+  color: #a78bfa;
+}
+
+.aui-tool-type-icon.is-security {
+  color: #d97706;
+}
+
+.dark .aui-tool-type-icon.is-security {
+  color: #fbbf24;
+}
+
+.aui-tool-type-icon.is-general {
+  color: #4b5563;
+}
+
+.dark .aui-tool-type-icon.is-general {
+  color: #9ca3af;
+}
+
+.aui-tool-title-group {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.aui-tool-display-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #18181b;
+  letter-spacing: -0.01em;
+}
+
+.dark .aui-tool-display-name {
+  color: #f4f4f5;
+}
+
+.aui-tool-code-name {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #71717a;
+}
+
+.dark .aui-tool-code-name {
+  color: #a1a1aa;
+}
+
+.aui-tool-param-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1.5px 8px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #52525b;
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .aui-tool-param-pill {
+  background: rgba(255, 255, 255, 0.08);
+  color: #d4d4d8;
+}
+
+.aui-tool-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Status Badges */
+.aui-tool-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2.5px 8px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.aui-tool-badge.is-running {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.22);
+}
+
+.dark .aui-tool-badge.is-running {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.aui-tool-badge.is-pending {
+  background: rgba(113, 113, 122, 0.1);
+  color: #71717a;
+  border: 1px solid rgba(113, 113, 122, 0.2);
+}
+
+.dark .aui-tool-badge.is-pending {
+  background: rgba(161, 161, 170, 0.12);
+  color: #a1a1aa;
+}
+
+.aui-tool-badge.is-success {
+  background: rgba(16, 185, 129, 0.09);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.22);
+}
+
+.dark .aui-tool-badge.is-success {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.aui-tool-badge.is-error {
+  background: rgba(239, 68, 68, 0.09);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+.dark .aui-tool-badge.is-error {
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.aui-tool-badge.is-approval {
+  background: rgba(245, 158, 11, 0.1);
+  color: #d97706;
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.dark .aui-tool-badge.is-approval {
+  background: rgba(245, 158, 11, 0.16);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+.aui-tool-badge.is-denied {
+  background: rgba(113, 113, 122, 0.12);
+  color: #52525b;
+  border: 1px solid rgba(113, 113, 122, 0.25);
+}
+
+.dark .aui-tool-badge.is-denied {
+  background: rgba(113, 113, 122, 0.2);
+  color: #a1a1aa;
+}
+
+.aui-tool-badge-dot {
+  position: relative;
+  display: inline-flex;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: currentColor;
+}
+
+.aui-tool-badge-pulse {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background-color: currentColor;
+  animation: auiPulseRing 1.6s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes auiPulseRing {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.aui-tool-spinner {
+  animation: auiSpin 1.2s linear infinite;
+}
+
+@keyframes auiSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Action Buttons & Chevron */
+.aui-tool-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: #71717a;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.aui-tool-action-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #18181b;
+}
+
+.dark .aui-tool-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f4f5;
+}
+
+.aui-tool-action-btn .is-success {
+  color: #059669;
+}
+
+.dark .aui-tool-action-btn .is-success {
+  color: #34d399;
+}
+
+.aui-tool-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aui-tool-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+
+/* Tool Body Container */
+.aui-tool-card-body {
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(248, 248, 250, 0.7);
+  animation: auiToolExpand 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .aui-tool-card-body {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(18, 18, 20, 0.6);
+}
+
+@keyframes auiToolExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==========================================================================
+   Specialized Tool UIs
+   ========================================================================== */
+
+/* 1. Terminal Tool UI */
+.aui-terminal-container {
+  display: flex;
+  flex-direction: column;
+  background: #141417;
+  color: #f4f4f5;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.aui-terminal-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  background: #1e1e23;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.aui-terminal-window-dots {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.aui-terminal-window-dots .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.aui-terminal-window-dots .dot-close {
+  background-color: #ff5f56;
+}
+
+.aui-terminal-window-dots .dot-minimize {
+  background-color: #ffbd2e;
+}
+
+.aui-terminal-window-dots .dot-maximize {
+  background-color: #27c93f;
+}
+
+.aui-terminal-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.aui-terminal-copy-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #d4d4d8;
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.aui-terminal-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+
+.aui-terminal-command-line {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 14px 7px;
+  font-size: 12px;
+  line-height: 1.5;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.aui-terminal-prompt {
+  color: #10b981;
+  font-weight: 700;
+  user-select: none;
+}
+
+.aui-terminal-command-text {
+  color: #f4f4f5;
+  word-break: break-all;
+}
+
+.aui-terminal-output {
+  padding: 6px 10px;
+  max-height: 260px;
+  overflow-y: auto;
+  font-size: 11.5px;
+}
+
+.aui-terminal-output .chat-code-pre {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  color: #d4d4d8;
+}
+
+.aui-terminal-running-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 11.5px;
+  color: #60a5fa;
+}
+
+.aui-terminal-cursor-blink {
+  animation: auiCursorBlink 1s infinite;
+  color: #60a5fa;
+}
+
+@keyframes auiCursorBlink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* 2. File Op Tool UI */
+.aui-file-op-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.aui-file-meta-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  background: rgba(0, 0, 0, 0.035);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 6px;
+}
+
+.dark .aui-file-meta-bar {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+.aui-file-path-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.aui-file-icon {
+  color: #059669;
+  flex-shrink: 0;
+}
+
+.dark .aui-file-icon {
+  color: #34d399;
+}
+
+.aui-file-path-text {
+  font-size: 11.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #27272a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .aui-file-path-text {
+  color: #e4e4e7;
+}
+
+.aui-file-line-range {
+  font-size: 10.5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1px 5px;
+  background: rgba(5, 150, 105, 0.1);
+  color: #059669;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.dark .aui-file-line-range {
+  background: rgba(52, 211, 153, 0.14);
+  color: #34d399;
+}
+
+.aui-file-path-copy-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  background: transparent;
+  color: #71717a;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.aui-file-path-copy-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: #18181b;
+}
+
+.dark .aui-file-path-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f4f4f5;
+}
+
+.aui-file-instruction {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: #52525b;
+  line-height: 1.4;
+  padding: 2px 4px;
+}
+
+.dark .aui-file-instruction {
+  color: #a1a1aa;
+}
+
+.aui-file-instruction-label {
+  font-weight: 600;
+  color: #27272a;
+}
+
+.dark .aui-file-instruction-label {
+  color: #e4e4e7;
+}
+
+.aui-file-code-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aui-file-section-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0 4px;
+}
+
+.aui-file-code-wrapper {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: #fff;
+  overflow: hidden;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dark .aui-file-code-wrapper {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #141416;
+}
+
+.aui-file-code-wrapper .chat-code-pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+}
+
+/* 3. Search Tool UI */
+.aui-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.aui-search-meta-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.aui-search-query-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: rgba(124, 58, 237, 0.08);
+  border: 1px solid rgba(124, 58, 237, 0.2);
+  color: #7c3aed;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.dark .aui-search-query-pill {
+  background: rgba(167, 139, 250, 0.12);
+  border-color: rgba(167, 139, 250, 0.28);
+  color: #c4b5fd;
+}
+
+.aui-search-tag {
+  display: inline-block;
+  padding: 3px 8px;
+  background: rgba(0, 0, 0, 0.04);
+  color: #52525b;
+  border-radius: 5px;
+  font-size: 11px;
+}
+
+.dark .aui-search-tag {
+  background: rgba(255, 255, 255, 0.06);
+  color: #a1a1aa;
+}
+
+.aui-search-tag-accent {
+  display: inline-block;
+  padding: 2px 6px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563eb;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dark .aui-search-tag-accent {
+  background: rgba(59, 130, 246, 0.16);
+  color: #60a5fa;
+}
+
+.aui-search-result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aui-search-result-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  padding: 0 4px;
+}
+
+.aui-search-result-content {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: #fff;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dark .aui-search-result-content {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #141416;
+}
+
+.aui-search-result-content .chat-code-pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+}
+
+.aui-search-running {
+  font-size: 11.5px;
+  color: #7c3aed;
+  padding: 4px;
+}
+
+/* 4. Pentest Tool UI */
+.aui-pentest-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.aui-pentest-target-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(217, 119, 6, 0.08);
+  border: 1px solid rgba(217, 119, 6, 0.2);
+  border-radius: 7px;
+}
+
+.dark .aui-pentest-target-bar {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.25);
+}
+
+.aui-pentest-target-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.aui-pentest-target-pill .is-shield {
+  color: #d97706;
+}
+
+.dark .aui-pentest-target-pill .is-shield {
+  color: #fbbf24;
+}
+
+.aui-pentest-target-pill .is-error {
+  color: #dc2626;
+}
+
+.aui-pentest-url {
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #92400e;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .aui-pentest-url {
+  color: #fde68a;
+}
+
+.aui-pentest-open-link {
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px;
+  border-radius: 4px;
+  transition: all 0.12s;
+}
+
+.dark .aui-pentest-open-link {
+  color: #fcd34d;
+}
+
+.aui-pentest-open-link:hover {
+  background: rgba(217, 119, 6, 0.15);
+}
+
+.aui-pentest-result-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aui-pentest-result-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  padding: 0 4px;
+}
+
+.aui-pentest-result-content {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: #fff;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dark .aui-pentest-result-content {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #141416;
+}
+
+.aui-pentest-result-content .chat-code-pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+}
+
+.aui-pentest-running {
+  font-size: 11.5px;
+  color: #d97706;
+  padding: 4px;
+}
+
+/* 5. Default Generic Tool UI */
+.aui-default-tool-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+}
+
+.aui-default-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 7px;
+  width: fit-content;
+}
+
+.dark .aui-default-tabs {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aui-default-tab-btn {
+  border: none;
+  background: transparent;
+  padding: 3px 10px;
+  border-radius: 5px;
+  font-size: 11.5px;
+  color: #71717a;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.dark .aui-default-tab-btn {
+  color: #a1a1aa;
+}
+
+.aui-default-tab-btn.is-active {
+  background: #fff;
+  color: #18181b;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+}
+
+.dark .aui-default-tab-btn.is-active {
+  background: #27272a;
+  color: #f4f4f5;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.aui-default-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.aui-default-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  text-transform: uppercase;
+  padding: 0 2px;
+}
+
+.aui-default-code-wrapper {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 7px;
+  background: #fff;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dark .aui-default-code-wrapper {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: #141416;
+}
+
+.aui-default-code-wrapper .chat-code-pre {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 11.5px;
+}
+
+.aui-tool-error-callout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 9px 12px;
+  background: rgba(239, 68, 68, 0.07);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 7px;
+  color: #b91c1c;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dark .aui-tool-error-callout {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.28);
+  color: #fca5a5;
+}
+
+.aui-tool-error-icon {
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.aui-tool-error-content {
+  flex: 1;
+  word-break: break-word;
+}
+
+.aui-tool-artifact-box {
+  margin-top: 6px;
+  border-radius: 7px;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.dark .aui-tool-artifact-box {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+/* ==========================================================================
+   assistant-ui ToolGroup & Step Timeline Components
+   ========================================================================== */
+
+.aui-tool-group {
+  margin: 10px 0;
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.02),
+    0 4px 14px rgba(0, 0, 0, 0.03);
+  overflow: hidden;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .aui-tool-group {
+  border-color: rgba(255, 255, 255, 0.08);
+  background: rgba(24, 24, 28, 0.82);
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.25),
+    0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.aui-tool-group:hover {
+  border-color: rgba(0, 0, 0, 0.14);
+}
+
+.dark .aui-tool-group:hover {
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.aui-tool-group.status-running {
+  border-color: rgba(59, 130, 246, 0.38);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.15),
+    0 4px 16px rgba(59, 130, 246, 0.08);
+}
+
+.dark .aui-tool-group.status-running {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 6px 22px rgba(59, 130, 246, 0.12);
+}
+
+.aui-tool-group.status-error {
+  border-color: rgba(239, 68, 68, 0.32);
+}
+
+.dark .aui-tool-group.status-error {
+  border-color: rgba(239, 68, 68, 0.4);
+}
+
+/* ToolGroup Header */
+.aui-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+.aui-group-header:hover {
+  background-color: rgba(0, 0, 0, 0.025);
+}
+
+.dark .aui-group-header:hover {
+  background-color: rgba(255, 255, 255, 0.035);
+}
+
+.aui-group-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.aui-group-icon-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(0, 0, 0, 0.04);
+  flex-shrink: 0;
+}
+
+.dark .aui-group-icon-bubble {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.aui-group-status-icon.is-running {
+  color: #2563eb;
+}
+
+.dark .aui-group-status-icon.is-running {
+  color: #60a5fa;
+}
+
+.aui-group-status-icon.is-success {
+  color: #10b981;
+}
+
+.dark .aui-group-status-icon.is-success {
+  color: #34d399;
+}
+
+.aui-group-status-icon.is-error {
+  color: #ef4444;
+}
+
+.dark .aui-group-status-icon.is-error {
+  color: #f87171;
+}
+
+.aui-group-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.aui-group-headline {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #18181b;
+  letter-spacing: -0.01em;
+}
+
+.dark .aui-group-headline {
+  color: #f4f4f5;
+}
+
+.aui-group-pills {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.aui-group-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1.5px 7px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 11px;
+  color: #52525b;
+  font-weight: 500;
+}
+
+.dark .aui-group-pill {
+  background: rgba(255, 255, 255, 0.07);
+  color: #a1a1aa;
+}
+
+.aui-group-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.aui-group-count-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: #71717a;
+}
+
+.dark .aui-group-count-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: #a1a1aa;
+}
+
+.aui-group-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aui-group-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+
+/* ToolGroup Body */
+.aui-group-body {
+  border-top: 1px solid rgba(0, 0, 0, 0.07);
+  background: rgba(250, 250, 252, 0.65);
+  padding: 12px 14px 10px 14px;
+  animation: auiToolExpand 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dark .aui-group-body {
+  border-color: rgba(255, 255, 255, 0.06);
+  background: rgba(18, 18, 22, 0.6);
+}
+
+/* ToolGroup Step Timeline */
+.aui-group-timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.aui-timeline-item {
+  display: flex;
+  align-items: flex-start;
+  position: relative;
+}
+
+.aui-timeline-axis {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 22px;
+  flex-shrink: 0;
+  margin-right: 10px;
+  align-self: stretch;
+}
+
+.aui-timeline-node {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  z-index: 1;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.dark .aui-timeline-node {
+  background: #1f1f23;
+  border-color: rgba(255, 255, 255, 0.09);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.aui-step-status-icon.is-running {
+  color: #2563eb;
+}
+
+.dark .aui-step-status-icon.is-running {
+  color: #60a5fa;
+}
+
+.aui-step-status-icon.is-success {
+  color: #10b981;
+}
+
+.dark .aui-step-status-icon.is-success {
+  color: #34d399;
+}
+
+.aui-step-status-icon.is-error {
+  color: #ef4444;
+}
+
+.dark .aui-step-status-icon.is-error {
+  color: #f87171;
+}
+
+.aui-step-status-icon.is-pending {
+  color: #a1a1aa;
+}
+
+.aui-timeline-line {
+  width: 2px;
+  flex: 1;
+  background: rgba(0, 0, 0, 0.08);
+  margin: 2px 0;
+}
+
+.dark .aui-timeline-line {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.aui-timeline-content {
+  flex: 1;
+  min-width: 0;
+  padding-bottom: 12px;
+}
+
+.aui-timeline-item.is-last .aui-timeline-content {
+  padding-bottom: 2px;
+}
+
+.aui-timeline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 7px;
+  transition: background-color 0.14s ease;
+}
+
+.aui-timeline-header.is-clickable {
+  cursor: pointer;
+}
+
+.aui-timeline-header.is-clickable:hover {
+  background: rgba(0, 0, 0, 0.035);
+}
+
+.dark .aui-timeline-header.is-clickable:hover {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.aui-timeline-header-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+}
+
+.aui-step-cat-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.aui-step-cat-icon.is-terminal {
+  color: #2563eb;
+}
+
+.dark .aui-step-cat-icon.is-terminal {
+  color: #60a5fa;
+}
+
+.aui-step-cat-icon.is-security {
+  color: #d97706;
+}
+
+.dark .aui-step-cat-icon.is-security {
+  color: #fbbf24;
+}
+
+.aui-step-cat-icon.is-file {
+  color: #059669;
+}
+
+.dark .aui-step-cat-icon.is-file {
+  color: #34d399;
+}
+
+.aui-step-cat-icon.is-search {
+  color: #7c3aed;
+}
+
+.dark .aui-step-cat-icon.is-search {
+  color: #a78bfa;
+}
+
+.aui-step-cat-icon.is-general {
+  color: #71717a;
+}
+
+.aui-step-display-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #27272a;
+  flex-shrink: 0;
+}
+
+.dark .aui-step-display-name {
+  color: #f4f4f5;
+}
+
+.aui-step-code-name {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #71717a;
+  flex-shrink: 0;
+}
+
+.dark .aui-step-code-name {
+  color: #a1a1aa;
+}
+
+.aui-step-param-pill {
+  display: inline-block;
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1px 7px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.05);
+  color: #52525b;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dark .aui-step-param-pill {
+  background: rgba(255, 255, 255, 0.07);
+  color: #d4d4d8;
+}
+
+.aui-timeline-header-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-shrink: 0;
+}
+
+.aui-step-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #a1a1aa;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.aui-step-chevron.is-expanded {
+  transform: rotate(180deg);
+}
+
+/* 步骤详情主体 */
+.aui-timeline-step-body {
+  margin-top: 6px;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.07);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  background: #fff;
+}
+
+.dark .aui-timeline-step-body {
+  border-color: rgba(255, 255, 255, 0.07);
+  background: #18181c;
+}
+
+/* 步骤前思考 Callout */
+.aui-step-reasoning-callout {
+  padding: 8px 12px;
+  background: rgba(245, 158, 11, 0.05);
+  border-bottom: 1px dashed rgba(245, 158, 11, 0.2);
+  font-size: 11.5px;
+  color: #78350f;
+}
+
+.dark .aui-step-reasoning-callout {
+  background: rgba(245, 158, 11, 0.08);
+  border-bottom-color: rgba(245, 158, 11, 0.25);
+  color: #fde68a;
+}
+
+.aui-step-reasoning-title {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  font-size: 11px;
+  margin-bottom: 3px;
+  color: #b45309;
+}
+
+.dark .aui-step-reasoning-title {
+  color: #fbbf24;
+}
+
+.aui-step-reasoning-text {
+  line-height: 1.5;
+  color: #451a03;
+}
+
+.dark .aui-step-reasoning-text {
+  color: #fef3c7;
+}
+
+/* Terminal 空输出提示与靶机目标补充 */
+.aui-terminal-empty-hint {
+  padding: 10px 14px;
+  font-size: 11.5px;
+  color: #71717a;
+  font-style: italic;
+}
+
+.dark .aui-terminal-empty-hint {
+  color: #a1a1aa;
+}
+
+.aui-pentest-desc-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.025);
+  border-radius: 5px;
+  font-size: 11.5px;
+  color: #4b5563;
+}
+
+.dark .aui-pentest-desc-bar {
+  background: rgba(255, 255, 255, 0.04);
+  color: #9ca3af;
+}
+
+.aui-pentest-desc-label {
+  font-weight: 600;
+  color: #1f2937;
+  font-size: 11px;
+}
+
+.dark .aui-pentest-desc-label {
+  color: #e5e7eb;
+}

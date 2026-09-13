@@ -1,271 +1,153 @@
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { tool } from "ai";
-import { z } from "zod";
-import { computeBlackboxRiskScore } from "../../specialized/attackSurface/blackboxRiskScoring";
-import {
-  EndpointTransportEnum,
-  GrpcEndpointMetadataSchema,
-} from "../../specialized/attackSurface/grpcSchema";
-import { generateThreatModelForEndpoint } from "./threatModelGenerator";
-import type { ToolContext } from "./types";
+/**
+ * document_endpoint: 记录攻击面分析中发现的具体端点与风险评估 (read-only 观测记录)。
+ *
+ * 安全工具域成员：实现 pentest 的 RuntimePentestTool 契约，由
+ * pentest 域的 executor 与安全闸统一调度：
+ * - 纯本地端点资产归档与黑盒风险打分，无主动发包，不具破坏性
+ * - 产物持久化于工作区 .agents/pentest/endpoints/<appName>/ 目录
+ * - 严格防路径逃逸（path traversal 拦截），保障只写在当前工作区内
+ */
+import { mkdir, writeFile } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
+import type { RuntimePentestTool } from '../../pentest/tools.js'
+
+const DOCUMENT_ENDPOINT_DESCRIPTION = [
+  'Document a discovered endpoint during attack surface reconnaissance into the workspace pentest artifact repository.',
+  'Arguments: appName (required), routePath (required, e.g. /api/users), endpointType (api-endpoint|web-endpoint|asset),',
+  'description (required), method (optional string or array), authRequired (optional boolean),',
+  'riskLevel (optional LOW|MEDIUM|HIGH|CRITICAL), notes (optional).'
+].join(' ')
 
 function sanitizeName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9-_.]/g, "_");
+  return name.toLowerCase().replace(/[^a-z0-9-_.]/g, '_')
 }
 
-const documentEndpointInputSchema = z.object({
-  appName: z
-    .string()
-    .describe(
-      "Name of the parent application this endpoint belongs to. " +
-        "Must match the appName used in a prior document_app call.",
-    ),
-  routePath: z
-    .string()
-    .describe(
-      "The endpoint's unique identity — its HTTP route or access pattern. " +
-        "This is the URL path a client requests, NOT a source-file path. " +
-        "Examples: '/api/users', '/dashboard', '/auth/login', " +
-        "'/{objectKey}?X-Amz-Signature=...', 'arn:aws:s3:::bucket-name'. " +
-        "For cloud-resource endpoints (endpointType 'asset') use the specific " +
-        "access pattern, not the base domain URL (which is stored on the parent " +
-        "application). The route path is the endpoint's display identity — there " +
-        "is no separate name field.",
-    ),
-  endpointType: z
-    .enum(["api-endpoint", "web-endpoint", "asset"])
-    .describe(
-      "Type of endpoint: 'api-endpoint' for REST/GraphQL APIs, " +
-        "'web-endpoint' for pages/views, 'asset' for other resources. " +
-        "A gRPC method is still 'api-endpoint' — set `transport` to mark it gRPC.",
-    ),
-  transport: EndpointTransportEnum.optional().describe(
-    "Wire transport. Omit or 'http' for normal endpoints. Set 'grpc' " +
-      "(or 'grpc_web' / 'connect') for a gRPC method and populate `grpc`.",
-  ),
-  grpc: GrpcEndpointMetadataSchema.optional().describe(
-    "gRPC attributes — required when transport is a gRPC variant. Put the " +
-      "wire path '/package.Service/Method' in `routePath`; do not glue on a host.",
-  ),
-  description: z
-    .string()
-    .describe("Detailed description of the endpoint including what it does"),
-  method: z
-    .union([z.string(), z.array(z.string())])
-    .optional()
-    .describe(
-      "HTTP method(s) supported (e.g., 'GET', 'POST', or ['GET', 'POST', 'DELETE']). " +
-        "Use 'PAGE' for web pages/views.",
-    ),
-  handler: z
-    .string()
-    .optional()
-    .describe("Handler function or component name (whitebox analysis)"),
-  file: z
-    .string()
-    .optional()
-    .describe(
-      "Source-code file where this endpoint is defined, e.g. 'src/routes/users.ts'. " +
-        "This is the source-code location, NOT the HTTP route — the HTTP route " +
-        "belongs in 'routePath'.",
-    ),
-  line: z
-    .number()
-    .optional()
-    .describe("Line number in the source file (whitebox analysis)"),
-  authRequired: z
-    .boolean()
-    .optional()
-    .describe("Whether authentication appears to be required"),
-  authentication: z
-    .string()
-    .optional()
-    .describe("Authentication details if known"),
-  riskLevel: z
-    .preprocess(
-      (val) => {
-        if (typeof val === "string") {
-          const upper = val.toUpperCase();
-          if (upper.includes("CRITICAL")) return "CRITICAL";
-          if (upper.includes("HIGH")) return "HIGH";
-          if (upper.includes("MEDIUM")) return "MEDIUM";
-          if (upper.includes("LOW")) return "LOW";
-        }
-        return val;
-      },
-      z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
-    )
-    .describe("Risk level: LOW-CRITICAL (exposed/sensitive)"),
-  notes: z
-    .string()
-    .optional()
-    .describe("Additional notes or observations about the endpoint"),
-  toolCallDescription: z
-    .string()
-    .describe(
-      "A concise, human-readable description of what this tool call is doing",
-    ),
-});
+function computeBlackboxRiskScore(
+  riskLevel: string,
+  routePath: string,
+  authRequired?: boolean,
+  method?: string | string[]
+): number {
+  let base = 50
+  const normalizedLevel = riskLevel.toUpperCase()
+  if (normalizedLevel.includes('CRITICAL')) base = 90
+  else if (normalizedLevel.includes('HIGH')) base = 75
+  else if (normalizedLevel.includes('LOW')) base = 25
 
-type DocumentEndpointInput = z.infer<typeof documentEndpointInputSchema>;
+  let modifier = 0
+  const lowerPath = routePath.toLowerCase()
 
-/**
- * Factory for the `document_endpoint` tool.
- *
- * Documents a discovered endpoint during attack surface analysis —
- * writes a JSON file to the session's assets directory (scoped by
- * app name). This tool is specifically for individual endpoints and
- * is designed for incremental creation via the agent log persister in Console.
- */
-export function documentEndpoint(ctx: ToolContext) {
-  const baseAssetsPath = join(ctx.session.rootPath, "assets");
+  // Sensitive keyword indicators
+  if (/admin|manage|root|system|superuser/i.test(lowerPath)) modifier += 10
+  if (/auth|login|token|jwt|oauth|session|passwd|password|credential/i.test(lowerPath)) modifier += 10
+  if (/upload|file|download|export|backup|dump/i.test(lowerPath)) modifier += 10
+  if (/exec|eval|cmd|shell|run|query|graphql/i.test(lowerPath)) modifier += 10
 
-  return tool({
-    description: `Document a discovered endpoint during attack surface analysis.
+  // High risk methods
+  const methods = Array.isArray(method) ? method.map((m) => m.toUpperCase()) : [String(method ?? '').toUpperCase()]
+  if (methods.includes('DELETE') || methods.includes('PUT') || methods.includes('PATCH')) modifier += 5
 
-This stores a session-local reconnaissance artifact and runs endpoint threat-model enrichment. It does NOT create or update an endpoint in the user's authenticated Pensar workspace. Use \`create_workspace_endpoint\` for that mutation.
+  // Unauthenticated exposure on sensitive route
+  if (authRequired === false && modifier > 0) modifier += 10
 
-Endpoints are individual API routes, web pages, or functional paths within an application. Each endpoint belongs to an application (specified by appName).
+  return Math.min(100, Math.max(0, base + modifier))
+}
 
-Use this tool to document:
-- API endpoints (e.g., /api/users, /api/orders/:id, /graphql)
-- Web pages and views (e.g., /dashboard, /settings, /admin)
-- Authentication endpoints (e.g., /login, /auth/callback)
-- File upload endpoints, search endpoints, webhook receivers
+export function createDocumentEndpointTool(): RuntimePentestTool {
+  return {
+    name: 'document_endpoint',
+    kind: 'read-only',
+    description: DOCUMENT_ENDPOINT_DESCRIPTION,
+    async execute(command, context) {
+      const args = command.arguments ?? {}
+      const appName = typeof args.appName === 'string' ? args.appName.trim() : ''
+      if (!appName) {
+        throw new Error('document_endpoint requires a non-empty appName.')
+      }
 
-**API endpoint consolidation:** Do NOT create separate entries for each HTTP method on the same path. Document each unique path ONCE and list all supported methods in \`method\` (e.g., \`["GET", "POST", "DELETE"]\`). Use \`"PAGE"\` for web pages/views.
+      let routePath = typeof args.routePath === 'string' ? args.routePath.trim() : ''
+      if (!routePath) {
+        throw new Error('document_endpoint requires a non-empty routePath.')
+      }
 
-You MUST specify \`appName\` to associate the endpoint with its parent application (previously documented via \`document_app\`).
-
-Each endpoint creates a JSON file in the assets directory for tracking and analysis.`,
-    inputSchema:
-      documentEndpointInputSchema as z.ZodType<DocumentEndpointInput>,
-    execute: async (input: DocumentEndpointInput) => {
-      if (ctx.attackSurfaceRegistry) {
-        const assetRecord = {
-          appName: input.appName,
-          assetName: input.routePath,
-          assetType: "endpoint" as const,
-          description: input.description,
-          details: { url: input.routePath },
-        };
-        const check = await ctx.attackSurfaceRegistry.register(assetRecord);
-        if (check.duplicate) {
-          const matchName = check.matchedAsset?.assetName ?? "unknown";
-          return {
-            success: false,
-            duplicate: true,
-            matchType: check.matchType,
-            matchedAsset: matchName,
-            message: `Duplicate endpoint (${check.matchType}): already documented as "${matchName}". Skipping.`,
-          };
+      // If user passed a full URL, strip origin to keep routePath clean
+      if (routePath.startsWith('http://') || routePath.startsWith('https://')) {
+        try {
+          const parsed = new URL(routePath)
+          routePath = parsed.pathname + parsed.search
+        } catch {
+          // keep as is
         }
       }
 
-      if (
-        input.routePath.startsWith("https://") ||
-        input.routePath.startsWith("http://")
-      ) {
-        return {
-          success: false,
-          error: "routePath_is_url",
-          message:
-            `routePath "${input.routePath}" is a full URL. The domain is already stored on the parent application. ` +
-            `Use a path or access pattern instead (e.g. "/api/users", "/{objectKey}?X-Amz-Signature={sig}", "arn:aws:s3:::bucket-name").`,
-        };
+      const endpointType =
+        typeof args.endpointType === 'string' && args.endpointType
+          ? args.endpointType
+          : 'api-endpoint'
+      const description = typeof args.description === 'string' ? args.description : ''
+      const method = Array.isArray(args.method)
+        ? (args.method.filter((m): m is string => typeof m === 'string'))
+        : typeof args.method === 'string'
+          ? args.method
+          : undefined
+      const authRequired =
+        typeof args.authRequired === 'boolean' ? args.authRequired : undefined
+      const authentication =
+        typeof args.authentication === 'string' ? args.authentication : undefined
+      const riskLevel =
+        typeof args.riskLevel === 'string' && args.riskLevel ? args.riskLevel : 'MEDIUM'
+      const notes = typeof args.notes === 'string' ? args.notes : undefined
+      const transport = typeof args.transport === 'string' ? args.transport : 'http'
+
+      const riskScore = computeBlackboxRiskScore(riskLevel, routePath, authRequired, method)
+
+      const root = resolve(context.workspacePath)
+      const targetDir = resolve(root, '.agents', 'pentest', 'endpoints', sanitizeName(appName))
+      if (targetDir !== root && !targetDir.startsWith(root + sep)) {
+        throw new Error('Endpoint directory escapes the workspace root.')
       }
 
-      const targetDir = join(baseAssetsPath, sanitizeName(input.appName));
+      await mkdir(targetDir, { recursive: true })
 
-      if (!existsSync(targetDir)) {
-        mkdirSync(targetDir, { recursive: true });
+      const sanitizedPath = sanitizeName(routePath)
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+      const filename = `asset_${sanitizedPath}_${timestamp}.json`
+      const filepath = resolve(targetDir, filename)
+      if (filepath !== root && !filepath.startsWith(root + sep)) {
+        throw new Error('Endpoint record path escapes the workspace root.')
       }
 
-      const sanitizedPath = sanitizeName(input.routePath);
-      const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-      const filename = `asset_${sanitizedPath}_${timestamp}.json`;
-      const filepath = join(targetDir, filename);
-
-      const heuristicRiskScore = computeBlackboxRiskScore(
-        input.riskLevel,
-        "endpoint",
-        {
-          url: input.routePath,
-          method: input.method,
-          handler: input.handler,
-          file: input.file,
-          line: input.line,
-          authRequired: input.authRequired,
-          authentication: input.authentication,
-        },
-        input.notes,
-      );
-
-      const subagentInput = {
-        appName: input.appName,
-        routePath: input.routePath,
-        method: input.method,
-        file: input.file,
-        line: input.line,
-        handler: input.handler,
-        authRequired: input.authRequired,
-        description: input.description,
-        transport: input.transport,
-        grpc: input.grpc,
-      };
-
-      const threatModelOutput = await generateThreatModelForEndpoint(
-        ctx,
-        subagentInput,
-      );
-
-      const riskScore = threatModelOutput?.riskScore ?? heuristicRiskScore;
-      const pentestObjectives = threatModelOutput?.pentestObjectives ?? [];
-      const businessLogic = threatModelOutput?.businessLogic;
-      const threatModel = threatModelOutput?.threatModel;
-
-      const endpointRecord = {
-        ...input,
-        pentestObjectives,
-        discoveredAt: new Date().toISOString(),
-        sessionId: ctx.session.id,
-        target: ctx.session.targets[0],
+      const record = {
+        appName,
+        routePath,
+        endpointType,
+        transport,
+        description,
+        method,
+        authRequired,
+        authentication,
+        riskLevel,
         riskScore,
-        ...(businessLogic ? { businessLogic } : {}),
-        ...(threatModel ? { threatModel } : {}),
-      };
-
-      try {
-        writeFileSync(filepath, JSON.stringify(endpointRecord, null, 2));
-      } catch (writeError: unknown) {
-        if (ctx.attackSurfaceRegistry) {
-          await ctx.attackSurfaceRegistry.unregister({
-            appName: input.appName,
-            assetName: input.routePath,
-            assetType: "endpoint",
-            description: input.description,
-            details: { url: input.routePath },
-          });
-        }
-        throw writeError;
+        notes,
+        targetRef: command.targetRef,
+        discoveredAt: new Date().toISOString()
       }
+
+      await writeFile(filepath, JSON.stringify(record, null, 2), 'utf-8')
 
       return {
-        success: true,
-        appName: input.appName,
-        routePath: input.routePath,
-        endpointType: input.endpointType,
-        transport: input.transport,
-        grpc: input.grpc,
-        riskLevel: input.riskLevel,
-        filepath,
-        businessLogic: businessLogic ?? undefined,
-        threatModel: threatModel ?? undefined,
-        pentestObjectives,
-        riskScore,
-        message: `Endpoint '${input.routePath}' documented successfully under app '${input.appName}'`,
-      };
-    },
-  });
+        output: JSON.stringify({
+          success: true,
+          appName,
+          routePath,
+          endpointType,
+          riskLevel,
+          riskScore,
+          filepath,
+          message: `Endpoint '${routePath}' documented successfully under app '${appName}'.`
+        }, null, 2),
+        exitCode: 0
+      }
+    }
+  }
 }

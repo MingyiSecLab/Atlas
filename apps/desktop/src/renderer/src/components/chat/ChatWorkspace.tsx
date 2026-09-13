@@ -147,7 +147,7 @@ export function ChatWorkspace({
   const shouldFollowRef = useRef(true)
 
   const model = snapshot?.modelId ?? '未选择模型'
-  const permission = snapshot?.permissionProfileId ?? 'Build'
+  const permission = snapshot?.permissionProfileId ?? 'Pentest'
   const modeOptions = useMemo(() => modes.map((m) => m.name), [modes])
   const isStreaming = snapshot?.isRunning ?? false
   const accessRequests = snapshot?.accessRequests ?? []

@@ -22,11 +22,9 @@ export {
   defaultModes,
   customModes,
   allModes,
-  buildMode,
-  planMode,
-  fastMode,
   pentestMode,
-  auditMode
+  auditMode,
+  ATLAS_BRAND_PREAMBLE
 } from './modes.js'
 export type { RuntimeModeInfo } from './modes.js'
 

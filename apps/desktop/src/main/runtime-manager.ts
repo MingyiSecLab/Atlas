@@ -35,13 +35,27 @@ export class DesktopRuntimeManager {
       : join(app.getPath('userData'), 'projects')
   }
 
+  /**
+   * Kali 沙箱配置（默认启用；容器按需拉起，未调用 kali_* 工具前不触碰 Docker）。
+   * 置 MINGYI_SANDBOX_DISABLED=1 可整体关闭沙箱能力。
+   */
+  getSandboxConfig(): { containerName: string; image: string; networkMode: string } | undefined {
+    if (process.env.MINGYI_SANDBOX_DISABLED) return undefined
+    return {
+      containerName: process.env.MINGYI_SANDBOX_CONTAINER || 'mingyi-sandbox',
+      image: process.env.MINGYI_SANDBOX_IMAGE || 'mingyi-sandbox:latest',
+      networkMode: process.env.MINGYI_SANDBOX_NETWORK || 'host'
+    }
+  }
+
   async getRuntime(): Promise<LocalRuntimeInstance> {
     await this.lifecycle
     if (!this.runtimePromise) {
       const runtimePromise = createLocalRuntime({
         workspacePath: this.workspacePath,
         pentestDataDir: this.getPentestDataDir(),
-        projectsDataDir: this.getProjectsDataDir()
+        projectsDataDir: this.getProjectsDataDir(),
+        ...(this.getSandboxConfig() ? { sandbox: this.getSandboxConfig() } : {})
       })
       this.runtimePromise = runtimePromise
       runtimePromise.catch(() => {

@@ -25,7 +25,7 @@ import { ExpertPicker, type ExpertPickerHandle } from '../chat/experts/ExpertPic
 import type { RuntimeSkillInfo } from '@mingyi/runtime'
 import type { ExpertItem } from '../hub/hub-types'
 
-const DEFAULT_AGENT_MODES = ['Build', 'Plan', 'Fast', 'Pentest', 'Audit']
+const DEFAULT_AGENT_MODES = ['Pentest', 'Audit']
 
 export type { ChatImageAttachment }
 
@@ -46,7 +46,7 @@ interface MainWorkspaceProps {
   projects?: Array<{ id: string; name: string; rootPath?: string }>
   selectedProjectId?: string | null
   onSelectProject?: (projectId: string | null) => void
-  onCreateProjectForTask?: () => void
+  onPickFolder?: () => Promise<string | null>
   runtimeError?: string | null
   modelIds: string[]
   onSelectWorkspace: () => void
@@ -54,11 +54,9 @@ interface MainWorkspaceProps {
 
 export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
   onSendMessage,
-  workspace,
   projects = [],
   selectedProjectId = null,
-  onSelectProject,
-  onCreateProjectForTask,
+  onPickFolder,
   runtimeError,
   modelIds,
   onSelectWorkspace
@@ -73,8 +71,23 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
 
   const [promptText, setPromptText] = useState('')
   const [selectedModel, setSelectedModel] = useState('自动选择')
-  const [selectedMode, setSelectedMode] = useState('Build')
-  const [isChatOnly, setIsChatOnly] = useState(!workspace)
+  const [selectedMode, setSelectedMode] = useState('Pentest')
+  const currentProject = useMemo(() => {
+    if (selectedProjectId) {
+      return projects.find((p) => p.id === selectedProjectId)
+    }
+    return undefined
+  }, [projects, selectedProjectId])
+  const folderDisplayName = currentProject ? currentProject.name : '选择目录'
+  const [prevSelectedProjectId, setPrevSelectedProjectId] = useState(selectedProjectId)
+  const [isChatOnly, setIsChatOnly] = useState(!selectedProjectId)
+
+  if (selectedProjectId !== prevSelectedProjectId) {
+    setPrevSelectedProjectId(selectedProjectId)
+    if (selectedProjectId) {
+      setIsChatOnly(false)
+    }
+  }
   const [activeMenu, setActiveMenu] = useState<'add' | 'skills' | 'experts' | null>(null)
   const [skillQuery, setSkillQuery] = useState('')
   const [expertQuery, setExpertQuery] = useState('')
@@ -82,7 +95,7 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
   const [selectedExpert, setSelectedExpert] = useState<ExpertItem | undefined>()
   const [goalMode, setGoalMode] = useState(false)
   const [attachments, setAttachments] = useState<ChatImageAttachment[]>([])
-  const [openDropdown, setOpenDropdown] = useState<'mode' | 'model' | 'project' | null>(null)
+  const [openDropdown, setOpenDropdown] = useState<'mode' | 'model' | null>(null)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -133,7 +146,7 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
         goalMode: goalMode || undefined,
         selectedSkill,
         selectedExpert,
-        projectId: selectedProjectId
+        projectId: isChatOnly ? null : (selectedProjectId ?? null)
       }
     )
     setPromptText('')
@@ -218,19 +231,37 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
     setIsChatOnly(true)
   }
 
-  const handleSelectFolder = (): void => {
-    if (workspace && isChatOnly) {
-      setIsChatOnly(false)
+  const handleSelectFolder = async (): Promise<void> => {
+    if (!currentProject) {
+      if (onPickFolder) {
+        const id = await onPickFolder()
+        if (id) setIsChatOnly(false)
+      } else {
+        onSelectWorkspace()
+        setIsChatOnly(false)
+      }
     } else {
-      setIsChatOnly(false)
-      onSelectWorkspace()
+      if (isChatOnly) {
+        setIsChatOnly(false)
+      } else {
+        if (onPickFolder) {
+          await onPickFolder()
+        } else {
+          onSelectWorkspace()
+        }
+      }
     }
   }
 
-  const handleChangeFolder = (e: React.MouseEvent): void => {
+  const handleChangeFolder = async (e: React.MouseEvent): Promise<void> => {
     e.stopPropagation()
-    setIsChatOnly(false)
-    onSelectWorkspace()
+    if (onPickFolder) {
+      const id = await onPickFolder()
+      if (id) setIsChatOnly(false)
+    } else {
+      onSelectWorkspace()
+      setIsChatOnly(false)
+    }
   }
 
   const hasContent =
@@ -569,77 +600,6 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
                   <button
                     type="button"
                     className="main-workspace-chip"
-                    onClick={() => setOpenDropdown(openDropdown === 'project' ? null : 'project')}
-                    title="选择任务空间"
-                    aria-label="选择任务空间"
-                  >
-                    <Folder size={13} />
-                    <span>
-                      {selectedProjectId
-                        ? (projects.find((project) => project.id === selectedProjectId)?.name ??
-                          '空间')
-                        : '临时对话'}
-                    </span>
-                    <ChevronDown size={11} color="#71717a" />
-                  </button>
-                  {openDropdown === 'project' && (
-                    <div
-                      className="main-workspace-dropdown"
-                      style={{ left: 0, bottom: 'calc(100% + 6px)', minWidth: 220 }}
-                    >
-                      <button
-                        type="button"
-                        className={`main-workspace-dropdown-item${selectedProjectId === null ? ' is-selected' : ''}`}
-                        onClick={() => {
-                          onSelectProject?.(null)
-                          setOpenDropdown(null)
-                        }}
-                      >
-                        <MessageSquare size={13} />
-                        <span>临时对话</span>
-                        {selectedProjectId === null && (
-                          <Check size={12} style={{ marginLeft: 'auto' }} />
-                        )}
-                      </button>
-                      {projects.map((project) => {
-                        const isSelected = project.id === selectedProjectId
-                        return (
-                          <button
-                            key={project.id}
-                            type="button"
-                            className={`main-workspace-dropdown-item${isSelected ? ' is-selected' : ''}`}
-                            onClick={() => {
-                              onSelectProject?.(project.id)
-                              setOpenDropdown(null)
-                            }}
-                          >
-                            <Folder size={13} />
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              {project.name}
-                            </span>
-                            {isSelected && <Check size={12} style={{ marginLeft: 'auto' }} />}
-                          </button>
-                        )
-                      })}
-                      <button
-                        type="button"
-                        className="main-workspace-dropdown-item"
-                        onClick={() => {
-                          setOpenDropdown(null)
-                          onCreateProjectForTask?.()
-                        }}
-                      >
-                        <FolderPlus size={13} />
-                        <span>选择目录并新建空间</span>
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                <div style={{ position: 'relative' }}>
-                  <button
-                    type="button"
-                    className="main-workspace-chip"
                     onClick={() => setOpenDropdown(openDropdown === 'mode' ? null : 'mode')}
                     title="选择模式"
                   >
@@ -747,22 +707,20 @@ export const MainWorkspace: React.FC<MainWorkspaceProps> = ({
                 role="tab"
                 aria-selected={!isChatOnly}
                 className={`main-workspace-toggle-btn${!isChatOnly ? ' is-active' : ''}`}
-                onClick={handleSelectFolder}
+                onClick={() => void handleSelectFolder()}
                 title={
-                  workspace
-                    ? `当前工作区: ${workspace.name}${!isChatOnly ? '（点击更换文件夹）' : '（点击切换）'}`
-                    : '选择本机工作区文件夹'
+                  currentProject
+                    ? `当前空间: ${currentProject.name}${!isChatOnly ? '（点击更换目录）' : '（点击切换）'}`
+                    : '选择本机工作区目录作为空间任务'
                 }
               >
                 <Folder size={13} />
-                <span className="main-workspace-toggle-folder-name">
-                  {workspace ? workspace.name : '选择文件夹'}
-                </span>
-                {workspace && !isChatOnly && (
+                <span className="main-workspace-toggle-folder-name">{folderDisplayName}</span>
+                {currentProject && !isChatOnly && (
                   <span
                     className="main-workspace-toggle-change"
-                    onClick={handleChangeFolder}
-                    title="更换文件夹"
+                    onClick={(e) => void handleChangeFolder(e)}
+                    title="更换目录"
                   >
                     <FolderPlus size={12} />
                   </span>

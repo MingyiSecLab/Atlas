@@ -1,119 +1,154 @@
-import { tool } from "ai";
-import { z } from "zod";
-import { targetFetch } from "../../../http/targetHeaders";
-import {
-  assertUrlInScope,
-  resolverSessionFromCtx,
-  ScopeViolationError,
-} from "./scopeGuard";
-import type { ToolContext } from "./types";
-
 /**
- * Factory for the `test_endpoint_variations` tool.
+ * test_endpoint_variations: 批量测试端点变体与参数变种的可达性与鉴权边界 (active)。
  *
- * Tests multiple endpoint URLs for accessibility, useful for
- * probing authorization issues and mapping live routes.
+ * 安全工具域成员：实现 pentest 的 RuntimePentestTool 契约，由
+ * pentest 域的 executor 与安全闸统一调度：
+ * - 发起测试前对每一个待测端点经 isTargetInScope 逐一校验 scope
+ * - 纯探测型 GET 请求，不执行有副作用的数据修改
+ * - 限制单次测试端点数量上限（<= 25），防止流量洪泛
  */
-export function testEndpointVariations(ctx: ToolContext) {
-  return tool({
-    description: `Test multiple variations of an endpoint pattern with different parameters.
+import { isTargetInScope } from '../../pentest/scope.js'
+import type { RuntimePentestTool } from '../../pentest/tools.js'
 
-Use this to:
-- Test an endpoint with multiple IDs to check for authorization issues
-- Test related endpoints that follow similar patterns
-- Systematically probe endpoint variations you've identified`,
-    inputSchema: z.object({
-      endpoints: z.array(z.string()).describe("Array of endpoint URLs to test"),
-      sessionCookie: z
-        .string()
-        .optional()
-        .describe("Session cookie if authentication required"),
-      toolCallDescription: z
-        .string()
-        .describe(
-          "A concise, human-readable description of what this tool call is doing",
-        ),
-    }),
-    execute: async (params) => {
-      try {
-        for (const endpoint of params.endpoints) {
-          assertUrlInScope(endpoint, ctx);
-        }
-      } catch (e) {
-        if (e instanceof ScopeViolationError) {
-          return { success: false, message: e.message };
-        }
-        throw e;
-      }
+const MAX_ENDPOINTS = 25
 
-      try {
-        const { endpoints, sessionCookie } = params;
+const TEST_VARIATIONS_DESCRIPTION = [
+  'Test multiple variations of an endpoint pattern or route to verify accessibility, status codes,',
+  'and authorization boundaries. Arguments: endpoints (array of URLs or route paths),',
+  'baseUrl (optional base URL to resolve relative paths, defaults to targetRef),',
+  'sessionCookie (optional cookie string). Every resolved URL must be inside authorized scope.'
+].join(' ')
 
-        const results: Array<{
-          endpoint: string;
-          status: number;
-          accessible: boolean;
-          contentLength?: number;
-          error?: string;
-        }> = [];
-        const accessible: Array<string> = [];
-        const inaccessible: Array<string> = [];
+function normalizeUrl(rawUrl: string, base?: string): URL {
+  let url: URL
+  try {
+    url = base ? new URL(rawUrl, base) : new URL(rawUrl)
+  } catch {
+    throw new Error(`test_endpoint_variations requires valid URLs, got: ${rawUrl}`)
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw new Error('test_endpoint_variations requires http or https URLs.')
+  }
+  url.username = ''
+  url.password = ''
+  url.hash = ''
+  return url
+}
 
-        for (const endpoint of endpoints) {
-          try {
-            const request: RequestInit = { method: "GET" };
-            if (sessionCookie) {
-              request.headers = { Cookie: sessionCookie };
-            }
+export function createTestEndpointVariationsTool(): RuntimePentestTool {
+  return {
+    name: 'test_endpoint_variations',
+    kind: 'active',
+    description: TEST_VARIATIONS_DESCRIPTION,
+    timeoutMs: 25_000,
+    async execute(command, context) {
+      const args = command.arguments ?? {}
+      let rawEndpoints: string[] = []
 
-            const result = await targetFetch(
-              resolverSessionFromCtx(ctx),
-              endpoint,
-              request,
-            );
-            const body = await result.text();
-
-            results.push({
-              endpoint,
-              status: result.status,
-              accessible: result.status >= 200 && result.status < 400,
-              contentLength: body ? body.length : 0,
-            });
-
-            if (result.status >= 200 && result.status < 400) {
-              accessible.push(endpoint);
-            } else {
-              inaccessible.push(endpoint);
-            }
-          } catch (error: unknown) {
-            const errorMsg =
-              error instanceof Error ? error.message : String(error);
-            results.push({
-              endpoint,
-              status: 0,
-              accessible: false,
-              error: errorMsg,
-            });
-            inaccessible.push(endpoint);
+      if (Array.isArray(args.endpoints)) {
+        rawEndpoints = args.endpoints.filter((e): e is string => typeof e === 'string')
+      } else if (typeof args.endpoints === 'string') {
+        try {
+          const parsed = JSON.parse(args.endpoints)
+          if (Array.isArray(parsed)) {
+            rawEndpoints = parsed.filter((e): e is string => typeof e === 'string')
+          } else {
+            rawEndpoints = [args.endpoints]
           }
+        } catch {
+          rawEndpoints = args.endpoints.split(',').map((s) => s.trim()).filter(Boolean)
         }
-
-        return {
-          success: true,
-          totalTested: endpoints.length,
-          accessible: accessible.length,
-          inaccessible: inaccessible.length,
-          results,
-          accessibleEndpoints: accessible,
-          message: `Tested ${endpoints.length} endpoints. ${accessible.length} accessible, ${inaccessible.length} not accessible.`,
-        };
-      } catch (error: unknown) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        return {
-          success: false,
-          message: `Endpoint testing error: ${errorMsg}`,
-        };
       }
-    },
-  });
+
+      if (rawEndpoints.length === 0) {
+        throw new Error('test_endpoint_variations requires at least one endpoint in arguments.endpoints.')
+      }
+
+      const endpointsToTest = rawEndpoints.slice(0, MAX_ENDPOINTS)
+      const baseUrl =
+        (typeof args.baseUrl === 'string' && args.baseUrl) || command.targetRef || undefined
+
+      // Resolve and validate all URLs against scope before making requests
+      const resolvedUrls: URL[] = []
+      for (const endpoint of endpointsToTest) {
+        const resolved = normalizeUrl(endpoint, baseUrl)
+        if (!isTargetInScope(resolved.toString(), context.scope)) {
+          throw new Error(`Target is outside authorized scope: ${resolved.toString()}`)
+        }
+        resolvedUrls.push(resolved)
+      }
+
+      const sessionCookie =
+        typeof args.sessionCookie === 'string' && args.sessionCookie ? args.sessionCookie : undefined
+
+      const results: Array<{
+        endpoint: string
+        status: number
+        accessible: boolean
+        contentLength: number
+        error?: string
+      }> = []
+
+      const accessibleList: string[] = []
+      const inaccessibleList: string[] = []
+
+      for (const targetUrl of resolvedUrls) {
+        const urlStr = targetUrl.toString()
+        try {
+          const reqHeaders: Record<string, string> = {
+            'user-agent': 'mingyi-variations-probe/0.1'
+          }
+          if (sessionCookie) {
+            reqHeaders.cookie = sessionCookie
+          }
+
+          const response = await fetch(urlStr, {
+            method: 'GET',
+            redirect: 'manual',
+            headers: reqHeaders
+          })
+
+          const body = await response.arrayBuffer()
+          const isAccessible = response.status >= 200 && response.status < 400
+
+          results.push({
+            endpoint: urlStr,
+            status: response.status,
+            accessible: isAccessible,
+            contentLength: body.byteLength
+          })
+
+          if (isAccessible) {
+            accessibleList.push(urlStr)
+          } else {
+            inaccessibleList.push(urlStr)
+          }
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : String(error)
+          results.push({
+            endpoint: urlStr,
+            status: 0,
+            accessible: false,
+            contentLength: 0,
+            error: msg
+          })
+          inaccessibleList.push(urlStr)
+        }
+      }
+
+      const summary = {
+        success: true,
+        totalTested: results.length,
+        accessibleCount: accessibleList.length,
+        inaccessibleCount: inaccessibleList.length,
+        accessibleEndpoints: accessibleList,
+        results
+      }
+
+      return {
+        output: JSON.stringify(summary, null, 2),
+        exitCode: 0
+      }
+    }
+  }
 }

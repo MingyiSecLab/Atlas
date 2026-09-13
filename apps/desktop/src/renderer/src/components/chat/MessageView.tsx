@@ -8,9 +8,12 @@ import {
   ThumbsDown,
   ThumbsUp
 } from 'lucide-react'
+import { useMemo } from 'react'
 import { Markdown } from './Markdown'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ToolCallBlock } from './ToolCallBlock'
+import { ToolGroup } from './tool-ui/ToolGroup'
+import { groupChatBlocks } from './tool-ui/types'
 import { SkillMessage } from './skills/SkillMessage'
 import type { ChatError, ChatMessage } from './types'
 import { messageSkill, messageText } from './types'
@@ -103,14 +106,21 @@ export function AssistantMessage({ message }: { message: ChatMessage }): React.R
             <span className="chat-typing-dot" />
           </div>
         ) : null}
-        {(message.blocks ?? []).map((block, index) => {
+        {useMemo(
+          () => groupChatBlocks(message.blocks ?? [], message.id),
+          [message.blocks, message.id]
+        ).map((unit) => {
+          if (unit.type === 'tool_group') {
+            return <ToolGroup key={unit.key} summary={unit.summary} />
+          }
+
+          const block = unit.block
           if (!block) return null
-          const key = `${message.id}-${block.type || 'text'}-${index}`
-          if (block.type === 'reasoning') return <ReasoningBlock key={key} block={block} />
-          if (block.type === 'tool') return <ToolCallBlock key={key} block={block} />
-          if (block.type === 'skill') return <SkillMessage key={key} skill={block} />
+          if (block.type === 'reasoning') return <ReasoningBlock key={unit.key} block={block} />
+          if (block.type === 'tool') return <ToolCallBlock key={unit.key} block={block} />
+          if (block.type === 'skill') return <SkillMessage key={unit.key} skill={block} />
           return (
-            <Markdown key={key} isStreaming={message.isStreaming}>
+            <Markdown key={unit.key} isStreaming={message.isStreaming}>
               {block.text ?? ''}
             </Markdown>
           )
