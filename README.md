@@ -18,8 +18,8 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
 | ![侧栏任务与空间](docs/screenshots/sidebar.png) | ![终端面板](docs/screenshots/terminal.png) |
 | **统一模型服务配置** | **Pentest 渗透测试工作流** |
 | ![模型服务配置](docs/screenshots/providers.png) | ![Pentest 工作流](docs/screenshots/pentest.png) |
-| **开源致谢与社区贡献** | **持续演进中** |
-| ![开源致谢与社区贡献](docs/screenshots/acknowledgements.png) | *更多创新特性与安全工具逐步开放* |
+| **开源致谢与社区贡献** | **扩展中心与专家角色** |
+| ![开源致谢与社区贡献](docs/screenshots/acknowledgements.png) | ![扩展中心与专家角色](docs/screenshots/hub.png) |
 
 ## 仓库结构
 
@@ -134,6 +134,15 @@ await runtime.sessions.sendMessage({ sessionId, content: '你好' })
 
 await runtime.shutdown()
 ```
+
+## 致谢与开源基石 (Acknowledgements & Credits)
+
+Atlas (Mingyi) 的诞生离不开现代开源 AI 与前端交互生态的卓越贡献。我们向以下优秀的开源项目、设计哲学及其研发团队致以诚挚的感谢：
+
+- **[Mastra](https://mastra.ai/)** (`@mastra/core` & `@mastra/code-sdk`)：为 Atlas 提供了工业级、稳健的本地 AgentController 引擎底座、工作模式（Modes）、工具编排体系与会话状态持久化能力；
+- **[assistant-ui](https://github.com/assistant-ui/assistant-ui)** (`@assistant-ui/react`)：为桌面端呈现极致流畅、可组合且具备丰富交互细节的现代化生成式 AI 对话与工具流体验；
+- **[Vercel AI SDK](https://sdk.vercel.ai/)** (`ai`)：为系统提供了优雅、统一的流式消息协议、工具执行生命周期以及跨模型交互的标准数据契约；
+- **[Electron](https://www.electronjs.org/)** & **[React](https://react.dev/)**：构建高性能、原生集成终端与跨平台安全演练桌面工作台的坚实基础。
 
 ## 许可证与商业授权 (License & Commercial Use)
 
