@@ -24,6 +24,8 @@ import {
   ConversationMap,
   type ConversationMapEntry
 } from '@renderer/components/assistant-ui/elements/conversation-map'
+import { DayDivider } from '@renderer/components/assistant-ui/elements/day-separator'
+import { isSameDay } from '@renderer/lib/date'
 import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
 import {
   partsToChatBlocks,
@@ -209,6 +211,30 @@ export function ChatWorkspace({
         initialAccessRequests={boot.accessRequests}
       />
     </SessionChatProvider>
+  )
+}
+
+function ChatTimelineMessage({ message }: { message: ThreadMessage }): React.ReactNode {
+  const isFirstOfDay = useAuiState((s) => {
+    const msgs = s.thread.messages
+    const idx = msgs.findIndex((m) => m.id === message.id)
+    if (idx === 0) return true
+    if (idx > 0) {
+      const prev = msgs[idx - 1]
+      return !isSameDay(prev.createdAt, message.createdAt)
+    }
+    return false
+  })
+
+  return (
+    <>
+      {isFirstOfDay ? <DayDivider timestamp={message.createdAt} /> : null}
+      {message.role === 'user' ? (
+        <UserMessage message={message} />
+      ) : (
+        <AssistantMessage message={message} />
+      )}
+    </>
   )
 }
 
@@ -572,13 +598,7 @@ function ChatWorkspaceInner({
           <ThreadPrimitive.ViewportProvider>
             <div className="chat-timeline" data-markdown-scroll-container>
               <ThreadPrimitive.Messages>
-                {({ message }) =>
-                  message.role === 'user' ? (
-                    <UserMessage message={message} />
-                  ) : (
-                    <AssistantMessage message={message} />
-                  )
-                }
+                {({ message }) => <ChatTimelineMessage message={message} />}
               </ThreadPrimitive.Messages>
               {errorItems.map((error) => (
                 <ErrorMessage
