@@ -91,7 +91,7 @@ export function TodoPanel({ blocks }: { blocks: readonly ChatBlock[] }): React.R
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      className="w-full border-b border-border/50 bg-background/80 px-4 py-2 text-xs backdrop-blur-xs transition-all"
+      className="w-full rounded-t-[inherit] border-b border-border/50 bg-background/80 px-4 py-2 text-xs backdrop-blur-sm transition-all"
     >
       <CollapsibleTrigger className="group flex w-full items-center justify-between py-1 text-muted-foreground hover:text-foreground cursor-pointer outline-none">
         <div className="flex items-center gap-2 font-medium">
