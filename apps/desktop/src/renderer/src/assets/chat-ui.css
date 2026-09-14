@@ -50,6 +50,22 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-code-surface: var(--code-surface);
   --color-live: var(--aui-live);
+  @keyframes collapsible-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+  }
+  @keyframes collapsible-up {
+    from {
+      height: var(--radix-collapsible-content-height, var(--collapsible-panel-height, auto));
+    }
+    to {
+      height: 0;
+    }
+  }
 }
 
 :root {
