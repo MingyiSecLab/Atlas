@@ -1,7 +1,7 @@
 import { Loader2, ShieldAlert, Sparkles, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ChatBlock, ToolBlock } from './types'
-import { ShimmerLabel } from '@renderer/components/assistant-ui/elements/surfaces'
+import { ThinkingIndicator as ThinkingIndicatorElement } from '@renderer/components/assistant-ui/elements/thinking-indicator'
 
 function formatSeconds(sec: number): string {
   if (sec < 60) return `${sec}s`
@@ -17,6 +17,7 @@ interface ThinkingIndicatorProps {
 
 /**
  * 瞬时状态行 (Status Line / Thinking Indicator)
+ * 基于 assistant-ui elements/thinking-indicator 规范：
  * 专职呈现 Agent 运行期间的瞬态进展：连接等待、深度思考耗时、工具执行状态。
  * 当正文开始流式输出且无未决异步操作时，状态行优雅淡出，不干扰用户阅读。
  */
@@ -63,47 +64,31 @@ export function ThinkingIndicator({ running, blocks }: ThinkingIndicatorProps): 
 
   let iconNode: React.ReactNode
   let statusText = '正在思考...'
-  let isWarning = false
 
   if (runningTool) {
     if (runningTool.status === 'waiting_approval') {
-      isWarning = true
-      iconNode = <ShieldAlert size={13} className="aui-status-icon is-warning text-amber-500" />
+      iconNode = <ShieldAlert size={14} className="text-amber-500 shrink-0" />
       statusText = `等待授权审批: ${runningTool.name || '工具'}`
     } else {
-      iconNode = <Wrench size={13} className="aui-status-icon is-rotating text-blue-500" />
+      iconNode = <Wrench size={14} className="text-blue-500 shrink-0 animate-spin" />
       statusText = `正在执行工具: ${runningTool.name || '操作'}`
     }
   } else if (isReasoningActive || (hasActiveReasoning && !hasTextOutput)) {
-    iconNode = <Sparkles size={13} className="aui-status-icon is-pulsing text-blue-500" />
+    iconNode = <Sparkles size={14} className="text-purple-500 shrink-0 animate-pulse" />
     statusText = '正在深度思考'
   } else if (!hasTextOutput) {
-    iconNode = (
-      <Loader2 size={13} className="aui-status-icon is-spinning text-blue-500 animate-spin" />
-    )
+    iconNode = <Loader2 size={14} className="text-blue-500 shrink-0 animate-spin" />
     statusText = '正在组织思路...'
   }
 
-  const timeBadge = liveElapsed > 0 ? `(${formatSeconds(liveElapsed)})` : ''
+  const elapsedLabel = liveElapsed > 0 ? formatSeconds(liveElapsed) : undefined
 
   return (
-    <div
-      className={`aui-status-indicator ${isWarning ? 'is-warning' : ''}`}
-      role="status"
-      aria-live="polite"
-    >
-      <div className="aui-status-indicator-badge">
-        <span className="aui-status-icon-box">{iconNode}</span>
-        <span className="aui-status-text">
-          <ShimmerLabel active={running}>{statusText}</ShimmerLabel>
-        </span>
-        {timeBadge ? <span className="aui-status-timer">{timeBadge}</span> : null}
-      </div>
-      <div className="aui-status-pulse-dots" aria-hidden="true">
-        <span className="aui-status-dot" />
-        <span className="aui-status-dot" />
-        <span className="aui-status-dot" />
-      </div>
-    </div>
+    <ThinkingIndicatorElement
+      label={statusText}
+      elapsed={elapsedLabel}
+      icon={iconNode}
+      className="my-1 px-1"
+    />
   )
 }
