@@ -132,7 +132,7 @@ const components: Components = {
     void node
     return (
       <code
-        className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground/85"
+        className="rounded-md border border-border/40 bg-muted/70 px-1.5 py-0.5 font-mono text-[12px] font-medium text-foreground/90"
         {...props}
       >
         {children}
@@ -140,43 +140,49 @@ const components: Components = {
     )
   },
   h1: ({ children, ...props }) => (
-    <h1 className="mt-5 mb-2 text-lg font-semibold first:mt-0 last:mb-0" {...props}>
+    <h1 className="mt-5 mb-2 text-lg font-semibold text-foreground first:mt-0 last:mb-0" {...props}>
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
-    <h2 className="mt-4 mb-2 text-base font-semibold first:mt-0 last:mb-0" {...props}>
+    <h2
+      className="mt-4 mb-2 text-base font-semibold text-foreground first:mt-0 last:mb-0"
+      {...props}
+    >
       {children}
     </h2>
   ),
   h3: ({ children, ...props }) => (
-    <h3 className="mt-3 mb-1.5 text-sm font-semibold first:mt-0 last:mb-0" {...props}>
+    <h3
+      className="mt-3 mb-1.5 text-sm font-semibold text-foreground first:mt-0 last:mb-0"
+      {...props}
+    >
       {children}
     </h3>
   ),
   p: ({ children, ...props }) => (
-    <p className="my-2 leading-relaxed first:mt-0 last:mb-0" {...props}>
+    <p className="my-2.5 leading-relaxed text-foreground/90 first:mt-0 last:mb-0" {...props}>
       {children}
     </p>
   ),
   ul: ({ children, ...props }) => (
-    <ul className="my-2 ms-5 list-disc marker:text-muted-foreground [&>li]:mt-1" {...props}>
+    <ul className="my-2 ms-5 list-disc marker:text-muted-foreground/70 [&>li]:mt-1.5" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="my-2 ms-5 list-decimal marker:text-muted-foreground [&>li]:mt-1" {...props}>
+    <ol className="my-2 ms-5 list-decimal marker:text-muted-foreground/70 [&>li]:mt-1.5" {...props}>
       {children}
     </ol>
   ),
   li: ({ children, ...props }) => (
-    <li className="leading-relaxed" {...props}>
+    <li className="leading-relaxed text-foreground/85" {...props}>
       {children}
     </li>
   ),
   blockquote: ({ children, ...props }) => (
     <blockquote
-      className="my-2 border-s-2 border-border/80 ps-3.5 text-muted-foreground italic"
+      className="my-3 border-s-2 border-primary/50 bg-muted/20 py-1 ps-3.5 text-muted-foreground italic rounded-r-md"
       {...props}
     >
       {children}
@@ -184,15 +190,15 @@ const components: Components = {
   ),
   hr: (props) => <hr className="my-4 border-border/40" {...props} />,
   table: ({ children, ...props }) => (
-    <div className="my-3 overflow-x-auto rounded-lg border border-border/60">
-      <table className="w-full border-collapse text-left text-xs" {...props}>
+    <div className="my-3 overflow-x-auto rounded-xl border border-border/60 bg-muted/[0.04] shadow-2xs">
+      <table className="w-full border-collapse text-left text-[13px]" {...props}>
         {children}
       </table>
     </div>
   ),
   th: ({ children, ...props }) => (
     <th
-      className="border-b border-border/60 bg-muted/60 px-3 py-2 font-medium text-foreground/85"
+      className="border-b border-border/60 bg-muted/40 px-3.5 py-2 text-[12.5px] font-semibold text-foreground/85 select-none"
       {...props}
     >
       {children}
@@ -200,7 +206,7 @@ const components: Components = {
   ),
   td: ({ children, ...props }) => (
     <td
-      className="border-b border-border/30 px-3 py-2 text-foreground/80 last:border-b-0"
+      className="border-b border-border/25 px-3.5 py-2 text-foreground/80 last:border-b-0 leading-normal"
       {...props}
     >
       {children}

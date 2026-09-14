@@ -128,17 +128,19 @@ export function ConversationMap({
               <PreviewCard.Popup
                 className={cn(
                   floating,
-                  'z-50 w-60 origin-(--transform-origin) rounded-2xl p-3.5 outline-none',
-                  'transition-[opacity,scale] duration-200 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
+                  'z-50 w-64 origin-(--transform-origin) rounded-xl border border-border/70 bg-popover/95 p-3 shadow-xl backdrop-blur-md outline-none',
+                  'transition-[opacity,scale] duration-150 ease-[cubic-bezier(0.23,1,0.32,1)] motion-reduce:transition-none',
                   'data-[starting-style]:scale-[0.97] data-[starting-style]:opacity-0',
                   'data-[ending-style]:scale-[0.97] data-[ending-style]:opacity-0'
                 )}
               >
-                <p className="line-clamp-2 text-[13px] leading-snug font-medium">
-                  {payload?.title}
-                </p>
+                <div className="flex items-center justify-between gap-2 border-b border-border/40 pb-1.5 mb-1.5">
+                  <span className="text-[12px] font-semibold text-foreground/85">
+                    {payload?.title}
+                  </span>
+                </div>
                 {payload?.preview && (
-                  <p className="text-foreground/50 mt-1 line-clamp-3 text-[13px] leading-relaxed">
+                  <p className="text-foreground/70 line-clamp-3 text-[12.5px] leading-relaxed break-words">
                     {payload.preview}
                   </p>
                 )}

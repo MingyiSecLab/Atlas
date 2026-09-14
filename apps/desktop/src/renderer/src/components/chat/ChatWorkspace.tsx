@@ -26,6 +26,7 @@ import {
 } from '@renderer/components/assistant-ui/elements/conversation-map'
 import { DayDivider } from '@renderer/components/assistant-ui/elements/day-separator'
 import { isSameDay } from '@renderer/lib/date'
+import { cleanMarkdownPreview } from '@renderer/lib/markdown-utils'
 import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
 import {
   partsToChatBlocks,
@@ -108,7 +109,7 @@ function getMinimapItemPreview(item: MinimapItem): { title: string; text: string
     .join('\n')
     .trim()
   if (text) {
-    return { title: roleTitle, text: text.length > 180 ? `${text.slice(0, 180)}…` : text }
+    return { title: roleTitle, text: cleanMarkdownPreview(text, 160) }
   }
   const skill = item.blocks.find(
     (block): block is Extract<ChatBlock, { type: 'skill' }> => block.type === 'skill'
@@ -127,7 +128,7 @@ function getMinimapItemPreview(item: MinimapItem): { title: string; text: string
   if (reasoningBlock && reasoningBlock.type === 'reasoning' && reasoningBlock.text) {
     return {
       title: roleTitle,
-      text: `思考: ${reasoningBlock.text.slice(0, 120)}…`
+      text: `思考: ${cleanMarkdownPreview(reasoningBlock.text, 120)}`
     }
   }
   if (item.attachmentCount > 0) {
@@ -171,10 +172,7 @@ function buildBoot(snapshot: RuntimeSessionSnapshot): SessionChatBoot {
   }
 }
 
-export function ChatWorkspace({
-  taskId,
-  isSidebarCollapsed = false
-}: ChatWorkspaceProps): React.ReactNode {
+export function ChatWorkspace({ taskId }: ChatWorkspaceProps): React.ReactNode {
   const [sessionBoot, setSessionBoot] = useState<{ id: string; boot: SessionChatBoot } | null>(null)
 
   useEffect(() => {
@@ -207,7 +205,6 @@ export function ChatWorkspace({
       <ChatWorkspaceInner
         key={taskId}
         taskId={taskId}
-        isSidebarCollapsed={isSidebarCollapsed}
         initialAccessRequests={boot.accessRequests}
       />
     </SessionChatProvider>
@@ -240,11 +237,9 @@ function ChatTimelineMessage({ message }: { message: ThreadMessage }): React.Rea
 
 function ChatWorkspaceInner({
   taskId,
-  isSidebarCollapsed,
   initialAccessRequests
 }: {
   taskId: string
-  isSidebarCollapsed: boolean
   initialAccessRequests: SessionChatBoot['accessRequests']
 }): React.ReactNode {
   const { snapshots, modelIds, modes, updateSession, respondToAccessRequest, abortSession } =
@@ -580,18 +575,23 @@ function ChatWorkspaceInner({
         ref={workspaceRef}
         className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
       >
-        {isSidebarCollapsed && conversationEntries.length > 0 ? (
-          <aside className="absolute top-[70px] left-3 z-20" aria-label="对话导航导轨">
-            <ConversationMap
-              entries={conversationEntries}
-              side="right"
-              onSelect={(id) => {
-                document.getElementById(`message-${id}`)?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center'
-                })
-              }}
-            />
+        {conversationEntries.length >= 2 ? (
+          <aside
+            className="pointer-events-none absolute inset-y-0 right-2 z-20 hidden md:flex items-center justify-center"
+            aria-label="对话导航导轨"
+          >
+            <div className="pointer-events-auto">
+              <ConversationMap
+                entries={conversationEntries}
+                side="left"
+                onSelect={(id) => {
+                  document.getElementById(`message-${id}`)?.scrollIntoView({
+                    behavior: 'smooth',
+                    block: 'center'
+                  })
+                }}
+              />
+            </div>
           </aside>
         ) : null}
         <div ref={scrollRef} className="chat-scroll" onScroll={updateDistanceFromBottom}>
