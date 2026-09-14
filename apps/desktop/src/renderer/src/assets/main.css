@@ -5393,7 +5393,7 @@ button.tree-row {
   position: relative;
   width: 100%;
   min-width: 0;
-  color: #242428;
+  color: inherit;
 }
 
 .chat-assistant-blocks > * + * {
@@ -5619,12 +5619,12 @@ button.tree-row {
   max-height: 384px;
   margin: 0;
   overflow: auto;
-  padding: 12px 14px;
-  color: #24292f;
+  padding: 0;
+  color: inherit;
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 12px;
+  font-size: 12.5px;
   font-variant-ligatures: none;
-  line-height: 1.68;
+  line-height: 1.6;
   tab-size: 2;
   white-space: pre;
 }

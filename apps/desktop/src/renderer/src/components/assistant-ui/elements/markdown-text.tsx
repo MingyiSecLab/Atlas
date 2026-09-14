@@ -140,13 +140,16 @@ const components: Components = {
     )
   },
   h1: ({ children, ...props }) => (
-    <h1 className="mt-5 mb-2 text-lg font-semibold text-foreground first:mt-0 last:mb-0" {...props}>
+    <h1
+      className="mt-6 mb-2.5 text-lg font-semibold tracking-tight text-foreground first:mt-0 last:mb-0"
+      {...props}
+    >
       {children}
     </h1>
   ),
   h2: ({ children, ...props }) => (
     <h2
-      className="mt-4 mb-2 text-base font-semibold text-foreground first:mt-0 last:mb-0"
+      className="mt-5 mb-2 text-base font-semibold tracking-tight text-foreground first:mt-0 last:mb-0"
       {...props}
     >
       {children}
@@ -154,51 +157,62 @@ const components: Components = {
   ),
   h3: ({ children, ...props }) => (
     <h3
-      className="mt-3 mb-1.5 text-sm font-semibold text-foreground first:mt-0 last:mb-0"
+      className="mt-4 mb-1.5 text-sm font-semibold text-foreground first:mt-0 last:mb-0"
       {...props}
     >
       {children}
     </h3>
   ),
   p: ({ children, ...props }) => (
-    <p className="my-2.5 leading-relaxed text-foreground/90 first:mt-0 last:mb-0" {...props}>
+    <p
+      className="my-2.5 text-[13.5px] leading-[1.72] text-foreground/90 first:mt-0 last:mb-0"
+      {...props}
+    >
       {children}
     </p>
   ),
   ul: ({ children, ...props }) => (
-    <ul className="my-2 ms-5 list-disc marker:text-muted-foreground/70 [&>li]:mt-1.5" {...props}>
+    <ul className="my-2.5 ms-5 list-disc space-y-1 marker:text-muted-foreground/60" {...props}>
       {children}
     </ul>
   ),
   ol: ({ children, ...props }) => (
-    <ol className="my-2 ms-5 list-decimal marker:text-muted-foreground/70 [&>li]:mt-1.5" {...props}>
+    <ol className="my-2.5 ms-5 list-decimal space-y-1 marker:text-muted-foreground/60" {...props}>
       {children}
     </ol>
   ),
   li: ({ children, ...props }) => (
-    <li className="leading-relaxed text-foreground/85" {...props}>
+    <li className="text-[13.5px] leading-[1.72] text-foreground/90 ps-0.5" {...props}>
       {children}
     </li>
   ),
   blockquote: ({ children, ...props }) => (
     <blockquote
-      className="my-3 border-s-2 border-primary/50 bg-muted/20 py-1 ps-3.5 text-muted-foreground italic rounded-r-md"
+      className="my-3 border-s-2 border-primary/50 bg-muted/20 py-1.5 ps-3.5 pe-2 text-[13px] text-muted-foreground italic rounded-e-md"
       {...props}
     >
       {children}
     </blockquote>
   ),
   hr: (props) => <hr className="my-4 border-border/40" {...props} />,
+  strong: ({ children, ...props }) => (
+    <strong className="font-semibold text-foreground" {...props}>
+      {children}
+    </strong>
+  ),
   table: ({ children, ...props }) => (
-    <div className="my-3 overflow-x-auto rounded-xl border border-border/60 bg-muted/[0.04] shadow-2xs">
-      <table className="w-full border-collapse text-left text-[13px]" {...props}>
+    <div className="my-3.5 max-w-full overflow-x-auto">
+      <table
+        className="w-full border-separate border-spacing-0 text-left text-[13px] leading-normal"
+        {...props}
+      >
         {children}
       </table>
     </div>
   ),
   th: ({ children, ...props }) => (
     <th
-      className="border-b border-border/60 bg-muted/40 px-3.5 py-2 text-[12.5px] font-semibold text-foreground/85 select-none"
+      className="border-y border-s border-border/50 bg-muted/60 px-3.5 py-2.5 text-xs font-semibold text-foreground/85 first:rounded-ss-xl last:rounded-se-xl last:border-e select-none [[align=center]]:text-center [[align=right]]:text-right"
       {...props}
     >
       {children}
@@ -206,11 +220,19 @@ const components: Components = {
   ),
   td: ({ children, ...props }) => (
     <td
-      className="border-b border-border/25 px-3.5 py-2 text-foreground/80 last:border-b-0 leading-normal"
+      className="border-b border-s border-border/35 px-3.5 py-2.5 text-start text-foreground/85 leading-relaxed last:border-e first:font-medium first:text-foreground/90 [[align=center]]:text-center [[align=right]]:text-right"
       {...props}
     >
       {children}
     </td>
+  ),
+  tr: ({ children, ...props }) => (
+    <tr
+      className="transition-colors hover:bg-muted/20 [&:last-child>td:first-child]:rounded-es-xl [&:last-child>td:last-child]:rounded-ee-xl"
+      {...props}
+    >
+      {children}
+    </tr>
   )
 }
 
