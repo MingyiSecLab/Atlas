@@ -1,6 +1,7 @@
-import { AlertCircle, FileText } from 'lucide-react'
+import { FileText } from 'lucide-react'
 import type { ToolBlock } from '../types'
 import { HighlightedCode } from '../HighlightedCode'
+import { ToolError } from '@renderer/components/assistant-ui/elements/tool-error'
 import type { ParsedToolCall } from './types'
 
 interface DefaultToolUIProps {
@@ -22,21 +23,23 @@ function formatJsonIfPossible(str?: string): { formatted: string; isJson: boolea
   }
 }
 
-export function DefaultToolUI({ block }: DefaultToolUIProps): React.ReactNode {
+export function DefaultToolUI({ block, parsed }: DefaultToolUIProps): React.ReactNode {
   const hasInput = Boolean(block.input)
   const hasOutput = Boolean(block.output || block.outputArtifact)
 
   const formattedInput = formatJsonIfPossible(block.input)
   const formattedOutput = formatJsonIfPossible(block.output)
+  const isError = block.status === 'error' || block.status === 'denied'
 
   return (
-    <div className="aui-default-tool-container">
-      {/* 错误提示条（参考 assistant-ui ToolErrorCard） */}
-      {block.status === 'error' && block.output ? (
-        <div className="aui-tool-error-banner">
-          <AlertCircle size={13} className="aui-tool-error-banner-icon" />
-          <div className="aui-tool-error-banner-text">{block.output}</div>
-        </div>
+    <div className="aui-default-tool-container space-y-2.5">
+      {/* 错误提示：使用 assistant-ui ToolError 组件 */}
+      {isError && block.output ? (
+        <ToolError
+          name={parsed?.displayName || block.name}
+          target={parsed?.chip || parsed?.primaryParam || '调用失败'}
+          message={block.output}
+        />
       ) : null}
 
       {/* PARAMETERS 区域 */}

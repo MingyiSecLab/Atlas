@@ -1,6 +1,5 @@
 export { ToolCallCard } from './ToolCallCard'
 export { ToolGroup } from './ToolGroup'
-export { ToolGroupTimeline } from './ToolGroupTimeline'
 export { ToolHeader } from './ToolHeader'
 export { ToolStatusBadge } from './ToolStatusBadge'
 export { TerminalToolUI } from './TerminalToolUI'

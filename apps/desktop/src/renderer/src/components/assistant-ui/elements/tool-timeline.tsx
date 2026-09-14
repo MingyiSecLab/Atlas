@@ -42,6 +42,7 @@ export function ToolTimeline({
   onOpenChange,
   restingLabel,
   activeLabel,
+  stats,
   className
 }: ToolTimelineProps): React.ReactNode {
   const [openSteps, setOpenSteps] = useState<ReadonlySet<number>>(() => new Set())
@@ -122,6 +123,25 @@ export function ToolTimeline({
               </Collapsible>
             )
           })}
+          {stats && stats.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-foreground/[0.06] mt-2">
+              {stats.map((stat, idx) => (
+                <div
+                  key={`${stat.file}-${idx}`}
+                  className="flex items-center gap-1 text-[11px] font-mono bg-foreground/[0.04] px-2 py-0.5 rounded-md text-foreground/70"
+                  title={stat.file}
+                >
+                  <span className="truncate max-w-[200px]">{stat.file}</span>
+                  {typeof stat.added === 'number' && stat.added > 0 ? (
+                    <span className="text-emerald-500 font-medium">+{stat.added}</span>
+                  ) : null}
+                  {typeof stat.removed === 'number' && stat.removed > 0 ? (
+                    <span className="text-red-500 font-medium">-{stat.removed}</span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </CollapsibleContent>
     </Collapsible>
