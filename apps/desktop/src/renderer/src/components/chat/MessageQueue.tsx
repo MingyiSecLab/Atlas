@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronUp,
   Image as ImageIcon,
+  Layers,
   Pencil,
   Sparkles,
   Trash2,
@@ -49,138 +50,149 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
   if (queued.length === 0) return null
 
   return (
-    <div className="message-queue-container" role="status" aria-label="待发送任务队列">
-      {/* 顶部运行中状态胶囊 */}
-      <div className="message-queue-running-card">
-        <span className="message-queue-pulse-wrapper">
-          <span className="message-queue-pulse-ring" />
-          <span className="message-queue-pulse-dot" />
-        </span>
-        <span className="message-queue-running-text" title={runningText}>
-          {runningText}
-        </span>
-        <span className="message-queue-running-badge">{isRunning ? '生成中' : '排队中'}</span>
-      </div>
-
-      {/* 队列标题及全局控制栏 */}
-      <div className="message-queue-header">
-        <div className="message-queue-header-left">
-          <span className="message-queue-header-title">排队队列</span>
-          <span className="message-queue-header-count">({queued.length} 条待处理)</span>
+    <div
+      className="aui-message-queue-container message-queue-container"
+      role="status"
+      aria-label="待发送任务队列"
+    >
+      {/* 顶部运行指示器 */}
+      {isRunning && (
+        <div className="aui-queue-status-bar">
+          <div className="aui-queue-status-left">
+            <span className="aui-queue-pulse-dot" aria-hidden="true" />
+            <span className="aui-queue-running-text" title={runningText}>
+              {runningText}
+            </span>
+          </div>
         </div>
-        <div className="message-queue-header-actions">
-          {queued.length > 1 && (
-            <button
-              type="button"
-              className="message-queue-action-btn"
-              onClick={() => setIsExpanded((prev) => !prev)}
-              aria-label={isExpanded ? '收起排队列表' : '展开排队列表'}
-              title={isExpanded ? '收起' : '展开'}
-            >
-              {isExpanded ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              <span>{isExpanded ? '收起' : '展开'}</span>
-            </button>
-          )}
-          <button
-            type="button"
-            className="message-queue-action-btn is-danger"
-            onClick={onClearAll}
-            aria-label="清空所有排队任务"
-            title="清空全部排队"
-          >
-            <Trash2 size={13} />
-            <span>清空</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 排队项目列表 */}
-      {isExpanded && (
-        <ul className="message-queue-list">
-          {queued.map((item, index) => {
-            const hasAttachments = Boolean(item.attachments && item.attachments.length > 0)
-            const isFirst = index === 0
-            return (
-              <li key={item.id} className="message-queue-item">
-                <span className="message-queue-item-index">{index + 1}</span>
-
-                {/* 技能或专家附加徽章 */}
-                {item.skill && (
-                  <span
-                    className="message-queue-item-tag is-skill"
-                    title={`指定技能: /${item.skill.name}`}
-                  >
-                    <Sparkles size={11} />
-                    <span>/{item.skill.name}</span>
-                  </span>
-                )}
-                {item.expert && (
-                  <span
-                    className="message-queue-item-tag is-expert"
-                    title={`指定专家: ${item.expert.name}`}
-                  >
-                    <span>@{item.expert.name}</span>
-                  </span>
-                )}
-                {hasAttachments && (
-                  <span
-                    className="message-queue-item-tag is-attachment"
-                    title={`包含 ${item.attachments?.length} 个附件`}
-                  >
-                    <ImageIcon size={11} />
-                    <span>{item.attachments?.length}</span>
-                  </span>
-                )}
-
-                {/* 消息正文摘要 */}
-                <span className="message-queue-item-text" title={item.text || '(空文本)'}>
-                  {item.text || (hasAttachments ? '[附件图片]' : '(无文本)')}
-                </span>
-
-                {/* 动作区：插队优先 + 编辑 Prompt + 单项移除 */}
-                <div className="message-queue-item-actions">
-                  {!isFirst && (
-                    <button
-                      type="button"
-                      className="message-queue-item-btn is-steer"
-                      onClick={() => onSteerItem(item.id)}
-                      aria-label={`将第 ${index + 1} 条任务优先插队至首位`}
-                      title="优先插队 (Steer)"
-                    >
-                      <ArrowUp size={13} />
-                    </button>
-                  )}
-                  {onEditItem && (
-                    <button
-                      type="button"
-                      className="message-queue-item-btn is-edit"
-                      onClick={() => {
-                        setEditingItem({ id: item.id, text: item.text })
-                        setEditText(item.text)
-                      }}
-                      aria-label={`编辑排队任务“${item.text.slice(0, 16)}”`}
-                      title="编辑 Prompt"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="message-queue-item-btn is-cancel"
-                    onClick={() => onCancelItem(item.id)}
-                    aria-label={`移除排队任务“${item.text.slice(0, 16)}”`}
-                    title="移除"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
       )}
 
-      {/* 排队 Prompt 编辑浮层弹窗（通过 Portal 挂载到 body，避免被 composer 层叠上下文拦截） */}
+      {/* 队列卡片 */}
+      <div className="aui-queue-card">
+        {/* 头部摘要栏 */}
+        <div className="aui-queue-header">
+          <div className="aui-queue-header-left">
+            <Layers size={13} className="aui-queue-header-icon" />
+            <span className="aui-queue-header-title">任务队列</span>
+            <span className="aui-queue-header-count message-queue-header-count">
+              ({queued.length} 条待处理)
+            </span>
+          </div>
+
+          <div className="aui-queue-header-actions">
+            {queued.length > 1 && (
+              <button
+                type="button"
+                className="aui-queue-action-btn message-queue-action-btn"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                aria-label={isExpanded ? '收起排队列表' : '展开排队列表'}
+                title={isExpanded ? '收起' : '展开'}
+              >
+                {isExpanded ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                <span>{isExpanded ? '收起' : '展开'}</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="aui-queue-action-btn is-clear message-queue-action-btn is-danger"
+              onClick={onClearAll}
+              aria-label="清空所有排队任务"
+              title="清空队列中所有任务"
+            >
+              <Trash2 size={12} />
+              <span>清空</span>
+            </button>
+          </div>
+        </div>
+
+        {/* 展开的排队项列表 */}
+        {isExpanded && (
+          <ul className="aui-queue-list message-queue-list">
+            {queued.map((item, index) => {
+              const isFirst = index === 0
+
+              return (
+                <li key={item.id} className="aui-queue-item message-queue-item">
+                  <div className="aui-queue-item-main">
+                    <span className="aui-queue-item-index">#{index + 1}</span>
+
+                    {/* 特殊标记 (技能、专家、模式等) */}
+                    {item.skill && (
+                      <span className="aui-queue-tag is-skill" title={`技能: ${item.skill.name}`}>
+                        <Sparkles size={10} />
+                        <span>/{item.skill.name}</span>
+                      </span>
+                    )}
+
+                    {item.expert && (
+                      <span className="aui-queue-tag is-expert" title={`专家: ${item.expert.name}`}>
+                        <span>@{item.expert.name}</span>
+                      </span>
+                    )}
+
+                    {item.attachments && item.attachments.length > 0 && (
+                      <span className="aui-queue-tag is-attachment" title="包含图片附件">
+                        <ImageIcon size={10} />
+                        <span>{item.attachments.length}</span>
+                      </span>
+                    )}
+
+                    <span className="aui-queue-item-text" title={item.text}>
+                      {item.text || '(仅附件)'}
+                    </span>
+                  </div>
+
+                  <div className="aui-queue-item-actions">
+                    {/* 插队置顶 (Steer) */}
+                    {!isFirst && (
+                      <button
+                        type="button"
+                        className="aui-queue-btn is-steer message-queue-item-btn is-steer"
+                        onClick={() => onSteerItem(item.id)}
+                        aria-label={`将第 ${index + 1} 条任务优先插队至首位`}
+                        title="优先插队 (Steer)"
+                      >
+                        <ArrowUp size={12} />
+                        <span>插队</span>
+                      </button>
+                    )}
+
+                    {/* 编辑 */}
+                    {onEditItem && (
+                      <button
+                        type="button"
+                        className="aui-queue-btn is-edit message-queue-item-btn"
+                        onClick={() => {
+                          setEditingItem({ id: item.id, text: item.text })
+                          setEditText(item.text)
+                        }}
+                        aria-label={`编辑排队任务“${item.text.slice(0, 16)}”`}
+                        title="编辑 Prompt"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    )}
+
+                    {/* 取消 / 移除 */}
+                    <button
+                      type="button"
+                      className="aui-queue-btn is-remove message-queue-item-btn is-remove"
+                      onClick={() => onCancelItem(item.id)}
+                      aria-label={`移除排队任务“${item.text.slice(0, 16)}”`}
+                      title="移出队列"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+      </div>
+
+      {/* 排队 Prompt 编辑浮层弹窗（Portal 到 body 避免层叠上下文遮挡） */}
       {editingItem && typeof document !== 'undefined'
         ? createPortal(
             <div className="message-queue-edit-overlay" onClick={() => setEditingItem(null)}>
@@ -209,44 +221,32 @@ export const MessageQueue: React.FC<MessageQueueProps> = ({
                   <textarea
                     className="message-queue-edit-textarea"
                     value={editText}
-                    autoFocus
-                    placeholder="修改提示词内容..."
                     onChange={(e) => setEditText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
-                        e.preventDefault()
-                        if (editText.trim() && editText !== editingItem.text) {
-                          onEditItem?.(editingItem.id, editText.trim())
-                          setEditingItem(null)
-                        }
-                      } else if (e.key === 'Escape') {
-                        setEditingItem(null)
-                      }
-                    }}
+                    rows={4}
+                    autoFocus
                   />
                 </div>
                 <div className="message-queue-edit-footer">
-                  <span className="message-queue-edit-hint">按 ⌘+Enter 快速保存，Esc 取消</span>
-                  <div className="message-queue-edit-buttons">
-                    <button
-                      type="button"
-                      className="message-queue-edit-btn is-secondary"
-                      onClick={() => setEditingItem(null)}
-                    >
-                      取消
-                    </button>
-                    <button
-                      type="button"
-                      className="message-queue-edit-btn is-primary"
-                      disabled={!editText.trim() || editText === editingItem.text}
-                      onClick={() => {
-                        onEditItem?.(editingItem.id, editText.trim())
-                        setEditingItem(null)
-                      }}
-                    >
-                      保存修改
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    className="message-queue-edit-btn is-cancel"
+                    onClick={() => setEditingItem(null)}
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    className="message-queue-edit-btn is-save"
+                    onClick={() => {
+                      if (editText.trim() && onEditItem) {
+                        onEditItem(editingItem.id, editText.trim())
+                      }
+                      setEditingItem(null)
+                    }}
+                    disabled={!editText.trim()}
+                  >
+                    保存修改
+                  </button>
                 </div>
               </div>
             </div>,

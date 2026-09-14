@@ -1,3 +1,5 @@
+import type { MastraCodeState } from '@mastra/code-sdk/schema'
+
 export type RuntimeSessionMessageRole = 'user' | 'assistant'
 
 export interface RuntimeSessionTextBlock {
@@ -146,6 +148,9 @@ export type RuntimeSessionEvent =
       sessionId: string
       message: string
       retryable?: boolean
+      retryAttempt?: number
+      maxRetries?: number
+      retryDelay?: number
     }
 
 export type RuntimeSessionEventListener = (event: RuntimeSessionEvent) => void | Promise<void>
@@ -164,4 +169,11 @@ export interface RuntimeSessionService {
   abort(sessionId: string): Promise<void>
   subscribe(listener: RuntimeSessionEventListener): () => void
   shutdown(): Promise<void>
+  /**
+   * 将 OM（Observational Memory）等 Controller state 更新广播到 default 会话与
+   * 全部已物化会话，并记录为覆盖值 —— 后续创建的新会话会在挂载时重放。
+   * 各 Session state 相互隔离（创建时从 initialState 克隆），逐会话写入是
+   * 让运行中会话立即读到更新的唯一途径。
+   */
+  applyOmState(updates: Partial<MastraCodeState>): Promise<void>
 }

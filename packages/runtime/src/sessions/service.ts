@@ -163,6 +163,15 @@ export function createRuntimeSessionService({
   const ownerId = defaultSession.identity.getOwnerId()
   const materialized = new Map<string, MaterializedSession>()
   const listeners = new Set<RuntimeSessionEventListener>()
+  /** OM 等跨会话 state 覆盖值；新会话挂载时重放，保证设置对所有会话生效。 */
+  let omOverrides: Partial<MastraCodeState> = {}
+
+  const wire = async (session: Session<MastraCodeState>): Promise<void> => {
+    await wireSession?.(session)
+    if (Object.keys(omOverrides).length > 0) {
+      await session.state.set(omOverrides)
+    }
+  }
 
   const notify = (event: RuntimeSessionEvent): void => {
     for (const listener of listeners) {
@@ -245,11 +254,21 @@ export function createRuntimeSessionService({
       return
     }
     if (event.type === 'error') {
+      const errorEvent = event as {
+        error?: unknown
+        retryable?: boolean
+        retryAttempt?: number
+        maxRetries?: number
+        retryDelay?: number
+      }
       notify({
         type: 'error',
         sessionId,
-        message: eventErrorMessage(event.error),
-        ...(event.retryable !== undefined ? { retryable: event.retryable } : {})
+        message: eventErrorMessage(errorEvent.error),
+        ...(errorEvent.retryable !== undefined ? { retryable: errorEvent.retryable } : {}),
+        ...(typeof errorEvent.retryAttempt === 'number' ? { retryAttempt: errorEvent.retryAttempt } : {}),
+        ...(typeof errorEvent.maxRetries === 'number' ? { maxRetries: errorEvent.maxRetries } : {}),
+        ...(typeof errorEvent.retryDelay === 'number' ? { retryDelay: errorEvent.retryDelay } : {})
       })
       return
     }
@@ -281,7 +300,7 @@ export function createRuntimeSessionService({
       },
       threadId: sessionId
     })
-    await wireSession?.(session)
+    await wire(session)
     const unsubscribe = session.subscribe((event) => handleEvent(sessionId, session, event))
     materialized.set(sessionId, { session, unsubscribe })
     return session
@@ -344,7 +363,7 @@ export function createRuntimeSessionService({
         },
         threadId: sessionId
       })
-      await wireSession?.(session)
+      await wire(session)
       const unsubscribe = session.subscribe((event) => handleEvent(sessionId, session, event))
       materialized.set(sessionId, { session, unsubscribe })
 
@@ -472,6 +491,16 @@ export function createRuntimeSessionService({
     subscribe: (listener) => {
       listeners.add(listener)
       return () => listeners.delete(listener)
+    },
+
+    applyOmState: async (updates) => {
+      if (Object.keys(updates).length === 0) return
+      omOverrides = { ...omOverrides, ...updates }
+      const targets = [
+        defaultSession,
+        ...[...materialized.values()].map((entry) => entry.session)
+      ]
+      await Promise.all(targets.map((session) => session.state.set(updates)))
     },
 
     shutdown: async () => {

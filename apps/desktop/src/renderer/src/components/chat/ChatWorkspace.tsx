@@ -1,4 +1,3 @@
-import { ChevronDown } from 'lucide-react'
 import { ThreadPrimitive, useAui, useAuiState } from '@assistant-ui/react'
 import type { ThreadMessage } from '@assistant-ui/react'
 import type {
@@ -16,6 +15,11 @@ import { PentestCreateCard } from './PentestCreateCard'
 import { AssistantMessage, ErrorMessage, UserMessage } from './MessageView'
 import type { ExpertItem } from '../hub/hub-types'
 import { MessageQueue, type QueuedItem } from './MessageQueue'
+import { PromptSuggestions } from './PromptSuggestions'
+import { RetryConnectingBar } from './RetryConnectingBar'
+import { StoppedRunCard } from './StoppedRunCard'
+import { SelectionToolbar } from './SelectionToolbar'
+import { ScrollToBottomPill } from './ScrollToBottomPill'
 import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
 import {
   partsToChatBlocks,
@@ -220,8 +224,9 @@ export function ChatWorkspace({
   }
 
   return (
-    <SessionChatProvider sessionId={taskId} boot={boot}>
+    <SessionChatProvider sessionId={taskId} boot={boot} key={taskId}>
       <ChatWorkspaceInner
+        key={taskId}
         taskId={taskId}
         isSidebarCollapsed={isSidebarCollapsed}
         initialAccessRequests={boot.accessRequests}
@@ -254,6 +259,13 @@ function ChatWorkspaceInner({
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [accessRequests, setAccessRequests] = useState(initialAccessRequests)
   const [errorItems, setErrorItems] = useState<ChatError[]>([])
+  const [retryStatus, setRetryStatus] = useState<{
+    attempt: number
+    maxRetries: number
+    message?: string
+  } | null>(null)
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
+  const [wasStopped, setWasStopped] = useState(false)
   const workspaceRef = useRef<HTMLElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const composerHeightRef = useRef(112)
@@ -263,8 +275,21 @@ function ChatWorkspaceInner({
   const model = snapshot?.modelId ?? '未选择模型'
   const permission = snapshot?.permissionProfileId ?? 'Pentest'
   const modeOptions = useMemo(() => modes.map((m) => m.name), [modes])
-  const isStreaming = isRunning
+  const isStreaming = isRunning || (snapshot?.isRunning ?? false)
   const activeAccessRequest = accessRequests[0]
+
+  useEffect(() => {
+    if (!isStreaming) return undefined
+    const start = Date.now()
+    const timer = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - start) / 1000))
+    }, 1000)
+    return () => {
+      clearInterval(timer)
+      setElapsedSeconds(0)
+      setRetryStatus(null)
+    }
+  }, [isStreaming])
 
   // 审批请求与错误事件由本组件独立订阅（不进入消息流）
   useEffect(() => {
@@ -281,10 +306,28 @@ function ChatWorkspaceInner({
           current.filter((request) => request.toolCallId !== event.toolCallId)
         )
       } else if (event.type === 'error') {
-        setErrorItems((current) => [
-          ...current,
-          { id: `error-${crypto.randomUUID()}`, role: 'error', content: event.message }
-        ])
+        if (event.retryable) {
+          // 网络抖动重试中：展示轻量进度条，不塞入聊天流刷屏
+          setRetryStatus({
+            attempt: event.retryAttempt ?? 1,
+            maxRetries: event.maxRetries ?? 10,
+            message: event.message
+          })
+        } else {
+          // 最终不可恢复错误：清除重试条，并在聊天流显示最终错误
+          setRetryStatus(null)
+          if (event.message === 'terminated') {
+            setWasStopped(true)
+            return
+          }
+          setErrorItems((current) => [
+            ...current.filter((e) => e.content !== event.message),
+            { id: `error-${crypto.randomUUID()}`, role: 'error', content: event.message }
+          ])
+        }
+      } else if (event.type === 'message' || (event.type === 'run_state' && !event.isRunning)) {
+        // 重连成功产生新消息，或会话结束，清除重试条
+        setRetryStatus(null)
       }
     })
     return unsubscribe
@@ -371,6 +414,8 @@ function ChatWorkspaceInner({
       const skillName = skill?.name ?? command?.[1]
       const skillArguments = skill ? text : (command?.[2]?.trim() ?? '')
       if (!skillName && !text && attachments.length === 0) return
+      setWasStopped(false)
+      setErrorItems([])
       shouldFollowRef.current = true
 
       const imageParts = attachments.map((attachment) => ({
@@ -434,6 +479,19 @@ function ChatWorkspaceInner({
     [aui, pentestIntent]
   )
 
+  const handleRetryLast = useCallback(() => {
+    setWasStopped(false)
+    setErrorItems([])
+    const lastUserMessage = [...messages].reverse().find((m) => m.role === 'user')
+    if (lastUserMessage) {
+      aui.thread.append({
+        role: 'user',
+        content: lastUserMessage.content,
+        metadata: lastUserMessage.metadata
+      })
+    }
+  }, [messages, aui])
+
   const sendMessage = useCallback(
     (
       attachments: ChatImageAttachment[],
@@ -492,11 +550,15 @@ function ChatWorkspaceInner({
   const isAuditMode = permission.toLowerCase() === 'audit'
 
   const minimapItems = useMemo(() => {
-    const items = messages.map(minimapItemFromMessage)
+    const items: MinimapItem[] = []
+    for (const message of messages) {
+      items.push(minimapItemFromMessage(message))
+    }
     for (const error of errorItems) {
       items.push({
         id: error.id,
         role: 'error',
+        timestamp: '刚刚',
         blocks: [],
         attachmentCount: 0,
         content: error.content
@@ -525,8 +587,21 @@ function ChatWorkspaceInner({
                 }
               </ThreadPrimitive.Messages>
               {errorItems.map((error) => (
-                <ErrorMessage key={error.id} error={error} />
+                <ErrorMessage
+                  key={error.id}
+                  error={error}
+                  onDismiss={() => {
+                    setErrorItems((current) => current.filter((e) => e.id !== error.id))
+                  }}
+                  onRetry={() => {
+                    setErrorItems((current) => current.filter((e) => e.id !== error.id))
+                    handleRetryLast()
+                  }}
+                />
               ))}
+              {wasStopped ? (
+                <StoppedRunCard onDismiss={() => setWasStopped(false)} onRetry={handleRetryLast} />
+              ) : null}
               {pentestIntentBusy ? (
                 <p className="chat-pentest-intent-loading">正在生成评估草稿…</p>
               ) : null}
@@ -553,19 +628,15 @@ function ChatWorkspaceInner({
             </div>
           </ThreadPrimitive.ViewportProvider>
         </div>
-        {showScrollButton && !activeAccessRequest ? (
-          <button
-            className="chat-scroll-bottom"
-            type="button"
-            aria-label="滚动到底部"
-            title="滚动到底部"
+        {!activeAccessRequest ? (
+          <ScrollToBottomPill
+            visible={showScrollButton}
+            isStreaming={isStreaming}
             onClick={() => {
               shouldFollowRef.current = true
               scrollConversationToBottom('smooth')
             }}
-          >
-            <ChevronDown size={16} />
-          </button>
+          />
         ) : null}
         {activeAccessRequest ? (
           <div className="chat-approval-dock" data-testid="chat-approval-dock">
@@ -583,6 +654,15 @@ function ChatWorkspaceInner({
             />
           </div>
         ) : null}
+        {retryStatus ? (
+          <RetryConnectingBar
+            attempt={retryStatus.attempt}
+            maxRetries={retryStatus.maxRetries}
+            message={retryStatus.message}
+            elapsedSeconds={elapsedSeconds}
+            onCancel={() => void abortSession(taskId)}
+          />
+        ) : null}
         <MessageQueue
           isRunning={isStreaming}
           runningText={isStreaming ? 'AI 正在处理当前任务，完成后将自动发送' : undefined}
@@ -592,6 +672,13 @@ function ChatWorkspaceInner({
           onEditItem={handleEditQueued}
           onClearAll={handleClearQueued}
         />
+        {messages.length === 0 && queuedMessages.length === 0 && !isStreaming ? (
+          <PromptSuggestions
+            mode={permission}
+            disabled={isStreaming}
+            onSelect={(prompt) => setInput(prompt)}
+          />
+        ) : null}
         <Composer
           value={input}
           model={model}
@@ -614,7 +701,37 @@ function ChatWorkspaceInner({
           }}
           onHeightChange={updateComposerHeight}
           onSend={(attachments, options) => sendMessage(attachments, options)}
-          onStop={() => void abortSession(taskId)}
+          onStop={() => {
+            setWasStopped(true)
+            void abortSession(taskId)
+          }}
+        />
+        <SelectionToolbar
+          onQuote={(text) => {
+            const quoteBlock = text
+              .split('\n')
+              .map((line) => `> ${line}`)
+              .join('\n')
+            setInput((prev) =>
+              prev.trim() ? `${prev.trim()}\n\n${quoteBlock}\n\n` : `${quoteBlock}\n\n`
+            )
+          }}
+          onExplain={(text) => {
+            const quoteBlock = text
+              .split('\n')
+              .map((line) => `> ${line}`)
+              .join('\n')
+            const prompt = `请详细解释以下内容并梳理核心要点：\n${quoteBlock}\n\n`
+            setInput((prev) => (prev.trim() ? `${prev.trim()}\n\n${prompt}` : prompt))
+          }}
+          onAudit={(text) => {
+            const quoteBlock = text
+              .split('\n')
+              .map((line) => `> ${line}`)
+              .join('\n')
+            const prompt = `请对以下内容进行安全评估、排查潜在风险与脆弱点：\n${quoteBlock}\n\n`
+            setInput((prev) => (prev.trim() ? `${prev.trim()}\n\n${prompt}` : prompt))
+          }}
         />
       </section>
     </ThreadPrimitive.Root>

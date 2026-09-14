@@ -3,20 +3,24 @@ import {
   Bot,
   Check,
   Copy,
-  GitBranch,
   Pencil,
+  RotateCcw,
   ThumbsDown,
-  ThumbsUp
+  ThumbsUp,
+  X
 } from 'lucide-react'
-import { MessagePrimitive } from '@assistant-ui/react'
+import { MessagePrimitive, useAui } from '@assistant-ui/react'
 import type { ThreadMessage } from '@assistant-ui/react'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { Markdown } from './Markdown'
 import { ReasoningBlock } from './ReasoningBlock'
+import { ThinkingIndicator } from './ThinkingIndicator'
 import { ToolCallBlock } from './ToolCallBlock'
 import { ToolGroup } from './tool-ui/ToolGroup'
-import { groupChatBlocks } from './tool-ui/types'
+import { analyzeToolCall, groupChatBlocks } from './tool-ui/types'
 import { SkillMessage } from './skills/SkillMessage'
+import { BranchPicker } from './BranchPicker'
+import { FeedbackDialog } from './FeedbackDialog'
 import type { ChatBlock, ChatError, SkillBlock } from './types'
 import { messageAnchorId, partsToChatBlocks, readAssistantMetadata } from './runtime/converter'
 import { useCopyFeedback } from './useCopyFeedback'
@@ -26,16 +30,18 @@ function IconButton({
   label,
   children,
   onClick,
-  disabled = false
+  disabled = false,
+  active = false
 }: {
   label: string
   children: React.ReactNode
   onClick?: () => void
   disabled?: boolean
+  active?: boolean
 }): React.ReactNode {
   return (
     <button
-      className="chat-icon-button"
+      className={`chat-icon-button ${active ? 'is-active' : ''}`}
       type="button"
       aria-label={label}
       title={label}
@@ -72,9 +78,12 @@ function joinTextBlocks(blocks: readonly ChatBlock[]): string {
 
 export function UserMessage({ message }: { message: ThreadMessage }): React.ReactNode {
   const { copied, copy } = useCopyFeedback()
+  const aui = useAui()
+  const [isEditing, setIsEditing] = useState(false)
   const blocks = useMemo(() => partsToChatBlocks(message.content), [message])
   const skill = findSkillBlock(blocks)
   const content = joinTextBlocks(blocks)
+  const [editText, setEditText] = useState(content)
   const images = message.content.filter((part) => part.type === 'image')
   const anchorId = messageAnchorId(message)
   const timestamp = formatTimestamp(message.createdAt)
@@ -91,27 +100,78 @@ export function UserMessage({ message }: { message: ThreadMessage }): React.Reac
 
   return (
     <MessagePrimitive.Root asChild>
-      <article className="chat-message chat-user-message" id={`message-${anchorId}`}>
-        <div className="chat-user-bubble">
-          {images.length > 0 ? (
-            <div className="chat-user-attachments" aria-label="消息图片">
-              {images.map((part, index) => (
-                <img
-                  key={`${anchorId}-image-${index}`}
-                  src={part.type === 'image' ? part.image : ''}
-                  alt={part.type === 'image' ? (part.filename ?? '附件图片') : '附件图片'}
-                />
-              ))}
+      <article
+        className="chat-message chat-user-message"
+        id={`message-${anchorId}`}
+        data-message-id={message.id}
+      >
+        {isEditing ? (
+          <div className="chat-user-edit-container">
+            <textarea
+              className="chat-user-edit-textarea"
+              value={editText}
+              onChange={(e) => setEditText(e.target.value)}
+              rows={3}
+              autoFocus
+            />
+            <div className="chat-user-edit-actions">
+              <button
+                type="button"
+                className="chat-user-edit-btn is-cancel"
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditText(content)
+                }}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                className="chat-user-edit-btn is-save"
+                disabled={!editText.trim() || editText === content}
+                onClick={() => {
+                  if (editText.trim()) {
+                    aui.thread.append({
+                      role: 'user',
+                      content: [{ type: 'text', text: editText.trim() }]
+                    })
+                  }
+                  setIsEditing(false)
+                }}
+              >
+                保存并重新发送
+              </button>
             </div>
-          ) : null}
-          {content ? <Markdown>{content}</Markdown> : null}
-        </div>
+          </div>
+        ) : (
+          <div className="chat-user-bubble">
+            {images.length > 0 ? (
+              <div className="chat-user-attachments" aria-label="消息图片">
+                {images.map((part, index) => (
+                  <img
+                    key={`${anchorId}-image-${index}`}
+                    src={part.type === 'image' ? part.image : ''}
+                    alt={part.type === 'image' ? (part.filename ?? '附件图片') : '附件图片'}
+                  />
+                ))}
+              </div>
+            ) : null}
+            {content ? <Markdown>{content}</Markdown> : null}
+          </div>
+        )}
         <div className="chat-user-meta">
           <time>{timestamp}</time>
+          <BranchPicker />
           <IconButton label={copied ? '已复制' : '复制'} onClick={() => copy(content)}>
             {copied ? <Check size={13} /> : <Copy size={13} />}
           </IconButton>
-          <IconButton label="编辑 Prompt" disabled>
+          <IconButton
+            label="编辑 Prompt"
+            onClick={() => {
+              setIsEditing((prev) => !prev)
+              setEditText(content)
+            }}
+          >
             <Pencil size={13} />
           </IconButton>
         </div>
@@ -122,6 +182,8 @@ export function UserMessage({ message }: { message: ThreadMessage }): React.Reac
 
 export function AssistantMessage({ message }: { message: ThreadMessage }): React.ReactNode {
   const { copied, copy } = useCopyFeedback()
+  const [thumbState, setThumbState] = useState<'up' | 'down' | null>(null)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
   const running = message.status?.type === 'running'
   const metadata = readAssistantMetadata(message)
   const blocks = useMemo(() => partsToChatBlocks(message.content, running), [message, running])
@@ -136,20 +198,28 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
     return Boolean(block.text?.trim())
   })
 
+  // 统计本条消息中所有独立渲染的 task 块，用于 Living Task List 历史折叠合并
+  const singleTaskKeys = useMemo(() => {
+    return units
+      .filter((u) => {
+        if (u.type !== 'single' || !u.block || u.block.type !== 'tool') return false
+        return analyzeToolCall(u.block).category === 'task'
+      })
+      .map((u) => u.key)
+  }, [units])
+  const totalSingleTasks = singleTaskKeys.length
+
   // 空且已结束的 assistant 消息（如发送前中止）不渲染气泡
   if (!running && !hasVisibleContent) return null
 
   return (
     <MessagePrimitive.Root asChild>
-      <article className="chat-message chat-assistant-message" id={`message-${anchorId}`}>
+      <article
+        className="chat-message chat-assistant-message"
+        id={`message-${anchorId}`}
+        data-message-id={message.id}
+      >
         <div className="chat-assistant-blocks" aria-live={running ? 'polite' : undefined}>
-          {running && !hasVisibleContent ? (
-            <div className="chat-typing-indicator" aria-label="正在思考">
-              <span className="chat-typing-dot" />
-              <span className="chat-typing-dot" />
-              <span className="chat-typing-dot" />
-            </div>
-          ) : null}
           {units.map((unit) => {
             if (unit.type === 'tool_group') {
               return <ToolGroup key={unit.key} summary={unit.summary} />
@@ -158,7 +228,20 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
             const block = unit.block
             if (!block) return null
             if (block.type === 'reasoning') return <ReasoningBlock key={unit.key} block={block} />
-            if (block.type === 'tool') return <ToolCallBlock key={unit.key} block={block} />
+            if (block.type === 'tool') {
+              const taskOrder = singleTaskKeys.indexOf(unit.key)
+              const isTask = taskOrder !== -1
+              const isSuperseded = isTask && taskOrder < totalSingleTasks - 1
+              return (
+                <ToolCallBlock
+                  key={unit.key}
+                  block={block}
+                  isSuperseded={isSuperseded}
+                  versionIndex={isTask ? taskOrder + 1 : undefined}
+                  totalVersions={isTask ? totalSingleTasks : undefined}
+                />
+              )
+            }
             if (block.type === 'skill') return <SkillMessage key={unit.key} skill={block} />
             return (
               <Markdown key={unit.key} isStreaming={running}>
@@ -166,21 +249,31 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
               </Markdown>
             )
           })}
+          <ThinkingIndicator running={running} blocks={blocks} />
         </div>
         {!running || metadata.messageEnded ? (
           <div className="chat-turn-footer">
             <div className="chat-turn-actions">
+              <BranchPicker />
               <IconButton label={copied ? '已复制' : '复制'} onClick={() => copy(content)}>
                 {copied ? <Check size={13} /> : <Copy size={13} />}
               </IconButton>
-              <IconButton label="有帮助" disabled>
+              <IconButton
+                label="有帮助"
+                active={thumbState === 'up'}
+                onClick={() => setThumbState((prev) => (prev === 'up' ? null : 'up'))}
+              >
                 <ThumbsUp size={13} />
               </IconButton>
-              <IconButton label="没有帮助" disabled>
+              <IconButton
+                label="没有帮助"
+                active={thumbState === 'down'}
+                onClick={() => {
+                  setThumbState((prev) => (prev === 'down' ? null : 'down'))
+                  setFeedbackOpen(true)
+                }}
+              >
                 <ThumbsDown size={13} />
-              </IconButton>
-              <IconButton label="创建分支" disabled>
-                <GitBranch size={13} />
               </IconButton>
             </div>
             <div className="chat-turn-provenance">
@@ -194,6 +287,14 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
                 <Bot size={13} />
               )}
             </div>
+            <FeedbackDialog
+              messageId={anchorId}
+              isOpen={feedbackOpen}
+              onClose={() => setFeedbackOpen(false)}
+              onSubmit={(data) => {
+                console.log('Feedback submitted:', data)
+              }}
+            />
           </div>
         ) : null}
       </article>
@@ -201,11 +302,46 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
   )
 }
 
-export function ErrorMessage({ error }: { error: ChatError }): React.ReactNode {
+export function ErrorMessage({
+  error,
+  onDismiss,
+  onRetry
+}: {
+  error: ChatError
+  onDismiss?: () => void
+  onRetry?: () => void
+}): React.ReactNode {
   return (
     <div className="chat-error-message" role="alert" id={`message-${error.id}`}>
-      <AlertTriangle size={15} />
-      <span>{error.content}</span>
+      <div className="chat-error-content">
+        <AlertTriangle size={15} className="chat-error-icon" />
+        <span className="chat-error-text">{error.content}</span>
+      </div>
+      <div className="chat-error-actions">
+        {onRetry ? (
+          <button
+            type="button"
+            className="chat-error-action-btn is-retry"
+            onClick={onRetry}
+            title="重新尝试"
+            aria-label="重试生成"
+          >
+            <RotateCcw size={12} />
+            <span>重试</span>
+          </button>
+        ) : null}
+        {onDismiss ? (
+          <button
+            type="button"
+            className="chat-error-action-btn is-dismiss"
+            onClick={onDismiss}
+            title="关闭提示"
+            aria-label="关闭错误提示"
+          >
+            <X size={13} />
+          </button>
+        ) : null}
+      </div>
     </div>
   )
 }

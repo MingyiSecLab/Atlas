@@ -86,4 +86,3 @@ export function DefaultToolUI({ block }: DefaultToolUIProps): React.ReactNode {
     </div>
   )
 }
-

@@ -49,9 +49,12 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
         running={summary.status === 'running'}
         tone={tone}
       >
-        <ToolGroupTimeline steps={summary.steps} isGroupRunning={summary.status === 'running'} />
+        <ToolGroupTimeline
+          steps={summary.steps}
+          stats={summary.stats}
+          isGroupRunning={summary.status === 'running'}
+        />
       </Disclosure>
     </div>
   )
 }
-

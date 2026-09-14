@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import {
   Check,
+  Download,
   Search,
   Filter,
   FileText,
@@ -40,6 +41,7 @@ interface TopHeaderProps {
   onRenameTask?: (title: string) => void
   onToggleTaskPin?: () => void
   onDeleteTask?: () => void
+  onExportTask?: () => void
   isRightPanelOpen?: boolean
   rightPanelWidth?: number
   activeRightPanelSection?: RightPanelSection
@@ -108,6 +110,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
   onRenameTask,
   onToggleTaskPin,
   onDeleteTask,
+  onExportTask,
   isRightPanelOpen = false,
   rightPanelWidth = 380,
   activeRightPanelSection = 'pentest',
@@ -328,6 +331,17 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
                         >
                           <Pencil size={14} />
                           <span>重命名</span>
+                        </button>
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => {
+                            onExportTask?.()
+                            setTaskMenuOpen(false)
+                          }}
+                        >
+                          <Download size={14} />
+                          <span>导出对话 (Markdown)</span>
                         </button>
                         <button
                           type="button"

@@ -18,6 +18,7 @@ import type { RuntimeSkillInfo } from '@mingyi/runtime'
 import { useWorkspace } from './state/WorkspaceProvider'
 import { readSettings } from './components/overlays/settings/persistence'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
+import { formatSessionAsMarkdown, downloadMarkdownFile } from './components/chat/export-chat'
 import './assets/main.css'
 
 function relativeTime(value: unknown): string {
@@ -186,6 +187,19 @@ export const App: React.FC = () => {
       setCurrentTaskId((current) => (current === id ? null : current))
     })
   }
+
+  const handleExportTask = useCallback(async (id: string): Promise<void> => {
+    try {
+      const snapshot = await window.api.sessions.get(id)
+      const markdown = formatSessionAsMarkdown(snapshot)
+      const safeTitle = (snapshot.title || 'chat-export')
+        .replace(/[^\w\u4e00-\u9fa5\-_]/g, '_')
+        .slice(0, 32)
+      downloadMarkdownFile(`${safeTitle}-${new Date().toISOString().slice(0, 10)}.md`, markdown)
+    } catch (error) {
+      console.error('导出任务 Markdown 失败:', error)
+    }
+  }, [])
 
   const handleToggleSidebar = (): void => {
     setIsSidebarCollapsed((prev) => !prev)
@@ -374,6 +388,9 @@ export const App: React.FC = () => {
           }}
           onDeleteTask={() => {
             if (currentTask) handleDeleteTask(currentTask.id)
+          }}
+          onExportTask={() => {
+            if (currentTask) void handleExportTask(currentTask.id)
           }}
           isRightPanelOpen={isRightPanelOpen}
           rightPanelWidth={rightPanelWidth}

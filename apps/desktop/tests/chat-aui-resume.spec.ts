@@ -146,7 +146,12 @@ test.describe('Chat UI run resume', () => {
       type: 'message',
       sessionId: main!.id,
       phase: 'update',
-      message: wireMessage('assistant-resume-1', '第一段，随后是第二段结论。', now, 'claude-sonnet-5')
+      message: wireMessage(
+        'assistant-resume-1',
+        '第一段，随后是第二段结论。',
+        now,
+        'claude-sonnet-5'
+      )
     })
     await sendEvent({
       type: 'run_state',

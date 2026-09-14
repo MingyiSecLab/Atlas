@@ -92,6 +92,8 @@ test.describe('ToolGroup aggregation and status calculation', () => {
       parsed: {
         category: 'terminal' as const,
         displayName: '终端命令',
+        verb: 'Ran',
+        chip: 'curl http://target',
         isJsonArgs: true
       }
     }))
@@ -100,5 +102,81 @@ test.describe('ToolGroup aggregation and status calculation', () => {
     expect(summary.status).toBe('running')
     expect(summary.runningIndex).toBe(2)
     expect(summary.headline).toContain('正在执行第 2/2 步')
+  })
+
+  test('correctly extracts verbs, chips and file diff stats according to assistant-ui tool-timeline', () => {
+    const blocks: ChatBlock[] = [
+      {
+        type: 'tool',
+        name: 'view_file',
+        input: JSON.stringify({ AbsolutePath: '/project/thread.tsx' }),
+        status: 'success'
+      },
+      {
+        type: 'tool',
+        name: 'run_command',
+        input: JSON.stringify({ CommandLine: 'pnpm vitest' }),
+        status: 'success'
+      },
+      {
+        type: 'tool',
+        name: 'replace_file_content',
+        input: JSON.stringify({
+          TargetFile: '/project/composer.tsx',
+          TargetContent: 'line1\nline2\nline3',
+          ReplacementContent: 'newline1\nnewline2\nnewline3\nnewline4\nnewline5'
+        }),
+        status: 'success'
+      }
+    ]
+
+    const units = groupChatBlocks(blocks, 'msg-timeline')
+    expect(units).toHaveLength(1)
+    expect(units[0].type).toBe('tool_group')
+
+    if (units[0].type === 'tool_group') {
+      const summary = units[0].summary
+      expect(summary.totalCount).toBe(3)
+      expect(summary.steps[0].parsed.verb).toBe('Read')
+      expect(summary.steps[0].parsed.chip).toBe('thread.tsx')
+
+      expect(summary.steps[1].parsed.verb).toBe('Ran')
+      expect(summary.steps[1].parsed.chip).toBe('pnpm vitest')
+
+      expect(summary.steps[2].parsed.verb).toBe('Edited')
+      expect(summary.steps[2].parsed.chip).toBe('composer.tsx')
+
+      // 验证文件 diff 统计
+      expect(summary.stats).toHaveLength(1)
+      expect(summary.stats[0].fileName).toBe('composer.tsx')
+      expect(summary.stats[0].additions).toBe(5)
+      expect(summary.stats[0].deletions).toBe(3)
+      expect(summary.filesChangedCount).toBe(1)
+      expect(summary.headline).toBe('3 步 · 1 个文件变更')
+    }
+  })
+
+  test('correctly parses task tools and extracts progress summary', () => {
+    const taskBlock: ToolBlock = {
+      name: 'task_update',
+      input: JSON.stringify({
+        tasks: [
+          { content: '获取 BENCHMARK_TOKEN', status: 'completed' },
+          { content: '拉取题目列表并按难度排序', status: 'completed' },
+          { content: '逐题启动容器、解题并提交 flag', status: 'in_progress' }
+        ]
+      }),
+      status: 'success',
+      type: 'tool'
+    }
+
+    const units = groupChatBlocks([taskBlock], 'msg-task')
+    expect(units).toHaveLength(1)
+    if (units[0].type === 'tool_group') {
+      const step = units[0].summary.steps[0]
+      expect(step.parsed.category).toBe('task')
+      expect(step.parsed.displayName).toBe('更新任务')
+      expect(step.parsed.primaryParam).toBe('2/3 步骤完成')
+    }
   })
 })

@@ -12,7 +12,17 @@ function skillName(input: string | undefined): string | undefined {
   }
 }
 
-export function ToolCallBlock({ block }: { block: ToolBlock }): React.ReactNode {
+export function ToolCallBlock({
+  block,
+  isSuperseded = false,
+  versionIndex,
+  totalVersions
+}: {
+  block: ToolBlock
+  isSuperseded?: boolean
+  versionIndex?: number
+  totalVersions?: number
+}): React.ReactNode {
   const activatedSkill = block.name === 'skill' ? skillName(block.input) : undefined
 
   if (activatedSkill && block.output) {
@@ -21,5 +31,12 @@ export function ToolCallBlock({ block }: { block: ToolBlock }): React.ReactNode 
     )
   }
 
-  return <ToolCallCard block={block} />
+  return (
+    <ToolCallCard
+      block={block}
+      isSuperseded={isSuperseded}
+      versionIndex={versionIndex}
+      totalVersions={totalVersions}
+    />
+  )
 }

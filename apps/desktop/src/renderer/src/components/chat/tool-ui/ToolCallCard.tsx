@@ -1,11 +1,4 @@
-import {
-  FileCode,
-  ListChecks,
-  Search,
-  ShieldCheck,
-  Terminal,
-  Wrench
-} from 'lucide-react'
+import { FileCode, ListChecks, Search, ShieldCheck, Terminal, Wrench } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Disclosure } from '../Disclosure'
 import type { ToolBlock } from '../types'
@@ -20,9 +13,18 @@ import { analyzeToolCall } from './types'
 interface ToolCallCardProps {
   block: ToolBlock
   defaultOpen?: boolean
+  isSuperseded?: boolean
+  versionIndex?: number
+  totalVersions?: number
 }
 
-export function ToolCallCard({ block, defaultOpen = false }: ToolCallCardProps): React.ReactNode {
+export function ToolCallCard({
+  block,
+  defaultOpen = false,
+  isSuperseded = false,
+  versionIndex,
+  totalVersions
+}: ToolCallCardProps): React.ReactNode {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const parsed = useMemo(() => analyzeToolCall(block), [block])
   const hasContent = Boolean(block.input || block.output || block.outputArtifact)
@@ -56,7 +58,15 @@ export function ToolCallCard({ block, defaultOpen = false }: ToolCallCardProps):
       case 'security':
         return <PentestToolUI block={block} parsed={parsed} />
       case 'task':
-        return <TaskToolUI block={block} parsed={parsed} />
+        return (
+          <TaskToolUI
+            block={block}
+            parsed={parsed}
+            isSuperseded={isSuperseded}
+            versionIndex={versionIndex}
+            totalVersions={totalVersions}
+          />
+        )
       case 'general':
       default:
         return <DefaultToolUI block={block} parsed={parsed} />
@@ -64,8 +74,24 @@ export function ToolCallCard({ block, defaultOpen = false }: ToolCallCardProps):
   }
 
   const title = parsed.displayName || block.name
-  const summary = parsed.primaryParam || block.summary || (block.status === 'success' ? '执行完成' : undefined)
+  const summary =
+    parsed.primaryParam || block.summary || (block.status === 'success' ? '执行完成' : undefined)
   const tone = block.status === 'error' || block.status === 'denied' ? 'error' : 'default'
+
+  // 对于已被后续版本取代的任务清单，直接作为独立微型胶囊条呈现，避免双层折叠嵌套
+  if (parsed.category === 'task' && isSuperseded) {
+    return (
+      <div className="chat-single-tool-text-wrapper">
+        <TaskToolUI
+          block={block}
+          parsed={parsed}
+          isSuperseded={isSuperseded}
+          versionIndex={versionIndex}
+          totalVersions={totalVersions}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="chat-single-tool-text-wrapper">
@@ -83,4 +109,3 @@ export function ToolCallCard({ block, defaultOpen = false }: ToolCallCardProps):
     </div>
   )
 }
-

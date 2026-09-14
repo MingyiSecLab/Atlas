@@ -404,4 +404,94 @@ describe('runtime session service', () => {
       expect.objectContaining({ allResources: true })
     )
   })
+
+  it('broadcasts OM state to live sessions and replays overrides on new sessions', async () => {
+    const threads = new Map<string, AgentControllerThread>()
+    const sessions = new Map<string, Session<MastraCodeState>>()
+    const workspacePath = '/tmp/mingyi-workspace'
+    const resourceId = 'project-resource'
+
+    const statefulSession = (
+      target: Session<MastraCodeState> & { stateSnapshot?: Partial<MastraCodeState> }
+    ): void => {
+      target.stateSnapshot = {}
+      ;(target as unknown as { state: unknown }).state = {
+        get: () => target.stateSnapshot,
+        set: vi.fn(async (updates: Partial<MastraCodeState>) => {
+          target.stateSnapshot = { ...target.stateSnapshot, ...updates }
+        })
+      }
+    }
+
+    const defaultSession = {
+      identity: { getResourceId: () => resourceId, getOwnerId: () => 'owner-1' },
+      thread: {
+        getById: vi.fn(async ({ threadId }: { threadId: string }) => threads.get(threadId) ?? null),
+        list: vi.fn(async () => [...threads.values()])
+      }
+    } as unknown as Session<MastraCodeState>
+    statefulSession(defaultSession as Session<MastraCodeState> & { stateSnapshot?: never })
+
+    const createMockSession = (id: string): Session<MastraCodeState> => {
+      const session = {
+        identity: { getResourceId: () => resourceId, getOwnerId: () => 'owner-1' },
+        displayState: { get: () => ({ isRunning: false, pendingSuspensions: new Map() }) },
+        model: { hasSelection: () => false, get: () => '', displayName: () => 'unknown' },
+        mode: { get: () => 'build' },
+        thread: {
+          listActiveMessages: vi.fn().mockResolvedValue([]),
+          rename: vi.fn(),
+          setSetting: vi.fn(),
+          delete: vi.fn(async () => threads.delete(id))
+        },
+        subscribe: vi.fn(() => () => undefined),
+        sendMessage: vi.fn(),
+        respondToToolSuspension: vi.fn(),
+        abort: vi.fn()
+      } as unknown as Session<MastraCodeState>
+      statefulSession(session)
+      sessions.set(id, session)
+      return session
+    }
+
+    const controller = {
+      createSession: vi.fn(async ({ id, tags }: { id: string; tags: Record<string, string> }) => {
+        const session = createMockSession(id)
+        threads.set(id, {
+          id,
+          resourceId,
+          createdAt: new Date('2026-08-18T10:00:00.000Z'),
+          updatedAt: new Date('2026-08-18T10:00:00.000Z'),
+          metadata: { ...tags }
+        })
+        return session
+      }),
+      deleteSession: vi.fn()
+    } as unknown as AgentController<MastraCodeState>
+
+    const service = createRuntimeSessionService({
+      controller,
+      defaultSession,
+      workspacePath
+    })
+
+    // 会话先于 OM 更新创建（对应聊天中途修改记忆设置的场景）
+    await service.create({ id: 'live-1', title: 'Live' })
+    await service.applyOmState({ observerModelId: 'bai/qwen3.8-flash' })
+
+    // default 会话与已物化会话都收到更新
+    expect(defaultSession.state.get().observerModelId).toBe('bai/qwen3.8-flash')
+    expect(sessions.get('live-1')?.state.get().observerModelId).toBe('bai/qwen3.8-flash')
+
+    // 更新之后创建的新会话在挂载时重放覆盖值
+    await service.create({ id: 'live-2', title: 'After update' })
+    expect(sessions.get('live-2')?.state.get().observerModelId).toBe('bai/qwen3.8-flash')
+
+    // 覆盖值持续累积：后续更新叠加而不清空早前字段
+    await service.applyOmState({ observationThreshold: 24_000 })
+    await service.create({ id: 'live-3', title: 'After second update' })
+    const third = sessions.get('live-3')?.state.get()
+    expect(third?.observerModelId).toBe('bai/qwen3.8-flash')
+    expect(third?.observationThreshold).toBe(24_000)
+  })
 })

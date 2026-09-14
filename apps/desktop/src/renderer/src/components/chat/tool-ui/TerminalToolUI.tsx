@@ -36,10 +36,7 @@ export function TerminalToolUI({ block, parsed }: TerminalToolUIProps): React.Re
   const isRunning = block.status === 'running'
   const isError = block.status === 'error'
   const exitCode = useMemo(() => (isError ? parseExitCode(output) : undefined), [isError, output])
-  const outputLineCount = useMemo(
-    () => (output ? output.split('\n').length : 0),
-    [output]
-  )
+  const outputLineCount = useMemo(() => (output ? output.split('\n').length : 0), [output])
   const collapsible = !expanded && outputLineCount > COLLAPSE_LINE_THRESHOLD
 
   const handleCopy = (textToCopy: string): void => {
@@ -112,4 +109,3 @@ export function TerminalToolUI({ block, parsed }: TerminalToolUIProps): React.Re
     </div>
   )
 }
-

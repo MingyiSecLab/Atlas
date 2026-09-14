@@ -208,7 +208,10 @@ export const ExpertDetailModal: React.FC<ExpertDetailModalProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="hub-modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div
+          className="hub-modal-footer"
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+        >
           <div style={{ display: 'flex', gap: '8px' }}>
             {onDelete && (
               <button

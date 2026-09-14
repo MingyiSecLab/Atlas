@@ -73,7 +73,11 @@ function SessionRunAttach({
   }, [isRunning])
 
   const attach = useCallback(
-    (seed?: readonly RuntimeSessionMessage[], overlay?: ToolStatusOverlay): void => {
+    (
+      seed?: readonly RuntimeSessionMessage[],
+      overlay?: ToolStatusOverlay,
+      terminal?: 'complete' | 'aborted' | 'error' | 'suspended'
+    ): void => {
       if (resumingRef.current) return
       resumingRef.current = true
       const messages = aui.thread.getState().messages
@@ -84,7 +88,8 @@ function SessionRunAttach({
           createSessionRunStream({
             sessionId,
             ...(seed ? { seed } : {}),
-            ...(overlay ? { seedOverlay: overlay } : {})
+            ...(overlay ? { seedOverlay: overlay } : {}),
+            ...(terminal ? { terminal } : {})
           }).stream
       })
     },
@@ -111,7 +116,9 @@ function SessionRunAttach({
       }
       // assistant message 事件：runtime 空闲说明该消息未被当前 run 消费，
       // 以它为种子 resume（事件本身不会再到达流订阅）
-      if (!aui.thread.getState().isRunning) attach([event.message])
+      if (!aui.thread.getState().isRunning) {
+        attach([event.message], undefined, event.phase === 'end' ? 'complete' : undefined)
+      }
     })
     return unsubscribe
   }, [aui, attach, sessionId])

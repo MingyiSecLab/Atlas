@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react'
-import { CircleAlert, RotateCcw } from 'lucide-react'
+import React, { useEffect, useId, useState } from 'react'
+import { Check, CircleAlert, RotateCcw, Sparkles } from 'lucide-react'
 import {
   SettingsPageActions,
   SettingsPageLayout,
@@ -30,13 +30,21 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
   const [loadError, setLoadError] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveFeedback, setSaveFeedback] = useState<string | null>(null)
+  const [syncReflector, setSyncReflector] = useState(true)
+  const syncToggleId = useId()
 
   useEffect(() => {
     let cancelled = false
     window.api.om
       .getStatus()
       .then((next) => {
-        if (!cancelled) setStatus(next)
+        if (!cancelled) {
+          setStatus(next)
+          if (next.reflectorModelId && next.observerModelId) {
+            setSyncReflector(next.reflectorModelId === next.observerModelId)
+          }
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
@@ -54,6 +62,10 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
     try {
       const next = await window.api.om.update(patch)
       setStatus(next)
+      setSaveFeedback('已自动保存配置')
+      setTimeout(() => {
+        setSaveFeedback(null)
+      }, 2000)
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : '保存记忆配置失败。')
     } finally {
@@ -61,20 +73,55 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
     }
   }
 
-  const modelOptions = (value: string): React.ReactNode => (
-    <>
-      {value !== OM_DEFAULTS.observerModelId && !modelIds.includes(value) && (
-        <option key={value} value={value}>
-          {value}
-        </option>
-      )}
-      {modelIds.map((modelId) => (
-        <option key={modelId} value={modelId}>
-          {modelId}
-        </option>
-      ))}
-    </>
-  )
+  // 检查是否缺少 Google 凭证却在使用默认的 Gemini 模型
+  const hasGoogleKey = modelIds.some((id) => id.startsWith('google/'))
+  const currentObserverUsesGoogle =
+    !status.observerModelId || status.observerModelId.startsWith('google/')
+  const currentReflectorUsesGoogle =
+    !status.reflectorModelId || status.reflectorModelId.startsWith('google/')
+  const isMissingGoogleKeyWarning =
+    !hasGoogleKey && (currentObserverUsesGoogle || currentReflectorUsesGoogle)
+
+  const handleObserverChange = (newModel: string): void => {
+    const patch: UpdateRuntimeOmInput = { observerModelId: newModel }
+    if (syncReflector) {
+      patch.reflectorModelId = newModel
+    }
+    void update(patch)
+  }
+
+  const handleApplyRecommended = (): void => {
+    if (modelIds.length === 0) return
+    const primaryModel = modelIds[0]
+    void update({
+      observerModelId: primaryModel,
+      reflectorModelId: primaryModel
+    })
+    setSyncReflector(true)
+  }
+
+  const renderModelOptions = (currentValue?: string): React.ReactNode => {
+    const hasCurrent = currentValue && modelIds.includes(currentValue)
+    return (
+      <>
+        {!hasCurrent && !currentValue && (
+          <option value="" disabled>
+            -- 请选择模型 --
+          </option>
+        )}
+        {currentValue && !modelIds.includes(currentValue) && (
+          <option key={currentValue} value={currentValue}>
+            {currentValue} (当前)
+          </option>
+        )}
+        {modelIds.map((modelId) => (
+          <option key={modelId} value={modelId}>
+            {modelId}
+          </option>
+        ))}
+      </>
+    )
+  }
 
   return (
     <SettingsPageLayout label="记忆设置">
@@ -85,9 +132,52 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
         </div>
       )}
 
+      {isMissingGoogleKeyWarning && modelIds.length > 0 && (
+        <div
+          className="settings-security-note"
+          role="alert"
+          style={{ background: '#fcf6e8', color: '#825c12', borderColor: '#ecd5a1' }}
+        >
+          <CircleAlert size={16} aria-hidden="true" style={{ flexShrink: 0 }} />
+          <div style={{ flex: 1, lineHeight: 1.4 }}>
+            <div>
+              <strong>未配置 Google 凭据：</strong>系统当前回退到默认的 Gemini
+              模型，在对话触发观察时可能报错。建议切换为已配置的可用模型。
+            </div>
+            <button
+              type="button"
+              className="settings-secondary-button"
+              style={{
+                marginTop: 6,
+                height: 24,
+                fontSize: 11,
+                padding: '0 8px',
+                cursor: 'pointer'
+              }}
+              onClick={handleApplyRecommended}
+              disabled={saving}
+            >
+              <Sparkles size={12} aria-hidden="true" />
+              一键应用首选模型「{modelIds[0]}」
+            </button>
+          </div>
+        </div>
+      )}
+
+      {saveFeedback && (
+        <div
+          className="settings-connector-status"
+          role="status"
+          style={{ background: '#eaf5eb', color: '#276738' }}
+        >
+          <Check size={14} aria-hidden="true" />
+          <span>{saveFeedback}</span>
+        </div>
+      )}
+
       <SettingsSection
         title="观察记忆"
-        description="Mastra Observational Memory 在后台把冗长的历史对话压缩为观察日志，保持长会话上下文可控。修改立即生效，无需重启。"
+        description="Mastra Observational Memory 在后台把冗长的历史对话压缩为观察日志，保持长会话上下文可控。修改立即生效，新会话自动继承。"
       >
         <SettingsRow
           title="观察者模型"
@@ -95,26 +185,58 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
         >
           <SettingsSelect
             label="观察者模型"
-            value={status.observerModelId}
+            value={status.observerModelId ?? ''}
             disabled={saving}
-            onChange={(event) => void update({ observerModelId: event.currentTarget.value })}
+            onChange={(event) => handleObserverChange(event.currentTarget.value)}
           >
-            {modelOptions(status.observerModelId)}
+            {renderModelOptions(status.observerModelId)}
           </SettingsSelect>
         </SettingsRow>
+
         <SettingsRow
-          title="反思者模型"
-          description="观察日志过长时由它整体重写压缩；可与观察者使用不同模型。"
+          title="同步反思模型"
+          description="反思者模型默认与观察者模型保持一致，避免反思压缩时回退到默认未授权模型。"
         >
-          <SettingsSelect
-            label="反思者模型"
-            value={status.reflectorModelId}
-            disabled={saving}
-            onChange={(event) => void update({ reflectorModelId: event.currentTarget.value })}
-          >
-            {modelOptions(status.reflectorModelId)}
-          </SettingsSelect>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <Toggle
+              label="反思者模型跟随观察者模型"
+              checked={syncReflector}
+              disabled={saving}
+              onChange={(checked) => {
+                setSyncReflector(checked)
+                if (
+                  checked &&
+                  status.observerModelId &&
+                  status.reflectorModelId !== status.observerModelId
+                ) {
+                  void update({ reflectorModelId: status.observerModelId })
+                }
+              }}
+            />
+            <label
+              htmlFor={syncToggleId}
+              style={{ fontSize: 12, color: 'var(--text-secondary, #777)', cursor: 'pointer' }}
+            >
+              保持一致
+            </label>
+          </div>
         </SettingsRow>
+
+        {!syncReflector && (
+          <SettingsRow
+            title="反思者模型"
+            description="观察日志过长时由它整体重写压缩；可与观察者使用不同模型。"
+          >
+            <SettingsSelect
+              label="反思者模型"
+              value={status.reflectorModelId ?? ''}
+              disabled={saving}
+              onChange={(event) => void update({ reflectorModelId: event.currentTarget.value })}
+            >
+              {renderModelOptions(status.reflectorModelId)}
+            </SettingsSelect>
+          </SettingsRow>
+        )}
       </SettingsSection>
 
       <SettingsSection
@@ -237,15 +359,19 @@ export const MemorySettingsPage: React.FC<MemorySettingsPageProps> = ({ modelIds
           className="settings-secondary-button"
           type="button"
           disabled={saving}
-          onClick={() =>
+          onClick={() => {
+            const defaultModel =
+              modelIds.length > 0 && !hasGoogleKey ? modelIds[0] : OM_DEFAULTS.observerModelId
             void update({
+              observerModelId: defaultModel,
+              reflectorModelId: defaultModel,
               observationThreshold: OM_DEFAULTS.observationThreshold,
               reflectionThreshold: OM_DEFAULTS.reflectionThreshold,
               cavemanObservations: OM_DEFAULTS.cavemanObservations,
               observeAttachments: OM_DEFAULTS.observeAttachments,
               scope: OM_DEFAULTS.omScope
             })
-          }
+          }}
         >
           <RotateCcw size={14} aria-hidden="true" />
           恢复默认参数

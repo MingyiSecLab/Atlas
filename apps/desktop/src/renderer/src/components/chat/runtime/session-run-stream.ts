@@ -9,6 +9,8 @@ export interface SessionRunStreamOptions {
   seed?: readonly RuntimeSessionMessage[]
   seedOverlay?: ToolStatusOverlay
   signal?: AbortSignal
+  /** 初始直接进入终结态（例如外部单条已结束消息触发的附着） */
+  terminal?: 'complete' | 'aborted' | 'error' | 'suspended'
 }
 
 export interface SessionRunStream {
@@ -40,7 +42,7 @@ export function createSessionRunStream(options: SessionRunStreamOptions): Sessio
 
   const queue: RuntimeSessionEvent[] = []
   let wakeup: (() => void) | undefined
-  let terminal: 'complete' | 'aborted' | 'error' | 'suspended' | undefined
+  let terminal: 'complete' | 'aborted' | 'error' | 'suspended' | undefined = options.terminal
   let stopped = false
   let failure: Error | undefined
 
@@ -76,6 +78,13 @@ export function createSessionRunStream(options: SessionRunStreamOptions): Sessio
     }
 
     try {
+      if (accumulator.parts.length > 0) {
+        yield { content: accumulator.parts, metadata: accumulator.metadata }
+        if (accumulator.metadata.custom?.messageEnded || terminal !== undefined) {
+          return
+        }
+      }
+
       while (true) {
         let produced = false
         while (queue.length > 0) {
@@ -83,6 +92,9 @@ export function createSessionRunStream(options: SessionRunStreamOptions): Sessio
           if (!event) break
           if (event.type === 'run_state' && !event.isRunning) {
             terminal = event.reason ?? 'complete'
+          } else if (event.type === 'message' && event.phase === 'end') {
+            accumulator.applyEvent(event)
+            terminal = 'complete'
           } else {
             accumulator.applyEvent(event)
           }

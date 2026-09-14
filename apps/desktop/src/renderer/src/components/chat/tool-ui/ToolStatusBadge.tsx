@@ -10,13 +10,23 @@ export function ToolStatusBadge({ status }: ToolStatusBadgeProps): React.ReactNo
   switch (status) {
     case 'running':
       return (
-        <span className="aui-tool-badge is-running" role="status" title="执行中" aria-label="执行中">
+        <span
+          className="aui-tool-badge is-running"
+          role="status"
+          title="执行中"
+          aria-label="执行中"
+        >
           <Loader2 size={13} className="aui-tool-spinner" />
         </span>
       )
     case 'pending':
       return (
-        <span className="aui-tool-badge is-pending" role="status" title="待执行" aria-label="待执行">
+        <span
+          className="aui-tool-badge is-pending"
+          role="status"
+          title="待执行"
+          aria-label="待执行"
+        >
           <Clock size={13} />
         </span>
       )
@@ -46,7 +56,12 @@ export function ToolStatusBadge({ status }: ToolStatusBadgeProps): React.ReactNo
     case 'success':
     default:
       return (
-        <span className="aui-tool-badge is-success" role="status" title="已完成" aria-label="已完成">
+        <span
+          className="aui-tool-badge is-success"
+          role="status"
+          title="已完成"
+          aria-label="已完成"
+        >
           <CheckCircle2 size={13} />
         </span>
       )

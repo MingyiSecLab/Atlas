@@ -1,4 +1,6 @@
 import { bootLocalAgentController, wireSessionConcerns } from '@mastra/code-sdk'
+import { loadSettings } from '@mastra/code-sdk/onboarding/settings'
+import type { MastraCodeState } from '@mastra/code-sdk/schema'
 import { join, resolve } from 'node:path'
 import { resolvePaths } from './paths.js'
 import { createControllerConfig } from './mastra/controller.js'
@@ -139,7 +141,45 @@ export async function createLocalRuntime(
     projectPath: paths.workspacePath,
     configDir: controllerConfig.configDir
   })
-  const om = createRuntimeOmService({ controller, defaultSession: session })
+  // OM 旋钮需广播到全部会话（各 Session state 隔离）并持久化到 settings.json，
+  // 重启后由 SDK 播种进新会话的 initialState。
+  const om = createRuntimeOmService({
+    controller,
+    defaultSession: session,
+    broadcastState: sessions.applyOmState,
+    ...(controllerConfig.settingsPath
+      ? { settingsPath: controllerConfig.settingsPath }
+      : {})
+  })
+  // 若 settings.json 中有持久化的 OM 覆盖配置，在会话服务挂载时预热 omOverrides，
+  // 确保所有会话（含刚创建或恢复的 Session）立即生效，避免回退到默认未授权的 Gemini。
+  if (controllerConfig.settingsPath) {
+    try {
+      const persisted = loadSettings(controllerConfig.settingsPath)
+      const initialOm: Partial<MastraCodeState> = {}
+      if (persisted.models?.observerModelOverride) {
+        initialOm.observerModelId = persisted.models.observerModelOverride
+      }
+      if (persisted.models?.reflectorModelOverride) {
+        initialOm.reflectorModelId = persisted.models.reflectorModelOverride
+      }
+      if (persisted.models?.omObservationThreshold) {
+        initialOm.observationThreshold = persisted.models.omObservationThreshold
+      }
+      if (persisted.models?.omReflectionThreshold) {
+        initialOm.reflectionThreshold = persisted.models.omReflectionThreshold
+      }
+      if (persisted.models?.omCavemanObservations !== null && persisted.models?.omCavemanObservations !== undefined) {
+        initialOm.cavemanObservations = persisted.models.omCavemanObservations
+      }
+      if (persisted.models?.omObserveAttachments !== null && persisted.models?.omObserveAttachments !== undefined) {
+        initialOm.observeAttachments = persisted.models.omObserveAttachments
+      }
+      if (Object.keys(initialOm).length > 0) {
+        void sessions.applyOmState(initialOm)
+      }
+    } catch {}
+  }
   // 工作区专家文件服务（<configDir>/agents/*.md 的扫描与写回；userAgentsDir 提供时
   // 同时合并用户级目录）；mode 注册发生在 Controller 构造时（createControllerConfig
   // 内扫描），save 后需重连工作区生效。

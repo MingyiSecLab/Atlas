@@ -2,14 +2,24 @@ import type { ChatBlock, ReasoningBlock, ToolBlock } from '../types'
 
 export type ToolCategory = 'terminal' | 'file_op' | 'search' | 'security' | 'task' | 'general'
 
+export interface TimelineStat {
+  fileName: string
+  filePath?: string
+  additions?: number
+  deletions?: number
+}
+
 export interface ParsedToolCall {
   category: ToolCategory
   displayName: string
+  verb: string
+  chip: string
   command?: string
   filePath?: string
   searchQuery?: string
   targetUrl?: string
   primaryParam?: string
+  diffStat?: TimelineStat
   parsedArgs?: Record<string, unknown> | null
   isJsonArgs: boolean
 }
@@ -25,7 +35,7 @@ export interface ToolGroupStep {
 }
 
 /**
- * 聚合 ToolGroup 的整体状态
+ * 聚合 ToolGroup 的整体状态 (assistant-ui Tool Timeline)
  */
 export interface ToolGroupSummary {
   status: 'running' | 'success' | 'error' | 'pending'
@@ -39,6 +49,9 @@ export interface ToolGroupSummary {
   headline: string
   /** 已结算步骤的耗时总和（毫秒）；0 表示无计时数据 */
   totalElapsedMs: number
+  /** assistant-ui Tool Timeline 文件统计栏 */
+  stats: TimelineStat[]
+  filesChangedCount: number
 }
 
 /** 耗时格式化：<1s 毫秒，<60s 一位小数秒，≥60s "2m 30s" */
@@ -94,6 +107,28 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
     name === 'task_complete' ||
     name === 'task_check'
   ) {
+    let taskSummary: string | undefined
+    const tasksArray = Array.isArray(args?.tasks)
+      ? args.tasks
+      : Array.isArray(args?.todos)
+        ? args.todos
+        : Array.isArray(args?.steps)
+          ? args.steps
+          : Array.isArray(args)
+            ? args
+            : null
+    if (tasksArray && tasksArray.length > 0) {
+      const completed = tasksArray.filter(
+        (t: any) =>
+          t &&
+          (t.status === 'completed' ||
+            t.status === 'done' ||
+            t.completed === true ||
+            t.done === true)
+      ).length
+      taskSummary = `${completed}/${tasksArray.length} 步骤完成`
+    }
+
     return {
       category: 'task',
       displayName:
@@ -104,6 +139,9 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
             : name === 'task_complete'
               ? '完成任务'
               : '更新任务',
+      verb: 'Task',
+      chip: taskSummary || '任务清单',
+      primaryParam: taskSummary,
       parsedArgs: args,
       isJsonArgs
     }
@@ -113,7 +151,6 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
   if (
     name === 'run_command' ||
     name === 'bash' ||
-    name === 'execute_command' ||
     name === 'terminal' ||
     name === 'kali_exec' ||
     name.includes('command') ||
@@ -135,6 +172,8 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
     return {
       category: 'terminal',
       displayName: name === 'kali_exec' ? 'Kali 终端' : '终端命令',
+      verb: 'Ran',
+      chip: shortParam || 'command',
       command: rawCmd,
       primaryParam: shortParam,
       parsedArgs: args,
@@ -159,18 +198,60 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
       (args?.filePath as string) ||
       (args?.path as string)
     let display = '文件操作'
-    if (name.includes('view') || name.includes('read')) display = '查看文件'
-    else if (name.includes('write')) display = '写入文件'
-    else if (name.includes('replace')) display = '编辑文件'
-    else if (name.includes('dir')) display = '目录浏览'
+    let verb = 'Read'
+    if (name.includes('view') || name.includes('read')) {
+      display = '查看文件'
+      verb = 'Read'
+    } else if (name.includes('write')) {
+      display = '写入文件'
+      verb = 'Created'
+    } else if (name.includes('replace')) {
+      display = '编辑文件'
+      verb = 'Edited'
+    } else if (name.includes('dir')) {
+      display = '目录浏览'
+      verb = 'List'
+    }
 
     const fileName = path ? path.split('/').pop() || path : undefined
+
+    // 计算文件行数增删统计 (diff stats)
+    let diffStat: TimelineStat | undefined
+    if (fileName) {
+      if (name.includes('write')) {
+        const code = (args?.CodeContent as string) || ''
+        const adds = code ? code.split('\n').length : 0
+        diffStat = { fileName, filePath: path, additions: adds, deletions: 0 }
+      } else if (name === 'replace_file_content') {
+        const target = (args?.TargetContent as string) || ''
+        const replacement = (args?.ReplacementContent as string) || ''
+        const dels = target ? target.split('\n').length : 0
+        const adds = replacement ? replacement.split('\n').length : 0
+        diffStat = { fileName, filePath: path, additions: adds, deletions: dels }
+      } else if (name === 'multi_replace_file_content') {
+        const chunks = Array.isArray(args?.ReplacementChunks) ? args.ReplacementChunks : []
+        let totalAdds = 0
+        let totalDels = 0
+        chunks.forEach((chunk: any) => {
+          if (chunk) {
+            const target = (chunk.TargetContent as string) || ''
+            const replacement = (chunk.ReplacementContent as string) || ''
+            totalDels += target ? target.split('\n').length : 0
+            totalAdds += replacement ? replacement.split('\n').length : 0
+          }
+        })
+        diffStat = { fileName, filePath: path, additions: totalAdds, deletions: totalDels }
+      }
+    }
 
     return {
       category: 'file_op',
       displayName: display,
+      verb,
+      chip: fileName || path || 'file',
       filePath: path,
       primaryParam: fileName,
+      diffStat,
       parsedArgs: args,
       isJsonArgs
     }
@@ -185,13 +266,14 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
   ) {
     const query = (args?.query as string) || (args?.Query as string)
     const isWeb = name.includes('web')
+    const shortQuery = query ? (query.length > 30 ? query.slice(0, 30) + '...' : query) : undefined
     return {
       category: 'search',
       displayName: isWeb ? '网页搜索' : '代码搜索',
+      verb: isWeb ? 'Searched' : 'Grep',
+      chip: shortQuery || 'search',
       searchQuery: query,
-      primaryParam: query
-        ? `"${query.length > 25 ? query.slice(0, 25) + '...' : query}"`
-        : undefined,
+      primaryParam: shortQuery ? `"${shortQuery}"` : undefined,
       parsedArgs: args,
       isJsonArgs
     }
@@ -215,13 +297,29 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
       (args?.target as string)
 
     let display = '安全工具'
-    if (name.includes('auth')) display = '认证检测'
-    else if (name.includes('crawl')) display = '网站抓取'
-    else if (name.includes('endpoint')) display = '接口提取'
-    else if (name.includes('url')) display = '读取网页'
-    else if (name.includes('task')) display = '任务编排'
-    else if (name.includes('init_pentest')) display = '渗透初始化'
-    else if (name.includes('scan')) display = '安全扫描'
+    let verb = 'Scan'
+    if (name.includes('auth')) {
+      display = '认证检测'
+      verb = 'Auth'
+    } else if (name.includes('crawl')) {
+      display = '网站抓取'
+      verb = 'Crawl'
+    } else if (name.includes('endpoint')) {
+      display = '接口提取'
+      verb = 'API'
+    } else if (name.includes('url')) {
+      display = '读取网页'
+      verb = 'Read'
+    } else if (name.includes('task')) {
+      display = '任务编排'
+      verb = 'Task'
+    } else if (name.includes('init_pentest')) {
+      display = '渗透初始化'
+      verb = 'Init'
+    } else if (name.includes('scan')) {
+      display = '安全扫描'
+      verb = 'Scan'
+    }
 
     let shortParam: string | undefined
     if (url) {
@@ -242,6 +340,8 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
     return {
       category: 'security',
       displayName: display,
+      verb,
+      chip: shortParam || 'target',
       targetUrl: url,
       primaryParam: shortParam,
       parsedArgs: args,
@@ -253,6 +353,8 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
   return {
     category: 'general',
     displayName: block.name,
+    verb: 'Call',
+    chip: block.summary || block.name,
     primaryParam: block.summary,
     parsedArgs: args,
     isJsonArgs
@@ -271,6 +373,8 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
   let runningStepName: string | undefined
 
   const categoryMap = new Map<string, number>()
+  // 收集并合并每个文件的 diff 统计 (assistant-ui Tool Timeline Stats)
+  const fileStatsMap = new Map<string, TimelineStat>()
 
   steps.forEach((step, idx) => {
     const st = step.toolBlock.status
@@ -278,7 +382,10 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
       isRunning = true
       if (runningIndex === undefined) {
         runningIndex = idx + 1
-        runningStepName = step.parsed.displayName || step.toolBlock.name
+        const actionDesc = step.parsed.verb
+          ? `${step.parsed.verb} ${step.parsed.chip}`
+          : step.parsed.displayName || step.toolBlock.name
+        runningStepName = `第 ${runningIndex}/${totalCount} 步 · ${actionDesc}`
       }
     } else if (st === 'error' || st === 'denied') {
       errorCount++
@@ -288,7 +395,21 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
 
     const name = step.parsed.displayName || step.toolBlock.name
     categoryMap.set(name, (categoryMap.get(name) || 0) + 1)
+
+    // 累加 diff stats
+    if (step.parsed.diffStat) {
+      const existing = fileStatsMap.get(step.parsed.diffStat.fileName)
+      if (existing) {
+        existing.additions = (existing.additions || 0) + (step.parsed.diffStat.additions || 0)
+        existing.deletions = (existing.deletions || 0) + (step.parsed.diffStat.deletions || 0)
+      } else {
+        fileStatsMap.set(step.parsed.diffStat.fileName, { ...step.parsed.diffStat })
+      }
+    }
   })
+
+  const stats = Array.from(fileStatsMap.values())
+  const filesChangedCount = stats.length
 
   let status: 'running' | 'success' | 'error' | 'pending' = 'success'
   if (isRunning) {
@@ -303,17 +424,20 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
     categoryPills.push(count > 1 ? `${cat} × ${count}` : cat)
   })
 
-  // 生成 Headline 文案
+  // 生成 Headline 文案 (assistant-ui Tool Timeline resting / active label)
   const totalElapsedMs = steps.reduce((sum, step) => sum + (step.toolBlock.elapsedMs ?? 0), 0)
   let headline = ''
   if (isRunning) {
     headline = runningStepName
-      ? `正在执行第 ${runningIndex || 1}/${totalCount} 步 · ${runningStepName}`
+      ? `正在执行${runningStepName}...`
       : `正在执行 ${totalCount} 个操作...`
   } else if (errorCount > 0) {
     headline = `已执行 ${totalCount} 个步骤 (${successCount} 成功, ${errorCount} 失败)`
   } else {
-    headline = `已完成 ${totalCount} 个步骤`
+    // 经典 elements 格式：4 steps · 2 files changed 或 4 步 · 2 个文件变更
+    const stepPart = `${totalCount} 步`
+    const filesPart = filesChangedCount > 0 ? ` · ${filesChangedCount} 个文件变更` : ''
+    headline = `${stepPart}${filesPart}`
   }
   if (!isRunning && totalElapsedMs > 0) {
     headline += ` · ${formatElapsedMs(totalElapsedMs)}`
@@ -329,7 +453,9 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
     runningStepName,
     categoryPills,
     headline,
-    totalElapsedMs
+    totalElapsedMs,
+    stats,
+    filesChangedCount
   }
 }
 

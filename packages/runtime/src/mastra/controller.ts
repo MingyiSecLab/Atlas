@@ -1,4 +1,5 @@
 import type { MastraCodeConfig } from '@mastra/code-sdk';
+import { loadSettings } from '@mastra/code-sdk/onboarding/settings';
 import type {
   AgentControllerMode,
   AgentControllerSubagent,
@@ -116,8 +117,24 @@ export function createControllerConfig(
     config.vector = options.vector;
   }
 
-  // Observational Memory 旋钮写入 initialState（显式配置优先于 settings 播种）
-  const initialState = applyOmConfigToInitialState(config.initialState, options.observationalMemory);
+  // Observational Memory 旋钮写入 initialState（显式配置优先，未提供时读取 settingsPath 预置）
+  let effectiveOm = options.observationalMemory;
+  if (!effectiveOm && options.settingsPath) {
+    try {
+      const persisted = loadSettings(options.settingsPath);
+      if (persisted.models) {
+        effectiveOm = {
+          ...(persisted.models.observerModelOverride ? { observerModelId: persisted.models.observerModelOverride } : {}),
+          ...(persisted.models.reflectorModelOverride ? { reflectorModelId: persisted.models.reflectorModelOverride } : {}),
+          ...(persisted.models.omObservationThreshold ? { observationThreshold: persisted.models.omObservationThreshold } : {}),
+          ...(persisted.models.omReflectionThreshold ? { reflectionThreshold: persisted.models.omReflectionThreshold } : {}),
+          ...(persisted.models.omCavemanObservations !== null && persisted.models.omCavemanObservations !== undefined ? { cavemanObservations: persisted.models.omCavemanObservations } : {}),
+          ...(persisted.models.omObserveAttachments !== null && persisted.models.omObserveAttachments !== undefined ? { observeAttachments: persisted.models.omObserveAttachments } : {})
+        };
+      }
+    } catch {}
+  }
+  const initialState = applyOmConfigToInitialState(config.initialState, effectiveOm);
   if (initialState) {
     config.initialState = initialState;
   }

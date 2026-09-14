@@ -18,13 +18,21 @@ import {
 } from 'lucide-react'
 import type { RuntimeSkillInfo, RuntimeTokenUsage } from '@mingyi/runtime'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { ChatImageAttachment, ImageMimeType } from './types'
 import { SkillPicker, type SkillPickerHandle } from './skills/SkillPicker'
 import { ExpertPicker, type ExpertPickerHandle } from './experts/ExpertPicker'
 import type { ExpertItem } from '../hub/hub-types'
-import { formatTokenCount, getModelContextLimit } from './token-counter'
-import { ModelBrandIcon } from '../common/ModelBrandIcon'
+import { AttachmentDropzone } from './AttachmentDropzone'
+import { ModelPicker } from './ModelPicker'
+import { ContextGauge } from './ContextGauge'
+
+function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 const AGENT_MODES = ['Pentest', 'Audit']
 
@@ -233,7 +241,6 @@ export function Composer({
   const [isDraggingOver, setIsDraggingOver] = useState(false)
   const [goalMode, setGoalMode] = useState(false)
   const [reasoningEffort, setReasoningEffort] = useState<ReasoningEffort>('high')
-  const [showTokenDetails, setShowTokenDetails] = useState(false)
   const reducedMotion = useReducedMotion()
 
   const readyAttachments = attachments.filter(isReadyAttachment)
@@ -245,11 +252,6 @@ export function Composer({
     readyAttachments.length > 0
   const inlineSkillQuery = selectedSkill ? null : slashSkillQuery(value)
   const showInlineSkillPicker = activeMenu === null && inlineSkillQuery !== null
-
-  // 使用 Mastra 原生 TokenUsage 与模型窗口容量
-  const contextLimit = useMemo(() => getModelContextLimit(model), [model])
-  const totalTokens = tokenUsage?.totalTokens ?? 0
-  const usagePercent = Math.min(100, Math.round((totalTokens / contextLimit) * 100))
 
   useEffect(() => {
     const textarea = textareaRef.current
@@ -445,6 +447,7 @@ export function Composer({
             event.currentTarget.value = ''
           }}
         />
+        <AttachmentDropzone isActive={isDraggingOver} />
         <div
           className="chat-composer-command-region"
           aria-hidden={
@@ -759,6 +762,11 @@ export function Composer({
                             )}
                           </span>
                         )}
+                        {attachment.sizeBytes ? (
+                          <span className="chat-composer-attachment-size">
+                            {formatFileSize(attachment.sizeBytes)}
+                          </span>
+                        ) : null}
                         {attachment.status !== 'ready' ? (
                           <span className="chat-composer-attachment-status">
                             {attachment.status === 'pending' ? '处理中…' : '失败'}
@@ -885,105 +893,17 @@ export function Composer({
               </AnimatePresence>
             </div>
             <div className="chat-composer-actions">
-              {/* 环形 Token 上下文仪表 ○ */}
-              <div
-                className="chat-composer-token-ring-wrap"
-                onMouseEnter={() => setShowTokenDetails(true)}
-                onMouseLeave={() => setShowTokenDetails(false)}
-                role="region"
-                aria-label="Token 消耗状态"
-                title={`Token 消耗: ${formatTokenCount(totalTokens)} / ${formatTokenCount(contextLimit)} (${usagePercent}%)`}
-              >
-                <svg
-                  className="chat-composer-token-ring"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 20 20"
-                >
-                  <circle
-                    className="chat-composer-token-ring-bg"
-                    cx="10"
-                    cy="10"
-                    r="7.5"
-                    fill="none"
-                    strokeWidth="2.2"
-                  />
-                  <circle
-                    className={`chat-composer-token-ring-progress${
-                      usagePercent >= 90 ? ' is-danger' : usagePercent >= 75 ? ' is-warning' : ''
-                    }`}
-                    cx="10"
-                    cy="10"
-                    r="7.5"
-                    fill="none"
-                    strokeWidth="2.2"
-                    strokeDasharray={2 * Math.PI * 7.5}
-                    strokeDashoffset={
-                      2 * Math.PI * 7.5 * (1 - Math.min(1, Math.max(0.04, usagePercent / 100)))
-                    }
-                    strokeLinecap="round"
-                    transform="rotate(-90 10 10)"
-                  />
-                </svg>
-                <AnimatePresence>
-                  {showTokenDetails ? (
-                    <motion.div
-                      className="chat-composer-token-popover is-right"
-                      initial={{ opacity: 0, y: 4, scale: 0.96 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 2, scale: 0.96 }}
-                      transition={{ duration: 0.12 }}
-                    >
-                      <div className="chat-composer-token-popover-title">Token 消耗统计</div>
-                      <div className="chat-composer-token-popover-row">
-                        <span>输入:</span>
-                        <strong>{tokenUsage?.promptTokens?.toLocaleString() ?? 0}</strong>
-                      </div>
-                      <div className="chat-composer-token-popover-row">
-                        <span>输出:</span>
-                        <strong>{tokenUsage?.completionTokens?.toLocaleString() ?? 0}</strong>
-                      </div>
-                      {tokenUsage?.reasoningTokens ? (
-                        <div className="chat-composer-token-popover-row">
-                          <span>思考:</span>
-                          <strong>{tokenUsage.reasoningTokens.toLocaleString()}</strong>
-                        </div>
-                      ) : null}
-                      {tokenUsage?.cachedInputTokens ? (
-                        <div className="chat-composer-token-popover-row">
-                          <span>缓存:</span>
-                          <strong>{tokenUsage.cachedInputTokens.toLocaleString()}</strong>
-                        </div>
-                      ) : null}
-                      <div className="chat-composer-token-popover-divider" />
-                      <div className="chat-composer-token-popover-row">
-                        <span>会话总计:</span>
-                        <strong>
-                          {totalTokens.toLocaleString()} ({usagePercent}%)
-                        </strong>
-                      </div>
-                      <div className="chat-composer-token-popover-row">
-                        <span>上下文上限:</span>
-                        <strong>{contextLimit.toLocaleString()}</strong>
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
+              {/* ContextGauge 环形容量健康度指示器 */}
+              <ContextGauge model={model} tokenUsage={tokenUsage} reducedMotion={reducedMotion} />
 
               {/* 模型选择器 */}
-              <SelectMenu
-                label="模型"
-                value={model}
-                options={modelOptions.length > 0 ? modelOptions : [model]}
-                icon={<ModelBrandIcon model={model} size={13} />}
-                renderOptionIcon={(opt) => <ModelBrandIcon model={opt} size={13} />}
+              <ModelPicker
+                model={model}
+                modelOptions={modelOptions}
                 open={activeMenu === 'model'}
-                menuAlign="right"
-                chipClassName="chat-composer-subtle-chip"
-                reducedMotion={reducedMotion}
                 onOpenChange={(open) => setActiveMenu(open ? 'model' : null)}
                 onChange={onModelChange}
+                reducedMotion={reducedMotion}
               />
 
               {/* 思考深度 / 推理级别选择器 🧠 高 ∨ */}
