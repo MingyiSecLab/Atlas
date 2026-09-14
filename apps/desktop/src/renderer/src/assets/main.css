@@ -5365,7 +5365,6 @@ button.tree-row {
 
 .chat-user-meta,
 .chat-turn-footer,
-.chat-turn-actions,
 .chat-turn-provenance {
   display: flex;
   align-items: center;
@@ -5471,11 +5470,6 @@ button.tree-row {
   margin-left: -6px;
 }
 
-.chat-turn-actions {
-  flex: 0 0 auto;
-  gap: 1px;
-}
-
 .chat-turn-provenance {
   min-width: 0;
   flex: 1;
@@ -5492,39 +5486,6 @@ button.tree-row {
   opacity: 1;
 }
 
-.chat-icon-button {
-  display: inline-flex;
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
-  align-items: center;
-  justify-content: center;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: #929299;
-  cursor: pointer;
-  transition:
-    background-color 120ms ease-out,
-    color 120ms ease-out,
-    transform 120ms ease-out;
-}
-
-.chat-icon-button:hover:not(:disabled) {
-  background: #f0f0f2;
-  color: #4e4e54;
-}
-
-.chat-icon-button:active:not(:disabled) {
-  transform: scale(0.92);
-}
-
-.chat-icon-button:disabled {
-  cursor: default;
-  opacity: 0.55;
-}
-
-.chat-icon-button:focus-visible,
 .chat-disclosure-trigger:focus-visible,
 .chat-composer button:focus-visible,
 .chat-scroll-bottom:focus-visible {
@@ -7398,7 +7359,6 @@ button.tree-row {
   .chat-user-meta,
   .chat-turn-provenance,
   .chat-approval,
-  .chat-icon-button,
   .chat-composer,
   .chat-disclosure-trigger,
   .chat-disclosure-chevron,
@@ -12624,17 +12584,6 @@ html.dark .workspace-code-editor-statusbar {
 /* ============================================================
    assistant-ui Elements P1: Branch Picker / Feedback / Suggestions
    ============================================================ */
-
-/* 动作条高亮激活态 */
-.chat-icon-button.is-active {
-  background: rgba(139, 92, 246, 0.15) !important;
-  color: #8b5cf6 !important;
-}
-
-.dark .chat-icon-button.is-active {
-  background: rgba(167, 139, 250, 0.22) !important;
-  color: #c4b5fd !important;
-}
 
 /* 分支切换器 (Branch Picker) */
 .aui-branch-picker {

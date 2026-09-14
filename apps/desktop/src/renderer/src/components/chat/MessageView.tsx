@@ -1,18 +1,13 @@
-import {
-  AlertTriangle,
-  Bot,
-  Check,
-  Copy,
-  Pencil,
-  RotateCcw,
-  ThumbsDown,
-  ThumbsUp,
-  X
-} from 'lucide-react'
+import { AlertTriangle, Bot, Check, Copy, Pencil, RotateCcw, X } from 'lucide-react'
 import { MessagePrimitive, useAui } from '@assistant-ui/react'
 import type { ThreadMessage } from '@assistant-ui/react'
 import { useMemo, useState } from 'react'
 import { Markdown } from '@renderer/components/assistant-ui/elements/markdown-text'
+import {
+  MessageActions,
+  type Reaction
+} from '@renderer/components/assistant-ui/elements/message-actions'
+import { TooltipIconButton } from '@renderer/components/assistant-ui/elements/tooltip-icon-button'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { ToolCallBlock } from './ToolCallBlock'
@@ -25,33 +20,6 @@ import type { ChatBlock, ChatError, SkillBlock } from './types'
 import { messageAnchorId, partsToChatBlocks, readAssistantMetadata } from './runtime/converter'
 import { useCopyFeedback } from './useCopyFeedback'
 import { ModelBrandIcon } from '../common/ModelBrandIcon'
-
-function IconButton({
-  label,
-  children,
-  onClick,
-  disabled = false,
-  active = false
-}: {
-  label: string
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  active?: boolean
-}): React.ReactNode {
-  return (
-    <button
-      className={`chat-icon-button ${active ? 'is-active' : ''}`}
-      type="button"
-      aria-label={label}
-      title={label}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      {children}
-    </button>
-  )
-}
 
 function formatTimestamp(value: string | Date): string {
   try {
@@ -162,18 +130,23 @@ export function UserMessage({ message }: { message: ThreadMessage }): React.Reac
         <div className="chat-user-meta">
           <time>{timestamp}</time>
           <BranchPicker />
-          <IconButton label={copied ? '已复制' : '复制'} onClick={() => copy(content)}>
+          <TooltipIconButton
+            tooltip={copied ? '已复制' : '复制'}
+            onClick={() => copy(content)}
+            className="size-5 p-0.5"
+          >
             {copied ? <Check size={13} /> : <Copy size={13} />}
-          </IconButton>
-          <IconButton
-            label="编辑 Prompt"
+          </TooltipIconButton>
+          <TooltipIconButton
+            tooltip="编辑 Prompt"
             onClick={() => {
               setIsEditing((prev) => !prev)
               setEditText(content)
             }}
+            className="size-5 p-0.5"
           >
             <Pencil size={13} />
-          </IconButton>
+          </TooltipIconButton>
         </div>
       </article>
     </MessagePrimitive.Root>
@@ -182,8 +155,9 @@ export function UserMessage({ message }: { message: ThreadMessage }): React.Reac
 
 export function AssistantMessage({ message }: { message: ThreadMessage }): React.ReactNode {
   const { copied, copy } = useCopyFeedback()
-  const [thumbState, setThumbState] = useState<'up' | 'down' | null>(null)
+  const [thumbState, setThumbState] = useState<Reaction>(null)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
+  const aui = useAui()
   const running = message.status?.type === 'running'
   const metadata = readAssistantMetadata(message)
   const blocks = useMemo(() => partsToChatBlocks(message.content, running), [message, running])
@@ -253,28 +227,28 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
         </div>
         {!running || metadata.messageEnded ? (
           <div className="chat-turn-footer">
-            <div className="chat-turn-actions">
+            <div className="flex items-center gap-1">
               <BranchPicker />
-              <IconButton label={copied ? '已复制' : '复制'} onClick={() => copy(content)}>
-                {copied ? <Check size={13} /> : <Copy size={13} />}
-              </IconButton>
-              <IconButton
-                label="有帮助"
-                active={thumbState === 'up'}
-                onClick={() => setThumbState((prev) => (prev === 'up' ? null : 'up'))}
-              >
-                <ThumbsUp size={13} />
-              </IconButton>
-              <IconButton
-                label="没有帮助"
-                active={thumbState === 'down'}
-                onClick={() => {
-                  setThumbState((prev) => (prev === 'down' ? null : 'down'))
-                  setFeedbackOpen(true)
+              <MessageActions
+                copied={copied}
+                reaction={thumbState}
+                regenerating={running}
+                onCopy={() => copy(content)}
+                onReactionChange={(next) => {
+                  setThumbState(next)
+                  if (next === 'down') {
+                    setFeedbackOpen(true)
+                  }
                 }}
-              >
-                <ThumbsDown size={13} />
-              </IconButton>
+                onRegenerate={() => {
+                  try {
+                    aui.message?.reload?.()
+                  } catch (err) {
+                    console.warn('Failed to regenerate message:', err)
+                  }
+                }}
+                onMore={() => setFeedbackOpen(true)}
+              />
             </div>
             <div className="chat-turn-provenance">
               <time>{timestamp}</time>
