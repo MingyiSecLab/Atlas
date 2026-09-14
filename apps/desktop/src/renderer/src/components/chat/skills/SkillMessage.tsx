@@ -1,7 +1,7 @@
 import { BookOpen } from 'lucide-react'
 import { useState } from 'react'
 import { Disclosure } from '../Disclosure'
-import { Markdown } from '../Markdown'
+import { Markdown } from '@renderer/components/assistant-ui/elements/markdown-text'
 import type { SkillBlock } from '../types'
 
 export function SkillMessage({ skill }: { skill: SkillBlock }): React.ReactNode {

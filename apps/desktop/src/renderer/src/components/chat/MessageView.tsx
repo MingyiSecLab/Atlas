@@ -12,7 +12,7 @@ import {
 import { MessagePrimitive, useAui } from '@assistant-ui/react'
 import type { ThreadMessage } from '@assistant-ui/react'
 import { useMemo, useState } from 'react'
-import { Markdown } from './Markdown'
+import { Markdown } from '@renderer/components/assistant-ui/elements/markdown-text'
 import { ReasoningBlock } from './ReasoningBlock'
 import { ThinkingIndicator } from './ThinkingIndicator'
 import { ToolCallBlock } from './ToolCallBlock'

@@ -1,6 +1,6 @@
 import { ChevronRight, Brain } from 'lucide-react'
 import { useState } from 'react'
-import { Markdown } from './Markdown'
+import { Markdown } from '@renderer/components/assistant-ui/elements/markdown-text'
 import type { ReasoningBlock as ReasoningBlockModel } from './types'
 import {
   Collapsible,
