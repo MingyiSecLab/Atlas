@@ -81,7 +81,9 @@ function SessionRunAttach({
       if (resumingRef.current) return
       resumingRef.current = true
       const messages = aui.thread.getState().messages
-      const parentId = messages.length > 0 ? messages[messages.length - 1].id : null
+      const lastBoot = boot.messages[boot.messages.length - 1] as { id?: string } | undefined
+      const parentId =
+        messages.length > 0 ? messages[messages.length - 1].id : (lastBoot?.id ?? null)
       aui.thread.resumeRun({
         parentId,
         stream: () =>
@@ -93,7 +95,7 @@ function SessionRunAttach({
           }).stream
       })
     },
-    [aui, sessionId]
+    [aui, sessionId, boot]
   )
 
   useEffect(() => {

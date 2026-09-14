@@ -1,4 +1,5 @@
 import './assets/main.css'
+import './assets/chat-ui.css'
 import 'streamdown/styles.css'
 
 import { StrictMode } from 'react'

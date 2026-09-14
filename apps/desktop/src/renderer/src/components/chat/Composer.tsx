@@ -19,13 +19,16 @@ import {
 import type { RuntimeSkillInfo, RuntimeTokenUsage } from '@mingyi/runtime'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
-import type { ChatImageAttachment, ImageMimeType } from './types'
+import { Popover, PopoverContent, PopoverTrigger } from '@renderer/components/ui/popover'
+import { cn } from '@renderer/lib/utils'
+import type { ChatBlock, ChatImageAttachment, ImageMimeType } from './types'
 import { SkillPicker, type SkillPickerHandle } from './skills/SkillPicker'
 import { ExpertPicker, type ExpertPickerHandle } from './experts/ExpertPicker'
 import type { ExpertItem } from '../hub/hub-types'
 import { AttachmentDropzone } from './AttachmentDropzone'
 import { ModelPicker } from './ModelPicker'
 import { ContextGauge } from './ContextGauge'
+import { TodoPanel } from './TodoPanel'
 
 function formatFileSize(bytes?: number): string {
   if (!bytes || bytes <= 0) return ''
@@ -103,7 +106,6 @@ function SelectMenu({
   chipClassName,
   menuAlign = 'left',
   optionLabels,
-  reducedMotion,
   onOpenChange,
   onChange
 }: {
@@ -117,67 +119,57 @@ function SelectMenu({
   chipClassName?: string
   menuAlign?: 'left' | 'right'
   optionLabels?: Record<string, string>
-  reducedMotion: boolean | null
+  reducedMotion?: boolean | null
   onOpenChange: (open: boolean) => void
   onChange: (value: string) => void
 }): React.ReactNode {
   return (
-    <div className="chat-composer-select">
-      <button
-        className={`chat-composer-chip${chipClassName ? ` ${chipClassName}` : ''}`}
-        type="button"
-        aria-label={label}
-        aria-expanded={open}
-        onClick={() => onOpenChange(!open)}
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <button
+          className={cn('chat-composer-chip cursor-pointer', chipClassName)}
+          type="button"
+          aria-label={label}
+          aria-expanded={open}
+        >
+          {icon}
+          <span>{displayValue ?? optionLabels?.[value] ?? value}</span>
+          <ChevronDown
+            size={11}
+            className={cn(
+              'chat-composer-chip-chevron transition-transform duration-200',
+              open && 'rotate-180'
+            )}
+          />
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align={menuAlign === 'right' ? 'end' : 'start'}
+        side="top"
+        sideOffset={6}
+        className="chat-composer-menu p-1 z-50 rounded-xl border border-border/70 bg-popover text-popover-foreground shadow-lg min-w-[120px] outline-none"
       >
-        {icon}
-        <span>{displayValue ?? optionLabels?.[value] ?? value}</span>
-        <ChevronDown size={11} className="chat-composer-chip-chevron" />
-      </button>
-      <AnimatePresence initial={false}>
-        {open ? (
-          <motion.div
-            className={`chat-composer-menu${menuAlign === 'right' ? ' is-right' : ''}`}
-            role="menu"
-            initial={reducedMotion ? false : { opacity: 0, scale: 0.98, y: 4 }}
-            animate={{
-              opacity: 1,
-              scale: 1,
-              y: 0,
-              transition: reducedMotion
-                ? { duration: 0 }
-                : { duration: 0.15, ease: [0.23, 1, 0.32, 1] }
-            }}
-            exit={{
-              opacity: 0,
-              scale: 0.98,
-              y: 3,
-              transition: reducedMotion
-                ? { duration: 0 }
-                : { duration: 0.11, ease: [0.4, 0, 0.2, 1] }
-            }}
-          >
-            {options.map((option) => (
-              <button
-                className={option === value ? 'is-selected' : undefined}
-                type="button"
-                role="menuitemradio"
-                aria-checked={option === value}
-                key={option}
-                onClick={() => {
-                  onChange(option)
-                  onOpenChange(false)
-                }}
-              >
-                {renderOptionIcon ? renderOptionIcon(option) : null}
-                <span>{optionLabels?.[option] ?? option}</span>
-                {option === value ? <Check size={12} /> : null}
-              </button>
-            ))}
-          </motion.div>
-        ) : null}
-      </AnimatePresence>
-    </div>
+        <div role="menu" className="flex flex-col gap-0.5">
+          {options.map((option) => (
+            <button
+              className={option === value ? 'is-selected cursor-pointer' : 'cursor-pointer'}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option === value}
+              key={option}
+              onClick={() => {
+                onChange(option)
+                onOpenChange(false)
+              }}
+            >
+              {renderOptionIcon ? renderOptionIcon(option) : null}
+              <span>{optionLabels?.[option] ?? option}</span>
+              {option === value ? <Check size={12} /> : null}
+            </button>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 
@@ -195,6 +187,7 @@ export function Composer({
   selectedSkill,
   tokenUsage,
   queuedCount = 0,
+  activeBlocks,
   onSkillSelect,
   onSkillClear,
   onHeightChange,
@@ -214,6 +207,7 @@ export function Composer({
   selectedSkill?: RuntimeSkillInfo
   tokenUsage?: RuntimeTokenUsage
   queuedCount?: number
+  activeBlocks?: readonly ChatBlock[]
   onSkillSelect: (skill: RuntimeSkillInfo) => void
   onSkillClear: () => void
   onHeightChange: (height: number) => void
@@ -659,6 +653,7 @@ export function Composer({
           </AnimatePresence>
         </div>
         <div className="chat-composer-card">
+          {activeBlocks && activeBlocks.length > 0 ? <TodoPanel blocks={activeBlocks} /> : null}
           {selectedSkill ? (
             <div className="chat-composer-selected-skill" role="group" aria-label="已选择 Skill">
               <BookOpen size={14} />
@@ -907,69 +902,83 @@ export function Composer({
               />
 
               {/* 思考深度 / 推理级别选择器 🧠 高 ∨ */}
-              <div className="chat-composer-select">
-                <button
-                  className="chat-composer-chip chat-composer-subtle-chip"
-                  type="button"
-                  aria-label="思考深度"
-                  aria-expanded={activeMenu === 'reasoning'}
-                  onClick={() => setActiveMenu(activeMenu === 'reasoning' ? null : 'reasoning')}
+              <Popover
+                open={activeMenu === 'reasoning'}
+                onOpenChange={(open) => setActiveMenu(open ? 'reasoning' : null)}
+              >
+                <PopoverTrigger asChild>
+                  <button
+                    className="chat-composer-chip chat-composer-subtle-chip cursor-pointer"
+                    type="button"
+                    aria-label="思考深度"
+                    aria-expanded={activeMenu === 'reasoning'}
+                  >
+                    <Brain size={13} />
+                    <span>{REASONING_LABELS[reasoningEffort]}</span>
+                    <ChevronDown
+                      size={11}
+                      className={cn(
+                        'chat-composer-chip-chevron transition-transform duration-200',
+                        activeMenu === 'reasoning' && 'rotate-180'
+                      )}
+                    />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  side="top"
+                  sideOffset={6}
+                  className="chat-composer-menu is-right p-1.5 z-50 rounded-xl border border-border/70 bg-popover text-popover-foreground shadow-lg min-w-[140px] outline-none"
                 >
-                  <Brain size={13} />
-                  <span>{REASONING_LABELS[reasoningEffort]}</span>
-                  <ChevronDown size={11} className="chat-composer-chip-chevron" />
-                </button>
-                <AnimatePresence initial={false}>
-                  {activeMenu === 'reasoning' ? (
-                    <motion.div
-                      className="chat-composer-menu is-right"
-                      role="menu"
-                      initial={reducedMotion ? false : { opacity: 0, scale: 0.98, y: 4 }}
-                      animate={{ opacity: 1, scale: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.98, y: 3 }}
-                      transition={reducedMotion ? { duration: 0 } : { duration: 0.15 }}
+                  <div className="chat-composer-menu-header px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                    思考深度
+                  </div>
+                  {(['high', 'medium', 'low', 'off'] as const).map((level) => (
+                    <button
+                      key={level}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={reasoningEffort === level}
+                      className={cn(
+                        'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer',
+                        reasoningEffort === level && 'is-selected font-medium'
+                      )}
+                      onClick={() => {
+                        setReasoningEffort(level)
+                        setActiveMenu(null)
+                      }}
                     >
-                      <div className="chat-composer-menu-header">思考深度</div>
-                      {(['high', 'medium', 'low', 'off'] as const).map((level) => (
-                        <button
-                          key={level}
-                          type="button"
-                          role="menuitemradio"
-                          aria-checked={reasoningEffort === level}
-                          className={reasoningEffort === level ? 'is-selected' : undefined}
-                          onClick={() => {
-                            setReasoningEffort(level)
-                            setActiveMenu(null)
-                          }}
-                        >
-                          <span className="chat-composer-menu-row">
-                            <Brain size={12} />
-                            <span>{REASONING_LABELS[level]}</span>
-                          </span>
-                          {reasoningEffort === level ? <Check size={12} /> : null}
-                        </button>
-                      ))}
-                      <div className="chat-composer-menu-divider" />
-                      <button
-                        type="button"
-                        role="menuitemcheckbox"
-                        aria-checked={goalMode}
-                        className={goalMode ? 'is-selected' : undefined}
-                        onClick={() => {
-                          setGoalMode((prev) => !prev)
-                          setActiveMenu(null)
-                        }}
-                      >
-                        <span className="chat-composer-menu-row">
-                          <Target size={12} />
-                          <span>Goal 模式</span>
-                        </span>
-                        {goalMode ? <Check size={12} /> : null}
-                      </button>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
+                      <span className="chat-composer-menu-row flex items-center gap-2">
+                        <Brain size={12} />
+                        <span>{REASONING_LABELS[level]}</span>
+                      </span>
+                      {reasoningEffort === level ? (
+                        <Check size={12} className="text-primary" />
+                      ) : null}
+                    </button>
+                  ))}
+                  <div className="chat-composer-menu-divider my-1 h-px bg-border/50" />
+                  <button
+                    type="button"
+                    role="menuitemcheckbox"
+                    aria-checked={goalMode}
+                    className={cn(
+                      'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer',
+                      goalMode && 'is-selected font-medium'
+                    )}
+                    onClick={() => {
+                      setGoalMode((prev) => !prev)
+                      setActiveMenu(null)
+                    }}
+                  >
+                    <span className="chat-composer-menu-row flex items-center gap-2">
+                      <Target size={12} />
+                      <span>Goal 模式</span>
+                    </span>
+                    {goalMode ? <Check size={12} className="text-primary" /> : null}
+                  </button>
+                </PopoverContent>
+              </Popover>
 
               {/* 发送 / 停止 / 排队按钮 */}
               <button

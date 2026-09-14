@@ -119,7 +119,7 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
             : null
     if (tasksArray && tasksArray.length > 0) {
       const completed = tasksArray.filter(
-        (t: any) =>
+        (t: Record<string, unknown>) =>
           t &&
           (t.status === 'completed' ||
             t.status === 'done' ||
@@ -232,7 +232,7 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
         const chunks = Array.isArray(args?.ReplacementChunks) ? args.ReplacementChunks : []
         let totalAdds = 0
         let totalDels = 0
-        chunks.forEach((chunk: any) => {
+        chunks.forEach((chunk: Record<string, unknown>) => {
           if (chunk) {
             const target = (chunk.TargetContent as string) || ''
             const replacement = (chunk.ReplacementContent as string) || ''

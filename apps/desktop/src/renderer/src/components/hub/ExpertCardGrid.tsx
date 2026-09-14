@@ -77,8 +77,7 @@ export const ExpertCardGrid: React.FC<ExpertCardGridProps> = ({
   onSelectExpert,
   onStartChat,
   onEditExpert,
-  onDeleteExpert,
-  onCloneExpert: _onCloneExpert
+  onDeleteExpert
 }) => {
   const query = searchQuery.trim().toLowerCase()
 

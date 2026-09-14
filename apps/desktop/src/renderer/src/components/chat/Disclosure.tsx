@@ -1,5 +1,12 @@
 import { ChevronRight } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
+import { cn } from '@renderer/lib/utils'
+import { collapsePanel } from '@renderer/components/assistant-ui/elements/surfaces'
 
 export function Disclosure({
   open,
@@ -32,22 +39,43 @@ export function Disclosure({
   }, [open])
 
   return (
-    <div ref={rootRef} className="chat-disclosure" data-tone={tone} data-open={open || undefined}>
-      <button
-        className="chat-disclosure-trigger"
-        type="button"
-        aria-expanded={hasContent ? open : undefined}
-        disabled={!hasContent}
-        onClick={onToggle}
-      >
-        <span className="chat-disclosure-icon">{icon}</span>
-        <span className={running ? 'chat-disclosure-title is-running' : 'chat-disclosure-title'}>
-          {title}
-        </span>
-        {summary ? <span className="chat-disclosure-summary">· {summary}</span> : null}
-        {hasContent ? <ChevronRight className="chat-disclosure-chevron" size={14} /> : null}
-      </button>
-      {hasContent && open ? <div className="chat-disclosure-content">{children}</div> : null}
-    </div>
+    <Collapsible
+      open={open}
+      onOpenChange={() => {
+        if (hasContent) onToggle()
+      }}
+      ref={rootRef}
+      className="chat-disclosure"
+      data-tone={tone}
+      data-open={open || undefined}
+    >
+      <CollapsibleTrigger asChild disabled={!hasContent}>
+        <button
+          className="chat-disclosure-trigger cursor-pointer"
+          type="button"
+          aria-expanded={hasContent ? open : undefined}
+        >
+          <span className="chat-disclosure-icon">{icon}</span>
+          <span className={running ? 'chat-disclosure-title is-running' : 'chat-disclosure-title'}>
+            {title}
+          </span>
+          {summary ? <span className="chat-disclosure-summary">· {summary}</span> : null}
+          {hasContent ? (
+            <ChevronRight
+              className={cn(
+                'chat-disclosure-chevron transition-transform duration-200',
+                open && 'rotate-90'
+              )}
+              size={14}
+            />
+          ) : null}
+        </button>
+      </CollapsibleTrigger>
+      {hasContent ? (
+        <CollapsibleContent className={cn('chat-disclosure-content', collapsePanel)}>
+          {children}
+        </CollapsibleContent>
+      ) : null}
+    </Collapsible>
   )
 }

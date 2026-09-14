@@ -202,26 +202,32 @@ export function ChatWorkspace({
   taskId,
   isSidebarCollapsed = false
 }: ChatWorkspaceProps): React.ReactNode {
-  const [boot, setBoot] = useState<SessionChatBoot | null>(null)
+  const [sessionBoot, setSessionBoot] = useState<{ id: string; boot: SessionChatBoot } | null>(null)
 
   useEffect(() => {
     let cancelled = false
     window.api.sessions
       .get(taskId)
       .then((snapshot) => {
-        if (!cancelled) setBoot(buildBoot(snapshot))
+        if (!cancelled) setSessionBoot({ id: taskId, boot: buildBoot(snapshot) })
       })
       .catch(() => {
-        if (!cancelled) setBoot({ messages: [], isRunning: false, accessRequests: [] })
+        if (!cancelled)
+          setSessionBoot({
+            id: taskId,
+            boot: { messages: [], isRunning: false, accessRequests: [] }
+          })
       })
     return () => {
       cancelled = true
     }
   }, [taskId])
 
-  if (!boot) {
+  if (!sessionBoot || sessionBoot.id !== taskId) {
     return <section className="chat-workspace" aria-busy="true" />
   }
+
+  const { boot } = sessionBoot
 
   return (
     <SessionChatProvider sessionId={taskId} boot={boot} key={taskId}>
@@ -689,6 +695,11 @@ function ChatWorkspaceInner({
           selectedSkill={selectedSkill}
           tokenUsage={snapshot?.tokenUsage}
           queuedCount={queuedMessages.length}
+          activeBlocks={
+            messages.length > 0
+              ? partsToChatBlocks(messages[messages.length - 1].content)
+              : undefined
+          }
           onSkillSelect={setSelectedSkill}
           onSkillClear={() => setSelectedSkill(undefined)}
           isStreaming={isStreaming}

@@ -2,6 +2,13 @@ import { ChevronRight, Brain } from 'lucide-react'
 import { useState } from 'react'
 import { Markdown } from './Markdown'
 import type { ReasoningBlock as ReasoningBlockModel } from './types'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger
+} from '@renderer/components/ui/collapsible'
+import { cn } from '@renderer/lib/utils'
+import { collapsePanel } from '@renderer/components/assistant-ui/elements/surfaces'
 
 function formatSeconds(sec: number): string {
   if (sec < 60) return `${sec} 秒`
@@ -33,38 +40,42 @@ export function ReasoningBlock({ block }: { block: ReasoningBlockModel }): React
         : '思考过程'
 
   return (
-    <div
-      className={`aui-reasoning-container ${isStreaming ? 'is-streaming' : ''} ${isOpen ? 'is-open' : ''}`}
+    <Collapsible
+      open={isOpen}
+      onOpenChange={(next) => setManualOpen(next)}
+      className={cn('aui-reasoning-container', isStreaming && 'is-streaming', isOpen && 'is-open')}
     >
       {/* 思维链折叠触发栏 */}
-      <button
-        type="button"
-        className="aui-reasoning-trigger"
-        onClick={() => setManualOpen(!isOpen)}
-        aria-expanded={isOpen}
-      >
-        <div className="aui-reasoning-left">
-          <span className={`aui-reasoning-icon ${isStreaming ? 'is-active' : ''}`}>
-            <Brain size={13} />
-          </span>
-          <span className="aui-reasoning-label">{label}</span>
-        </div>
-        <div className="aui-reasoning-right">
-          <ChevronRight
-            size={13}
-            className={`aui-reasoning-chevron ${isOpen ? 'is-expanded' : ''}`}
-          />
-        </div>
-      </button>
+      <CollapsibleTrigger asChild>
+        <button
+          type="button"
+          className="aui-reasoning-trigger cursor-pointer"
+          aria-expanded={isOpen}
+        >
+          <div className="aui-reasoning-left">
+            <span className={cn('aui-reasoning-icon', isStreaming && 'is-active')}>
+              <Brain size={13} />
+            </span>
+            <span className="aui-reasoning-label">{label}</span>
+          </div>
+          <div className="aui-reasoning-right">
+            <ChevronRight
+              size={13}
+              className={cn(
+                'aui-reasoning-chevron transition-transform duration-200',
+                isOpen && 'is-expanded rotate-90'
+              )}
+            />
+          </div>
+        </button>
+      </CollapsibleTrigger>
 
       {/* 展开的思维链内容流 */}
-      {isOpen ? (
-        <div className="aui-reasoning-body">
-          <div className="aui-reasoning-content">
-            <Markdown isStreaming={isStreaming}>{block.text || ''}</Markdown>
-          </div>
+      <CollapsibleContent className={cn('aui-reasoning-body', collapsePanel)}>
+        <div className="aui-reasoning-content">
+          <Markdown isStreaming={isStreaming}>{block.text || ''}</Markdown>
         </div>
-      ) : null}
-    </div>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }

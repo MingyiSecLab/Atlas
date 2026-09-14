@@ -1,0 +1,35 @@
+import type { ComponentProps } from 'react'
+import { cn } from '@renderer/lib/utils'
+import { mono, ShimmerLabel } from './surfaces'
+
+export function ThinkingIndicator({
+  label,
+  elapsed,
+  className,
+  ...props
+}: Omit<ComponentProps<'div'>, 'children' | 'label' | 'elapsed'> & {
+  label: string
+  elapsed?: string
+}): React.ReactNode {
+  return (
+    <div
+      data-slot="thinking-indicator"
+      className={cn('text-foreground/55 flex items-center gap-2.5 text-sm', className)}
+      {...props}
+    >
+      <span
+        aria-hidden
+        className="size-1.5 shrink-0 animate-pulse rounded-full bg-blue-500 motion-reduce:animate-none dark:bg-blue-400"
+      />
+      <span
+        key={label}
+        className="fade-in slide-in-from-bottom-1 animate-in relative inline-block leading-none duration-300"
+      >
+        <ShimmerLabel>{label}</ShimmerLabel>
+      </span>
+      {elapsed !== undefined && (
+        <span className={cn(mono, 'text-foreground/30 tabular-nums')}>{elapsed}</span>
+      )}
+    </div>
+  )
+}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { Check, MessageSquareWarning, X } from 'lucide-react'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@renderer/components/ui/dialog'
 
 export interface FeedbackData {
   messageId: string
@@ -33,8 +34,6 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
   const [comment, setComment] = useState('')
   const [submitted, setSubmitted] = useState(false)
 
-  if (!isOpen) return null
-
   const toggleTag = (tag: string): void => {
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]))
   }
@@ -56,22 +55,23 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
   }
 
   return (
-    <div
-      className="aui-feedback-overlay"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="feedback-dialog-title"
-      onClick={onClose}
-    >
-      <div className="aui-feedback-modal" onClick={(e) => e.stopPropagation()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent
+        className="aui-feedback-modal p-0 border-border/80 bg-background max-w-md rounded-2xl overflow-hidden shadow-2xl"
+        showCloseButton={false}
+      >
         <div className="aui-feedback-header">
-          <div className="aui-feedback-header-title" id="feedback-dialog-title">
-            <MessageSquareWarning size={14} />
-            <span>提供问题反馈</span>
-          </div>
+          <DialogHeader>
+            <DialogTitle asChild>
+              <div className="aui-feedback-header-title" id="feedback-dialog-title">
+                <MessageSquareWarning size={14} />
+                <span>提供问题反馈</span>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
           <button
             type="button"
-            className="aui-feedback-close"
+            className="aui-feedback-close cursor-pointer"
             onClick={onClose}
             aria-label="关闭"
             title="关闭"
@@ -98,7 +98,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
                     <button
                       key={tag}
                       type="button"
-                      className={`aui-feedback-tag ${isSelected ? 'is-selected' : ''}`}
+                      className={`aui-feedback-tag cursor-pointer ${isSelected ? 'is-selected' : ''}`}
                       onClick={() => toggleTag(tag)}
                     >
                       {tag}
@@ -123,12 +123,16 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
             </div>
 
             <div className="aui-feedback-footer">
-              <button type="button" className="aui-feedback-btn is-cancel" onClick={onClose}>
+              <button
+                type="button"
+                className="aui-feedback-btn is-cancel cursor-pointer"
+                onClick={onClose}
+              >
                 取消
               </button>
               <button
                 type="submit"
-                className="aui-feedback-btn is-submit"
+                className="aui-feedback-btn is-submit cursor-pointer"
                 disabled={selectedTags.length === 0 && !comment.trim()}
               >
                 提交反馈
@@ -136,7 +140,7 @@ export const FeedbackDialog: React.FC<FeedbackDialogProps> = ({
             </div>
           </form>
         )}
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }

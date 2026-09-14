@@ -88,7 +88,7 @@ test.describe('Chat UI run resume', () => {
     // mock session:get：主会话返回“仍在运行、末条为在途 assistant”的快照
     await electronApp.evaluate(
       ({ ipcMain }, { mainId, otherId, title, now: createdAt, userText, partialText }) => {
-        const summary = (id: string, name: string) => ({
+        const summary = (id: string, name: string): Record<string, unknown> => ({
           id,
           title: name,
           pinned: false,
