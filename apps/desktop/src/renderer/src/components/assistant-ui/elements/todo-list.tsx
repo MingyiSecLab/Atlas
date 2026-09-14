@@ -1,5 +1,7 @@
-import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react'
+'use client'
+
 import type { ComponentProps } from 'react'
+import { CheckIcon, Loader2Icon, XIcon } from 'lucide-react'
 import { cn } from '@renderer/lib/utils'
 import { mono } from './surfaces'
 
