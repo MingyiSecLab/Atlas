@@ -12,6 +12,15 @@ Runtime 基于 Mastra SDK 构建，核心依赖为 `@mastra/code-sdk`、`@mastra
 
 用户要求开发或扩展功能时，开始编码前必须先搜索并阅读可用的 Mastra skill，确认 Mastra 现有能力、推荐 API 和版本约束。若 skill 与本地安装版本不一致，以当前依赖的类型定义和源码为准，并记录兼容处理。
 
+## Desktop UI 与组件架构约束
+
+`apps/desktop/` 渲染进程采用 Radix UI 无障碍原语、Assistant-UI 与 Tailwind CSS v4 构建。对话界面采用清晰的分层架构：
+
+1. **基础原语层 (`src/renderer/src/components/ui/`)**：封装通用的无障碍 UI 原语（如 Button, Collapsible, Popover, Dialog, Tooltip, DropdownMenu, Badge 等），严禁自建易破坏键盘导航与 ARIA 规范的临时控件。
+2. **AI 元素层 (`src/renderer/src/components/assistant-ui/elements/`)**：参考 `tests/polaragent` 模式，维护专属 AI 流式与卡片组件（如 ThinkingIndicator, Reasoning, TodoList, ToolCall, ToolTimeline, Surfaces 等）。瞬时思考指示器与持久思维链手风琴需明确解耦。
+3. **注册源与组件扩展 (`apps/desktop/components.json`)**：工程已接入 `@shadcn`、`@assistant-ui` 与 `@animate-ui` 远端注册源。新增通用或 AI 交互组件时，优先在 `apps/desktop/` 目录执行 `npx shadcn@latest add <component>`，组件将依据 `@renderer/*` 别名配置自动输出至对应目录。
+4. **外层布局边界控制**：对话界面的改动范围严格限制在中央工作区与浮层；顶栏 (`TopHeader.tsx`)、窗口控制 (`windowstitle`)、侧边栏导航 (`Sidebar.tsx`)、底部终端 (`BottomTerminalPanel.tsx`) 与右侧能力面板 (`RightCapabilityPanel.tsx`) 属于稳定外壳，除非任务明确指定，否则不得更改其布局结构。
+
 ## 独立项目边界
 
 `ptcore/` 是暂存在本仓库中的独立项目，仅为早期协作提供目录位置。它不是根 workspace
