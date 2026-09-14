@@ -1,6 +1,7 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'tw-shimmer';
+@import 'tw-shimmer';
 
 @custom-variant dark (&:is(.dark *));
 @custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));

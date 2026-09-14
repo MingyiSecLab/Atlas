@@ -20,6 +20,10 @@ import { RetryConnectingBar } from './RetryConnectingBar'
 import { StoppedRunCard } from './StoppedRunCard'
 import { SelectionToolbar } from './SelectionToolbar'
 import { ScrollToBottomPill } from './ScrollToBottomPill'
+import {
+  ConversationMap,
+  type ConversationMapEntry
+} from '@renderer/components/assistant-ui/elements/conversation-map'
 import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
 import {
   partsToChatBlocks,
@@ -130,48 +134,15 @@ function getMinimapItemPreview(item: MinimapItem): { title: string; text: string
   return { title: roleTitle, text: '无文本内容' }
 }
 
-function ConversationMinimap({
-  items,
-  visible
-}: {
-  items: MinimapItem[]
-  visible: boolean
-}): React.ReactNode {
-  if (!visible) return null
-  return (
-    <nav className="chat-minimap" aria-label="对话导航">
-      {items.map((item) => {
-        const preview = getMinimapItemPreview(item)
-        const label = `${preview.title}: ${preview.text}`
-        return (
-          <div key={item.id} className="chat-minimap-item">
-            <button
-              className="chat-minimap-mark"
-              data-role={item.role}
-              type="button"
-              title={label}
-              aria-label={label}
-              onClick={() => {
-                document.getElementById(`message-${item.id}`)?.scrollIntoView({
-                  behavior: 'smooth',
-                  block: 'center'
-                })
-              }}
-            />
-            <div className="chat-minimap-popover" role="tooltip">
-              <div className="chat-minimap-popover-header">
-                <span className="chat-minimap-popover-role">{preview.title}</span>
-                {item.role !== 'error' && item.timestamp ? (
-                  <span className="chat-minimap-popover-time">{item.timestamp}</span>
-                ) : null}
-              </div>
-              <div className="chat-minimap-popover-content">{preview.text}</div>
-            </div>
-          </div>
-        )
-      })}
-    </nav>
-  )
+function minimapItemToConversationEntry(item: MinimapItem): ConversationMapEntry {
+  const preview = getMinimapItemPreview(item)
+  const title =
+    item.role !== 'error' && item.timestamp ? `${preview.title} · ${item.timestamp}` : preview.title
+  return {
+    id: item.id,
+    title,
+    preview: preview.text
+  }
 }
 
 /** sessions.get 快照 → boot（历史 hydrate + 运行中消息的 resume 种子） */
@@ -573,13 +544,30 @@ function ChatWorkspaceInner({
     return items
   }, [messages, errorItems])
 
+  const conversationEntries = useMemo(() => {
+    return minimapItems.map(minimapItemToConversationEntry)
+  }, [minimapItems])
+
   return (
     <ThreadPrimitive.Root asChild>
       <section
         ref={workspaceRef}
         className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
       >
-        <ConversationMinimap items={minimapItems} visible={isSidebarCollapsed} />
+        {isSidebarCollapsed && conversationEntries.length > 0 ? (
+          <aside className="absolute top-[70px] left-3 z-20" aria-label="对话导航导轨">
+            <ConversationMap
+              entries={conversationEntries}
+              side="right"
+              onSelect={(id) => {
+                document.getElementById(`message-${id}`)?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'center'
+                })
+              }}
+            />
+          </aside>
+        ) : null}
         <div ref={scrollRef} className="chat-scroll" onScroll={updateDistanceFromBottom}>
           <ThreadPrimitive.ViewportProvider>
             <div className="chat-timeline" data-markdown-scroll-container>
