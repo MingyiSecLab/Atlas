@@ -13,6 +13,9 @@
 !/docs/README.md
 /CHANGELOG.md
 
+# 公众号等内容生产工作目录，不进仓库
+/docs/wechat/
+
 # Local agent settings and workspace state
 .claude/
 .workbuddy/
