@@ -76,11 +76,12 @@ export function SwapLabel({
   children: [React.ReactNode, React.ReactNode]
   className?: string
 }): React.JSX.Element {
-  const layers = [useRef<HTMLSpanElement>(null), useRef<HTMLSpanElement>(null)]
+  const layer0 = useRef<HTMLSpanElement>(null)
+  const layer1 = useRef<HTMLSpanElement>(null)
   const [width, setWidth] = useState<number | null>(null)
 
   useLayoutEffect(() => {
-    const target = layers[active]?.current
+    const target = active === 0 ? layer0.current : layer1.current
     if (!target) return undefined
     const measure = (): void => setWidth(Math.ceil(target.getBoundingClientRect().width))
     measure()
@@ -97,16 +98,20 @@ export function SwapLabel({
         className
       )}
     >
-      {children.map((layer, index) => (
-        <span
-          key={index}
-          ref={layers[index]}
-          aria-hidden={active !== index}
-          className={cn(labelSwap, active === index ? labelSwapIn : labelSwapOut)}
-        >
-          {layer}
-        </span>
-      ))}
+      {[0, 1].map((index) => {
+        const layer = children[index]
+        const ref = index === 0 ? layer0 : layer1
+        return (
+          <span
+            key={index}
+            ref={ref}
+            aria-hidden={active !== index}
+            className={cn(labelSwap, active === index ? labelSwapIn : labelSwapOut)}
+          >
+            {layer}
+          </span>
+        )
+      })}
     </span>
   )
 }
