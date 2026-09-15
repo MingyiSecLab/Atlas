@@ -20,19 +20,11 @@ import { RetryConnectingBar } from './RetryConnectingBar'
 import { StoppedRunCard } from './StoppedRunCard'
 import { SelectionToolbar } from './SelectionToolbar'
 import { ScrollToBottomPill } from './ScrollToBottomPill'
-import {
-  ConversationMap,
-  type ConversationMapEntry
-} from '@renderer/components/assistant-ui/elements/conversation-map'
+import { ConversationMapAui } from '@renderer/components/assistant-ui/elements/conversation-map.aui'
 import { DayDivider } from '@renderer/components/assistant-ui/elements/day-separator'
 import { isSameDay } from '@renderer/lib/date'
-import { cleanMarkdownPreview } from '@renderer/lib/markdown-utils'
-import type { ChatBlock, ChatError, ChatImageAttachment } from './types'
-import {
-  partsToChatBlocks,
-  readAssistantMetadata,
-  runtimeMessageToThreadMessageLike
-} from './runtime/converter'
+import type { ChatError, ChatImageAttachment } from './types'
+import { partsToChatBlocks, runtimeMessageToThreadMessageLike } from './runtime/converter'
 import { SessionChatProvider, type SessionChatBoot } from './runtime/SessionChatProvider'
 
 interface ChatWorkspaceProps {
@@ -61,90 +53,6 @@ function mergePentestIntent(
     scope: next.scope?.length ? next.scope : existing.scope,
     principal: next.principal || existing.principal,
     authorizationRef: next.authorizationRef || existing.authorizationRef
-  }
-}
-
-interface MinimapItem {
-  id: string
-  role: 'user' | 'assistant' | 'error'
-  timestamp?: string
-  blocks: ChatBlock[]
-  attachmentCount: number
-  modelName?: string
-  content?: string
-}
-
-function formatTimestamp(value: string | Date): string {
-  try {
-    const date = typeof value === 'string' ? new Date(value) : value
-    return date.toLocaleTimeString('zh-CN', {
-      hour: '2-digit',
-      minute: '2-digit'
-    })
-  } catch {
-    return '刚刚'
-  }
-}
-
-function minimapItemFromMessage(message: ThreadMessage): MinimapItem {
-  const metadata = readAssistantMetadata(message)
-  return {
-    id: metadata.runtimeMessageId ?? message.id,
-    role: message.role === 'user' ? 'user' : 'assistant',
-    timestamp: formatTimestamp(message.createdAt),
-    blocks: partsToChatBlocks(message.content),
-    attachmentCount: message.content.filter((part) => part.type === 'image').length,
-    ...(metadata.modelName ? { modelName: metadata.modelName } : {})
-  }
-}
-
-function getMinimapItemPreview(item: MinimapItem): { title: string; text: string } {
-  if (item.role === 'error') {
-    return { title: '错误', text: item.content || '发生错误' }
-  }
-  const roleTitle = item.role === 'user' ? '用户' : item.modelName || '助手'
-  const text = item.blocks
-    .filter((block) => block.type === 'text')
-    .map((block) => block.text)
-    .join('\n')
-    .trim()
-  if (text) {
-    return { title: roleTitle, text: cleanMarkdownPreview(text, 160) }
-  }
-  const skill = item.blocks.find(
-    (block): block is Extract<ChatBlock, { type: 'skill' }> => block.type === 'skill'
-  )
-  if (skill) {
-    return {
-      title: roleTitle,
-      text: `技能: /${skill.name}${skill.arguments ? ` ${skill.arguments}` : ''}`
-    }
-  }
-  const toolBlock = item.blocks.find((block) => block?.type === 'tool')
-  if (toolBlock && toolBlock.type === 'tool') {
-    return { title: roleTitle, text: `工具调用: ${toolBlock.name}` }
-  }
-  const reasoningBlock = item.blocks.find((block) => block?.type === 'reasoning')
-  if (reasoningBlock && reasoningBlock.type === 'reasoning' && reasoningBlock.text) {
-    return {
-      title: roleTitle,
-      text: `思考: ${cleanMarkdownPreview(reasoningBlock.text, 120)}`
-    }
-  }
-  if (item.attachmentCount > 0) {
-    return { title: roleTitle, text: `[包含 ${item.attachmentCount} 个附件]` }
-  }
-  return { title: roleTitle, text: '无文本内容' }
-}
-
-function minimapItemToConversationEntry(item: MinimapItem): ConversationMapEntry {
-  const preview = getMinimapItemPreview(item)
-  const title =
-    item.role !== 'error' && item.timestamp ? `${preview.title} · ${item.timestamp}` : preview.title
-  return {
-    id: item.id,
-    title,
-    preview: preview.text
   }
 }
 
@@ -547,55 +455,15 @@ function ChatWorkspaceInner({
   const isPentestMode = permission.toLowerCase() === 'pentest'
   const isAuditMode = permission.toLowerCase() === 'audit'
 
-  const minimapItems = useMemo(() => {
-    const items: MinimapItem[] = []
-    for (const message of messages) {
-      items.push(minimapItemFromMessage(message))
-    }
-    for (const error of errorItems) {
-      items.push({
-        id: error.id,
-        role: 'error',
-        timestamp: '刚刚',
-        blocks: [],
-        attachmentCount: 0,
-        content: error.content
-      })
-    }
-    return items
-  }, [messages, errorItems])
-
-  const conversationEntries = useMemo(() => {
-    return minimapItems.map(minimapItemToConversationEntry)
-  }, [minimapItems])
-
   return (
     <ThreadPrimitive.Root asChild>
       <section
         ref={workspaceRef}
         className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
       >
-        {conversationEntries.length >= 2 ? (
-          <aside
-            className="pointer-events-none absolute inset-y-0 right-2 z-20 hidden md:flex items-center justify-center"
-            aria-label="对话导航导轨"
-          >
-            <div className="pointer-events-auto">
-              <ConversationMap
-                entries={conversationEntries}
-                side="left"
-                onSelect={(id) => {
-                  document.getElementById(`message-${id}`)?.scrollIntoView({
-                    behavior: 'smooth',
-                    block: 'center'
-                  })
-                }}
-              />
-            </div>
-          </aside>
-        ) : null}
-        <div ref={scrollRef} className="chat-scroll" onScroll={updateDistanceFromBottom}>
+        <div ref={scrollRef} className="chat-scroll relative" onScroll={updateDistanceFromBottom}>
           <ThreadPrimitive.ViewportProvider>
+            <ConversationMapAui side="right" />
             <div className="chat-timeline" data-markdown-scroll-container>
               <ThreadPrimitive.Messages>
                 {({ message }) => <ChatTimelineMessage message={message} />}

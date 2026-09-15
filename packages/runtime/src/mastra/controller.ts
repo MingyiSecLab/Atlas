@@ -37,6 +37,8 @@ export interface ControllerConfigOptions {
   pentestService?: RuntimePentestService;
   /** Kali 沙箱执行器；提供后注册 kali_* 工具（kali_exec / kali_session_* / kali_file_*） */
   sandbox?: RuntimeSandboxAdapter;
+  /** 获取当前活跃会话 ID（对话 UUID），用于沙箱工作目录绑定隔离 */
+  getActiveSessionId?: () => string | undefined;
 }
 
 /**
@@ -92,6 +94,7 @@ export function createControllerConfig(
   const securityTools = createSecurityMastraTools({
     workspacePath: options.workspacePath,
     pentestService: options.pentestService,
+    getActiveSessionId: options.getActiveSessionId,
     ...(options.sandbox ? { sandbox: options.sandbox } : {})
   });
   if (typeof options.extraTools === 'function') {

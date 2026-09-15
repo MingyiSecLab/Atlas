@@ -73,7 +73,12 @@ export function ReasoningBlock({ block }: { block: ReasoningBlockModel }): React
       {/* 展开的思维链内容流 */}
       <CollapsibleContent className={cn('aui-reasoning-body', collapsePanel)}>
         <div className="aui-reasoning-content">
-          <Markdown isStreaming={isStreaming}>{block.text || ''}</Markdown>
+          <Markdown
+            isStreaming={isStreaming}
+            className="text-[12.5px] leading-relaxed text-foreground/80"
+          >
+            {block.text || ''}
+          </Markdown>
         </div>
       </CollapsibleContent>
     </Collapsible>

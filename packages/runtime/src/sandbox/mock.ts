@@ -17,7 +17,9 @@ import type {
 export interface MockSandboxCall {
   method: 'exec' | 'openSession' | 'sessionSend' | 'sessionRead' | 'closeSession' | 'readFile' | 'writeFile'
   command?: string
+  cwd?: string
   path?: string
+  content?: string
   input?: string
   sessionId?: string
 }
@@ -100,7 +102,7 @@ export function createMockSandboxAdapter(options: MockSandboxOptions = {}): Mock
 
     async exec(command, execOptions) {
       options.onExec?.(command, execOptions)
-      calls.push({ method: 'exec', command })
+      calls.push({ method: 'exec', command, cwd: execOptions?.cwd })
       await this.ensure()
       const override = options.exec?.(command, execOptions)
       const result =
@@ -162,7 +164,7 @@ export function createMockSandboxAdapter(options: MockSandboxOptions = {}): Mock
     },
 
     async writeFile(path, content) {
-      calls.push({ method: 'writeFile', path })
+      calls.push({ method: 'writeFile', path, content })
       files.set(path, content)
     },
 

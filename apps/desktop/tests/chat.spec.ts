@@ -95,7 +95,7 @@ test.describe('Chat UI shell', () => {
           blocks: [
             {
               type: 'text',
-              text: '[danger](javascript:alert(1))\n\n<img src=x onerror=alert(1)>'
+              text: '[danger](javascript:alert(1))\n\n[upper]( JAVASCRIPT:alert(2))\n\n[control](java\u0000script:alert(3))\n\n<img src=x onerror=alert(1)>'
             }
           ],
           createdAt: new Date().toISOString()
@@ -105,7 +105,8 @@ test.describe('Chat UI shell', () => {
 
     const message = page.locator('#message-assistant-markdown-xss')
     await expect(message).toContainText('danger')
-    await expect(message).toContainText('[blocked]')
+    await expect(message).toContainText('upper')
+    await expect(message).toContainText('control')
     await expect(message).toContainText('[Image blocked: No description]')
     await expect(message.locator('a')).toHaveCount(0)
     await expect(message.locator('img')).toHaveCount(0)

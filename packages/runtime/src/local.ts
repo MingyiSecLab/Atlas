@@ -1,4 +1,5 @@
 import { bootLocalAgentController, wireSessionConcerns } from '@mastra/code-sdk'
+import type { Session } from '@mastra/core/agent-controller'
 import { loadSettings } from '@mastra/code-sdk/onboarding/settings'
 import type { MastraCodeState } from '@mastra/code-sdk/schema'
 import { join, resolve } from 'node:path'
@@ -88,6 +89,8 @@ export async function createLocalRuntime(
     ? createDockerSandboxAdapter({ ...config.sandbox })
     : undefined
 
+  let activeSessionId: string | undefined
+
   // 2. 创建 Controller 配置
   const controllerConfig = createControllerConfig({
     workspacePath: paths.workspacePath,
@@ -103,12 +106,27 @@ export async function createLocalRuntime(
     ...(config.userAgentsDir ? { userAgentsDir: config.userAgentsDir } : {}),
     observationalMemory: config.observationalMemory,
     pentestService: pentest,
-    ...(sandbox ? { sandbox } : {})
+    ...(sandbox ? { sandbox } : {}),
+    getActiveSessionId: () => activeSessionId
   })
 
   // 3. 调用官方 API 创建 Controller 和 Session
   const boot = await bootLocalAgentController(controllerConfig)
   const { controller, session, authStorage, stopPluginSignalProviders, mcpManager } = boot
+  activeSessionId =
+    boot.sessionId ??
+    session.identity?.getId() ??
+    session.thread?.getId() ??
+    undefined
+
+  const activateSession = (targetSession: Session<MastraCodeState>) => {
+    activeSessionId =
+      targetSession.identity?.getId() ??
+      targetSession.thread?.getId() ??
+      (targetSession as unknown as { sessionId?: string; id?: string }).sessionId ??
+      (targetSession as unknown as { id?: string }).id
+    boot.setActiveSession(targetSession)
+  }
 
   const models = createRuntimeModelService({
     controller,
@@ -125,12 +143,12 @@ export async function createLocalRuntime(
     defaultSession: session,
     workspacePath: paths.workspacePath,
     wireSession: (targetSession) => wireSessionConcerns(boot, targetSession),
-    activateSession: boot.setActiveSession
+    activateSession
   })
   const skills = createRuntimeSkillService({
     resolveSession: sessions.resolveSession,
     resolveDefaultSession: async () => session,
-    activateSession: boot.setActiveSession
+    activateSession
   })
   const automations = createRuntimeAutomationService({
     mastra: controller.getMastra(),

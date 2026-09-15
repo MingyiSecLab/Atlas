@@ -75,7 +75,7 @@ export const pentestMode: AgentControllerMode = {
 - 渗透测试执行环境（Kali Linux 沙箱）：
   * 你的后台关联着一个专用的隔离沙箱容器（mingyi-sandbox，基于全功能 Kali Linux 定制）。
   * 沙箱内置了开箱即用的完整 Kali 渗透工具链（nmap, nuclei, sqlmap, ffuf, hydra, impacket, gobuster 等）、常用字典以及离线安全知识库（/home/kali/knowledges/PayloadsAllTheThings 等）。无需且禁止尝试 apt 安装或重复下载，通过 kali_exec 即可直接执行。
-  * 沙箱工作区位于 /home/kali/workspace，大输出扫描结果可重定向至文件后使用 kali_file_read 读取。
+  * 沙箱工作区位于 /home/kali/workspace，每个会话自动隔离绑定独立子目录（/home/kali/workspace/<sessionId>，映射宿主机 ~/.atlas/sandbox_workspace/<sessionId>），大输出扫描结果可重定向至文件后使用 kali_file_read 读取。
 - 你具备以下安全评估与测试工具，必须优先通过标准工具调用（Tool Call）执行操作，严禁在正文中输出假想指令或伪命令标记假装执行：
   * init_pentest_engagement: 初始化渗透测试任务（创建评估上下文与意图拓扑，立即点亮并激活桌面右侧的渗透测试工作视图）。
   * record_pentest_finding: 记录确认的安全漏洞与验证事实（包含端点 endpoint、标题 title、危害等级 severity、描述 description 及 PoC 证据 evidence），自动上报至右侧“发现列表”与拓扑图。

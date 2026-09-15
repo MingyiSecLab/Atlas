@@ -49,12 +49,22 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
   docker build -t mingyi-sandbox:latest ./container
   ```
   *(镜像内置完整 Kali 安全工具链、离线 PoC 库及 HackTricks/PayloadsAllTheThings 知识库)*
-- **启动常驻沙箱容器**：
+- **启动常驻沙箱容器**（亦可通过 `npm run container:run` 跨平台一键启动）：
   ```bash
+  # macOS / Linux (工作区默认映射至 ~/.atlas/sandbox_workspace)
   docker run -d \
     --name mingyi-sandbox \
-    --net=host \
-    -v $(pwd)/datas/sandbox_workspace:/home/kali/workspace \
+    --network host \
+    --cap-add=NET_RAW --cap-add=NET_ADMIN \
+    -v ~/.atlas/sandbox_workspace:/home/kali/workspace \
+    mingyi-sandbox:latest
+
+  # Windows (工作区默认映射至 %USERPROFILE%\.atlas\sandbox_workspace)
+  docker run -d ^
+    --name mingyi-sandbox ^
+    --network host ^
+    --cap-add=NET_RAW --cap-add=NET_ADMIN ^
+    -v "%USERPROFILE%\.atlas\sandbox_workspace:/home/kali/workspace" ^
     mingyi-sandbox:latest
   ```
 - **自动化探测与握手**：
@@ -62,6 +72,7 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
 - **配置与环境变量**：
   - `MINGYI_SANDBOX_CONTAINER`：指定容器名称（默认 `mingyi-sandbox`）；
   - `MINGYI_SANDBOX_IMAGE`：指定镜像名称（默认 `mingyi-sandbox:latest`）；
+  - `MINGYI_SANDBOX_WORKSPACE_DIR`：指定宿主机工作区挂载目录（默认 `~/.atlas/sandbox_workspace`，Windows 为 `%USERPROFILE%\.atlas\sandbox_workspace`）；
   - `MINGYI_SANDBOX_DISABLED=1`：一键关闭沙箱桥接，直接在宿主环境受限执行。
 
 ### 3. 数据与存储架构接入 (Storage & Persistence)

@@ -12,7 +12,14 @@ export { createDocumentEndpointTool } from './documentEndpoint.js'
 export { createExtractJsEndpointsTool } from './extract-js-endpoints.js'
 export { createHttpRequestTool } from './http-request.js'
 export { createTestEndpointVariationsTool } from './testEndpointVariations.js'
-export { createKaliSandboxTools, KALI_SANDBOX_LOCAL_TARGET } from './kali-sandbox.js'
+export {
+  createKaliSandboxTools,
+  DEFAULT_SANDBOX_BASE_WORKSPACE,
+  KALI_SANDBOX_LOCAL_TARGET,
+  resolveSessionSandboxPath,
+  resolveSessionWorkspaceDir,
+  sanitizeSessionDirName
+} from './kali-sandbox.js'
 export type { KaliSandboxToolOptions } from './kali-sandbox.js'
 export {
   createDetectSandboxTool,

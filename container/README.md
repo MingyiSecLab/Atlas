@@ -25,18 +25,28 @@ docker build -t mingyi-sandbox:latest ./container
 
 ### 2. 启动沙箱容器
 
-启动一个后台常驻容器供桌面端随时调用：
+启动一个后台常驻容器供桌面端随时调用（推荐使用 `npm run container:run` 跨平台启动）：
 
 ```bash
+# macOS / Linux (工作区默认映射至 ~/.atlas/sandbox_workspace)
 docker run -d \
   --name mingyi-sandbox \
-  --net=host \
-  -v $(pwd)/datas/sandbox_workspace:/home/kali/workspace \
+  --network host \
+  --cap-add=NET_RAW --cap-add=NET_ADMIN \
+  -v ~/.atlas/sandbox_workspace:/home/kali/workspace \
+  mingyi-sandbox:latest
+
+# Windows (工作区默认映射至 %USERPROFILE%\.atlas\sandbox_workspace)
+docker run -d ^
+  --name mingyi-sandbox ^
+  --network host ^
+  --cap-add=NET_RAW --cap-add=NET_ADMIN ^
+  -v "%USERPROFILE%\.atlas\sandbox_workspace:/home/kali/workspace" ^
   mingyi-sandbox:latest
 ```
 
-* `--net=host`：使沙箱能直接访问宿主机网络及宿主机可达的内网/靶场；
-* `-v ...`：将工作区挂载到宿主机，便于实时查看生成的日志、扫描报告与截获的凭据。
+* `--network host`：使沙箱能直接访问宿主机网络及宿主机可达的内网/靶场；
+* `-v ...`：将工作区挂载到宿主机（默认集中于 `~/.atlas/sandbox_workspace`），便于实时查看生成的日志、扫描报告与截获的凭据，且与项目源码彻底隔离。
 
 ### 3. 测试验证
 

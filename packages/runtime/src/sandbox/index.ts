@@ -21,6 +21,7 @@ export {
   buildExecScript,
   createDockerSandboxAdapter,
   createSpawnDockerRunner,
+  isWorkspaceMountMatching,
   sanitizeSessionName,
   shquote,
   truncateOutput

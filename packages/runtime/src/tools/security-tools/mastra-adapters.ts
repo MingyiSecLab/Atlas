@@ -16,19 +16,38 @@ import type { RuntimePentestToolContext } from '../../pentest/tools.js'
 import type { RuntimePentestService } from '../../pentest/types.js'
 import type { RuntimeSandboxAdapter } from '../../sandbox/types.js'
 
-interface SecurityToolsOptions {
+export interface SecurityToolsOptions {
   workspacePath?: string
   scope?: readonly string[]
   allowDestructive?: boolean
   pentestService?: RuntimePentestService
   /** 提供后额外注册 kali 沙箱工具（kali_exec / kali_session_* / kali_file_*）。 */
   sandbox?: RuntimeSandboxAdapter
+  /** 获取当前活跃会话 ID（对话 UUID） */
+  getActiveSessionId?: () => string | undefined
+}
+
+function resolveSessionIdFromContext(
+  options?: SecurityToolsOptions,
+  executionContext?: unknown
+): string | undefined {
+  const ctx = executionContext as Record<string, any> | undefined
+  const fromContext =
+    ctx?.requestContext?.get?.('sessionId') ??
+    ctx?.requestContext?.get?.('threadId') ??
+    ctx?.agent?.threadId ??
+    ctx?.agent?.sessionId
+  if (typeof fromContext === 'string' && fromContext.trim().length > 0) {
+    return fromContext.trim()
+  }
+  return options?.getActiveSessionId?.()
 }
 
 function buildDefaultContext(
   urlOrTarget: string,
   options?: SecurityToolsOptions,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  sessionId?: string
 ): RuntimePentestToolContext {
   let targetHost = '*'
   try {
@@ -42,7 +61,8 @@ function buildDefaultContext(
     workspacePath: options?.workspacePath ?? process.cwd(),
     scope: options?.scope && options.scope.length > 0 ? options.scope : [targetHost, '*'],
     allowDestructive: options?.allowDestructive ?? false,
-    signal: signal ?? new AbortController().signal
+    signal: signal ?? new AbortController().signal,
+    sessionId: sessionId ?? options?.getActiveSessionId?.()
   }
 }
 
@@ -504,22 +524,32 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
   // 11-17. Kali 沙箱工具（仅当宿主注入 sandbox adapter 时注册）
   const sandboxTools: Record<string, ReturnType<typeof createTool>> = {}
   if (options?.sandbox) {
-    const rawKaliTools = createKaliSandboxTools({ adapter: options.sandbox })
+    const rawKaliTools = createKaliSandboxTools({
+      adapter: options.sandbox,
+      getActiveSessionId: options.getActiveSessionId
+    })
     const execRaw = rawKaliTools.find((tool) => tool.name === 'kali_exec')!
     sandboxTools.kali_exec = createTool({
       id: 'kali_exec',
       description:
         '在隔离的 Kali 沙箱容器内执行单条 shell 命令（nmap, nuclei, ffuf, sqlmap, impacket 等）并捕获输出。' +
         '沙箱具备完整无头 Kali 工具链、离线知识库 (/home/kali/knowledges) 与 PoC 库 (/home/kali/pocs)。' +
+        '工作目录默认自动绑定并隔离于当前对话 UUID 目录 (/home/kali/workspace/<sessionId>)。' +
         '参数：command (必填 shell 命令), target (必填授权目标引用), cwd (可选工作目录), timeoutMs (可选超时毫秒数)。',
       inputSchema: z.object({
         command: z.string().describe('要执行的 shell 命令'),
         target: z.string().describe('该命令所针对的授权测试目标（IP/主机/URL/sandbox）'),
-        cwd: z.string().optional().describe('容器内工作目录，默认 /home/kali/workspace'),
+        cwd: z.string().optional().describe('容器内工作目录，默认自动绑定当前会话隔离目录 /home/kali/workspace/<sessionId>'),
         timeoutMs: z.number().positive().optional().describe('超时毫秒数，默认 120000')
       }),
-      execute: async (inputData) => {
-        const context = buildDefaultContext(inputData.target, options)
+      execute: async (inputData, executionContext) => {
+        const sessionId = resolveSessionIdFromContext(options, executionContext)
+        const context = buildDefaultContext(
+          inputData.target,
+          options,
+          (executionContext as any)?.abortSignal,
+          sessionId
+        )
         const res = await execRaw.execute(
           {
             targetRef: inputData.target,
@@ -633,12 +663,18 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     sandboxTools.kali_file_read = createTool({
       id: 'kali_file_read',
       description:
-        '读取沙箱工作区中的文本文件（扫描报告、工具 XML 输出、截获数据）。参数：path (必填, 绝对路径或工作区相对路径)。',
+        '读取沙箱工作区中的文本文件（扫描报告、工具 XML 输出、截获数据）。自动隔离绑定至当前对话 UUID 目录 (/home/kali/workspace/<sessionId>)。参数：path (必填, 相对路径或绝对路径)。',
       inputSchema: z.object({
-        path: z.string().describe('沙箱内文件路径，例如 /home/kali/workspace/nmap_10.0.0.5.xml')
+        path: z.string().describe('沙箱内文件路径（相对路径或 /home/kali/workspace/* 均自动隔离至当前会话 UUID 目录）')
       }),
-      execute: async (inputData) => {
-        const context = buildDefaultContext(KALI_SANDBOX_LOCAL_TARGET, options)
+      execute: async (inputData, executionContext) => {
+        const sessionId = resolveSessionIdFromContext(options, executionContext)
+        const context = buildDefaultContext(
+          KALI_SANDBOX_LOCAL_TARGET,
+          options,
+          (executionContext as any)?.abortSignal,
+          sessionId
+        )
         const res = await fileReadRaw.execute(
           {
             targetRef: KALI_SANDBOX_LOCAL_TARGET,
@@ -655,13 +691,19 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     sandboxTools.kali_file_write = createTool({
       id: 'kali_file_write',
       description:
-        '向沙箱工作区写入文本文件（PoC 脚本、字典、笔记）。沙箱本地操作，不触达测试目标。参数：path (必填), content (必填)。',
+        '向沙箱工作区写入文本文件（PoC 脚本、字典、笔记）。沙箱本地操作，不触达测试目标。自动隔离绑定至当前对话 UUID 目录 (/home/kali/workspace/<sessionId>)。参数：path (必填), content (必填)。',
       inputSchema: z.object({
-        path: z.string().describe('沙箱内目标文件路径'),
+        path: z.string().describe('沙箱内目标文件路径（相对路径或 /home/kali/workspace/* 均自动隔离至当前会话 UUID 目录）'),
         content: z.string().describe('文件内容')
       }),
-      execute: async (inputData) => {
-        const context = buildDefaultContext(KALI_SANDBOX_LOCAL_TARGET, options)
+      execute: async (inputData, executionContext) => {
+        const sessionId = resolveSessionIdFromContext(options, executionContext)
+        const context = buildDefaultContext(
+          KALI_SANDBOX_LOCAL_TARGET,
+          options,
+          (executionContext as any)?.abortSignal,
+          sessionId
+        )
         const res = await fileWriteRaw.execute(
           {
             targetRef: KALI_SANDBOX_LOCAL_TARGET,

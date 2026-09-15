@@ -40,9 +40,71 @@ function optionalString(value: unknown, field: string, maxLength: number): strin
  * 仅供执行器 scope 闸在宽松 scope（含通配）下通过。
  */
 export const KALI_SANDBOX_LOCAL_TARGET = 'sandbox'
+export const DEFAULT_SANDBOX_BASE_WORKSPACE = '/home/kali/workspace'
+
+/**
+ * 将会话 UUID 转换为安全合法的子目录名称（仅允许字母、数字、下划线与连字符）。
+ */
+export function sanitizeSessionDirName(sessionId: string): string {
+  return sessionId.trim().replaceAll(/[^a-zA-Z0-9_-]/g, '-')
+}
+
+/**
+ * 获取当前会话在沙箱容器中的工作目录根路径。
+ * 若提供了 sessionId，返回 `/home/kali/workspace/<sessionId>`；未提供则回退至 `/home/kali/workspace`。
+ */
+export function resolveSessionWorkspaceDir(
+  baseWorkspaceDir = DEFAULT_SANDBOX_BASE_WORKSPACE,
+  sessionId?: string
+): string {
+  const base = baseWorkspaceDir.replace(/\/+$/, '')
+  if (!sessionId || sessionId.trim().length === 0) return base
+  return `${base}/${sanitizeSessionDirName(sessionId)}`
+}
+
+/**
+ * 转换文件或工作目录路径：
+ * 1. 相对路径（如 "poc.py"、"output/scan.xml"）自动绑定至当前会话目录 `<base>/<sessionId>/...`；
+ * 2. 泛型绝对工作区路径（如 "/home/kali/workspace/poc.py"）自动重写至当前会话目录 `<base>/<sessionId>/poc.py`；
+ * 3. 其它系统绝对路径（如 "/etc/passwd"、"/tmp/..."、"/home/kali/knowledges/..."）保持不变。
+ */
+export function resolveSessionSandboxPath(
+  inputPath: string,
+  baseWorkspaceDir = DEFAULT_SANDBOX_BASE_WORKSPACE,
+  sessionId?: string
+): string {
+  const sessionDir = resolveSessionWorkspaceDir(baseWorkspaceDir, sessionId)
+  const base = baseWorkspaceDir.replace(/\/+$/, '')
+
+  // 1. 相对路径
+  if (!inputPath.startsWith('/')) {
+    return `${sessionDir}/${inputPath}`
+  }
+
+  // 2. 指向 /home/kali/workspace 根目录本身
+  if (sessionId && (inputPath === base || inputPath === `${base}/`)) {
+    return sessionDir
+  }
+
+  // 3. 指向 /home/kali/workspace/...
+  if (sessionId && inputPath.startsWith(`${base}/`)) {
+    const sub = inputPath.slice(base.length + 1)
+    const cleanSessionId = sanitizeSessionDirName(sessionId)
+    // 若已显式包含了当前 session 目录前缀，不再重复追加
+    if (!sub.startsWith(cleanSessionId)) {
+      return `${sessionDir}/${sub}`
+    }
+  }
+
+  return inputPath
+}
 
 export interface KaliSandboxToolOptions {
   adapter: RuntimeSandboxAdapter
+  /** 获取当前活跃会话 ID（对话 UUID）的回调 */
+  getActiveSessionId?: () => string | undefined
+  /** 基础工作区路径，默认 /home/kali/workspace */
+  baseWorkspaceDir?: string
 }
 
 /**
@@ -51,6 +113,7 @@ export interface KaliSandboxToolOptions {
  */
 export function createKaliSandboxTools(options: KaliSandboxToolOptions): readonly RuntimePentestTool[] {
   const adapter = options.adapter
+  const baseWorkspaceDir = options.baseWorkspaceDir ?? DEFAULT_SANDBOX_BASE_WORKSPACE
 
   const kaliExec: RuntimePentestTool = {
     name: 'kali_exec',
@@ -59,10 +122,10 @@ export function createKaliSandboxTools(options: KaliSandboxToolOptions): readonl
       'Run one shell command inside the isolated Kali sandbox container (nmap, nuclei, ffuf,',
       'sqlmap, impacket, …) and capture stdout/stderr with exit code. The sandbox has the full',
       'Kali headless toolchain, offline knowledge bases (/home/kali/knowledges), and PoC repos',
-      '(/home/kali/pocs); large scan outputs should be redirected to files under',
-      '/home/kali/workspace and read back with kali_file_read (truncated).',
+      '(/home/kali/pocs); large scan outputs should be redirected to files under the session workspace',
+      '(/home/kali/workspace/<sessionId>) and read back with kali_file_read (truncated).',
       'Arguments: command (required shell command), target (required authorized target ref,',
-      'e.g. the in-scope host/URL this command operates on), cwd (optional working dir),',
+      'e.g. the in-scope host/URL this command operates on), cwd (optional working dir, defaults to current session workspace),',
       'timeoutMs (optional, default 120000).',
       'Commands must stay within the authorized scope; destructive operations',
       '(rm -rf /, dd, mkfs, drop table via DB clients, …) are blocked unless destructive',
@@ -72,7 +135,11 @@ export function createKaliSandboxTools(options: KaliSandboxToolOptions): readonl
     async execute(command: RuntimePentestToolCommand, context) {
       const cmd = requireString(command.arguments.command, 'command')
       assertCommandActionAllowed(cmd, { allowDestructive: context.allowDestructive })
-      const cwd = optionalString(command.arguments.cwd, 'cwd', 1024)
+      const activeSessionId = context.sessionId || options.getActiveSessionId?.()
+      const rawCwd = optionalString(command.arguments.cwd, 'cwd', 1024)
+      const cwd = rawCwd
+        ? resolveSessionSandboxPath(rawCwd, baseWorkspaceDir, activeSessionId)
+        : resolveSessionWorkspaceDir(baseWorkspaceDir, activeSessionId)
       const timeoutMs =
         typeof command.arguments.timeoutMs === 'number' && command.arguments.timeoutMs > 0
           ? Math.min(command.arguments.timeoutMs, 600_000)
@@ -172,13 +239,15 @@ export function createKaliSandboxTools(options: KaliSandboxToolOptions): readonl
     kind: 'read-only',
     description: [
       'Read a text file from the Kali sandbox workspace (scan reports, tool XML output,',
-      'captured data). Output is truncated to the sandbox output cap.',
-      'Arguments: path (required, absolute or workspace-relative).'
+      'captured data). Automatically scoped to the current session workspace directory (/home/kali/workspace/<sessionId>).',
+      'Arguments: path (required, relative or absolute path).'
     ].join(' '),
     timeoutMs: 15_000,
-    async execute(command: RuntimePentestToolCommand) {
-      const path = requireString(command.arguments.path, 'path', 1024)
-      const content = await adapter.readFile(path)
+    async execute(command: RuntimePentestToolCommand, context) {
+      const rawPath = requireString(command.arguments.path, 'path', 1024)
+      const activeSessionId = context.sessionId || options.getActiveSessionId?.()
+      const resolvedPath = resolveSessionSandboxPath(rawPath, baseWorkspaceDir, activeSessionId)
+      const content = await adapter.readFile(resolvedPath)
       return { output: content || '(empty file)' }
     }
   }
@@ -188,15 +257,17 @@ export function createKaliSandboxTools(options: KaliSandboxToolOptions): readonl
     kind: 'read-only',
     description: [
       'Write a text file into the Kali sandbox workspace (PoC scripts, wordlists, notes).',
-      'Sandbox-local operation: does not touch the assessment target.',
+      'Sandbox-local operation: does not touch the assessment target. Automatically scoped to the current session workspace (/home/kali/workspace/<sessionId>).',
       'Arguments: path (required), content (required).'
     ].join(' '),
     timeoutMs: 15_000,
-    async execute(command: RuntimePentestToolCommand) {
-      const path = requireString(command.arguments.path, 'path', 1024)
+    async execute(command: RuntimePentestToolCommand, context) {
+      const rawPath = requireString(command.arguments.path, 'path', 1024)
       const content = requireString(command.arguments.content, 'content', MAX_FILE_CONTENT_LENGTH)
-      await adapter.writeFile(path, content)
-      return { output: `wrote ${content.length} bytes to ${path}` }
+      const activeSessionId = context.sessionId || options.getActiveSessionId?.()
+      const resolvedPath = resolveSessionSandboxPath(rawPath, baseWorkspaceDir, activeSessionId)
+      await adapter.writeFile(resolvedPath, content)
+      return { output: `wrote ${content.length} bytes to ${resolvedPath}` }
     }
   }
 

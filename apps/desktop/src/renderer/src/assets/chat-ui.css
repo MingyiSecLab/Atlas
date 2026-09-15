@@ -2,6 +2,17 @@
 @import 'tw-animate-css';
 @import 'tw-shimmer';
 
+@source "../../../../../node_modules/streamdown/dist/*.js";
+@source "../../../../../node_modules/@streamdown/code/dist/*.js";
+@source "../../../../../node_modules/@streamdown/math/dist/*.js";
+@source "../../../../../node_modules/@streamdown/mermaid/dist/*.js";
+@source "../../../../../node_modules/@streamdown/cjk/dist/*.js";
+@source "../../../../node_modules/streamdown/dist/*.js";
+@source "../../../../node_modules/@streamdown/code/dist/*.js";
+@source "../../../../node_modules/@streamdown/math/dist/*.js";
+@source "../../../../node_modules/@streamdown/mermaid/dist/*.js";
+@source "../../../../node_modules/@streamdown/cjk/dist/*.js";
+
 @custom-variant dark (&:is(.dark *));
 @custom-variant data-open (&:where([data-state="open"], [data-open]:not([data-open="false"])));
 @custom-variant data-closed (&:where([data-state="closed"], [data-closed]:not([data-closed="false"])));

@@ -100,6 +100,8 @@ export interface DockerSandboxConfig {
   capAdd?: readonly string[]
   /** 容器内工作目录，默认 `/home/kali/workspace`。 */
   workspaceDir?: string
+  /** 宿主机工作区挂载目录；设置后启动容器时通过 -v hostWorkspaceDir:workspaceDir 挂载。 */
+  hostWorkspaceDir?: string
   /** docker 可执行文件，默认 `docker`；也可指向 DOCKER_HOST 对应的 CLI。 */
   dockerBin?: string
   /** exec 默认超时毫秒数，默认 120_000。 */

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   buildExecScript,
   createDockerSandboxAdapter,
+  isWorkspaceMountMatching,
   sanitizeSessionName,
   shquote,
   truncateOutput,
@@ -14,7 +15,11 @@ import {
   type SandboxProcessResult
 } from '../src/sandbox/index.js'
 import { createMockSandboxAdapter } from '../src/sandbox/index.js'
-import { createKaliSandboxTools } from '../src/tools/security-tools/kali-sandbox.js'
+import {
+  createKaliSandboxTools,
+  resolveSessionSandboxPath,
+  resolveSessionWorkspaceDir
+} from '../src/tools/security-tools/kali-sandbox.js'
 import { createRuntimePentestToolExecutor } from '../src/pentest/tools.js'
 
 // ---------------------------------------------------------------------------
@@ -56,6 +61,79 @@ describe('sandbox pure helpers', () => {
     expect(noCwd).not.toContain('cd ')
     expect(noCwd).toContain('timeout --kill-after=505 500 bash -c')
   })
+
+  it('isWorkspaceMountMatching 校验 POSIX 与 Windows 路径挂载匹配', () => {
+    // POSIX 匹配
+    expect(
+      isWorkspaceMountMatching(
+        ['/Users/administrator/.atlas/sandbox_workspace:/home/kali/workspace'],
+        '/Users/administrator/.atlas/sandbox_workspace',
+        '/home/kali/workspace'
+      )
+    ).toBe(true)
+
+    // POSIX 路径不匹配（映射到了 apps 目录）
+    expect(
+      isWorkspaceMountMatching(
+        ['/Users/administrator/Desktop/Project/Workspace/project_code/mingyi-tot/apps:/home/kali/workspace'],
+        '/Users/administrator/.atlas/sandbox_workspace',
+        '/home/kali/workspace'
+      )
+    ).toBe(false)
+
+    // Windows 盘符与反斜杠格式匹配
+    expect(
+      isWorkspaceMountMatching(
+        ['C:\\Users\\admin\\.atlas\\sandbox_workspace:/home/kali/workspace:rw'],
+        'C:/Users/admin/.atlas/sandbox_workspace',
+        '/home/kali/workspace'
+      )
+    ).toBe(true)
+
+    // 容器目标路径不匹配
+    expect(
+      isWorkspaceMountMatching(
+        ['/Users/admin/.atlas/sandbox_workspace:/home/kali/other'],
+        '/Users/admin/.atlas/sandbox_workspace',
+        '/home/kali/workspace'
+      )
+    ).toBe(false)
+
+    // 空 binds
+    expect(
+      isWorkspaceMountMatching([], '/Users/admin/.atlas/sandbox_workspace', '/home/kali/workspace')
+    ).toBe(false)
+    expect(
+      isWorkspaceMountMatching(undefined, '/Users/admin/.atlas/sandbox_workspace', '/home/kali/workspace')
+    ).toBe(false)
+  })
+
+  it('resolveSessionWorkspaceDir 与 resolveSessionSandboxPath 会话目录解析与路由', () => {
+    // 无 sessionId 时回退默认
+    expect(resolveSessionWorkspaceDir('/home/kali/workspace')).toBe('/home/kali/workspace')
+    expect(resolveSessionSandboxPath('poc.py', '/home/kali/workspace')).toBe('/home/kali/workspace/poc.py')
+    expect(resolveSessionSandboxPath('/home/kali/workspace/poc.py', '/home/kali/workspace')).toBe('/home/kali/workspace/poc.py')
+
+    // 带有 sessionId
+    const sid = 'f2e1f497-4e05-4d8f-9e73-995c6ebd23b0'
+    expect(resolveSessionWorkspaceDir('/home/kali/workspace', sid)).toBe(
+      `/home/kali/workspace/${sid}`
+    )
+    // 相对路径自动前缀 sessionId 目录
+    expect(resolveSessionSandboxPath('poc.py', '/home/kali/workspace', sid)).toBe(
+      `/home/kali/workspace/${sid}/poc.py`
+    )
+    // 泛型 /home/kali/workspace/poc.py 自动路由至 /home/kali/workspace/<sessionId>/poc.py
+    expect(
+      resolveSessionSandboxPath('/home/kali/workspace/scan.xml', '/home/kali/workspace', sid)
+    ).toBe(`/home/kali/workspace/${sid}/scan.xml`)
+    // 已经包含 sessionId 目录的路径不重复追加
+    expect(
+      resolveSessionSandboxPath(`/home/kali/workspace/${sid}/scan.xml`, '/home/kali/workspace', sid)
+    ).toBe(`/home/kali/workspace/${sid}/scan.xml`)
+    // 系统路径保持不变
+    expect(resolveSessionSandboxPath('/etc/hosts', '/home/kali/workspace', sid)).toBe('/etc/hosts')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -66,6 +144,7 @@ interface FakeDockerState {
   exists: boolean
   status: string
   containerId: string
+  binds?: string[]
   tmuxSessions: Map<string, string[]>
   /** 每条 docker exec bash -lc 脚本的定制响应。 */
   execResponse?: (script: string) => SandboxProcessResult
@@ -86,7 +165,14 @@ function createFakeDocker(state: FakeDockerState) {
     const [head, ...rest] = args
     if (head === 'inspect') {
       if (!state.exists) return fail(`Error: No such object: ${rest.at(-1)}`)
-      return ok(`${state.status}\n${state.containerId}`)
+      const rawBinds = state.binds ? `\n${JSON.stringify(state.binds)}` : ''
+      return ok(`${state.status}\n${state.containerId}${rawBinds}`)
+    }
+    if (head === 'rm') {
+      state.exists = false
+      state.status = 'missing'
+      state.binds = undefined
+      return ok()
     }
     if (head === 'run') {
       state.exists = true
@@ -184,6 +270,46 @@ describe('docker sandbox adapter', () => {
     await b.ensure()
     expect(stoppedState.status).toBe('running')
     expect(stopped.calls.some((args) => args[0] === 'run')).toBe(false)
+  })
+
+  it('ensure：hostWorkspaceDir 指定时挂载 -v 到容器 workspaceDir', async () => {
+    const missingState = freshState()
+    const missing = createFakeDocker(missingState)
+    const adapter = createDockerSandboxAdapter({
+      containerName: 'mingyi-sandbox',
+      hostWorkspaceDir: '/tmp/test_workspace',
+      runner: missing.runner
+    })
+    await adapter.ensure()
+    expect(missingState.exists).toBe(true)
+    const runCall = missing.calls.find((args) => args[0] === 'run')
+    expect(runCall).toBeDefined()
+    expect(runCall).toContain('-v')
+    expect(runCall).toContain('/tmp/test_workspace:/home/kali/workspace')
+  })
+
+  it('ensure：既有容器挂载目录与 hostWorkspaceDir 不匹配时，先 rm -f 旧容器再 run 新容器', async () => {
+    const mismatchedState: FakeDockerState = {
+      ...freshState(),
+      exists: true,
+      status: 'running',
+      binds: ['/mismatched/apps:/home/kali/workspace']
+    }
+    const fake = createFakeDocker(mismatchedState)
+    const adapter = createDockerSandboxAdapter({
+      containerName: 'mingyi-sandbox',
+      hostWorkspaceDir: '/Users/administrator/.atlas/sandbox_workspace',
+      runner: fake.runner
+    })
+    await adapter.ensure()
+    expect(fake.calls.some((args) => args[0] === 'rm' && args.includes('mingyi-sandbox'))).toBe(true)
+    expect(
+      fake.calls.some(
+        (args) =>
+          args[0] === 'run' &&
+          args.includes('/Users/administrator/.atlas/sandbox_workspace:/home/kali/workspace')
+      )
+    ).toBe(true)
   })
 
   it('exec：容器内 timeout(124) 与宿主兜底均标记 timedOut，超长输出截断', async () => {
@@ -423,5 +549,88 @@ describe('kali sandbox tools', () => {
     )
     expect(read.output).toBe('data')
     expect(mock.calls.some((call) => call.method === 'writeFile' && call.path === '/tmp/w')).toBe(true)
+  })
+
+  it('会话 UUID 自动隔离：kali_exec cwd 与文件读写自动限定在会话子目录', async () => {
+    const { mock, executor } = kaliExecutor()
+    const session1 = 'session-uuid-1111'
+    const session2 = 'session-uuid-2222'
+
+    // Session 1 执行命令，未显式传 cwd，应自动绑定至 /home/kali/workspace/session-uuid-1111
+    await executor.execute(
+      { targetRef: '127.0.0.1', toolName: 'kali_exec', arguments: { command: 'pwd' } },
+      {
+        signal: new AbortController().signal,
+        workspacePath: '/tmp',
+        scope: localPolicy.scope,
+        allowDestructive: false,
+        sessionId: session1
+      },
+      localPolicy
+    )
+    const execCall = mock.calls.find((c) => c.method === 'exec' && c.command === 'pwd')
+    expect(execCall?.cwd).toBe('/home/kali/workspace/session-uuid-1111')
+
+    // Session 1 写入 scan.txt
+    await executor.execute(
+      { targetRef: 'sandbox', toolName: 'kali_file_write', arguments: { path: 'scan.txt', content: 'session 1 result' } },
+      {
+        signal: new AbortController().signal,
+        workspacePath: '/tmp',
+        scope: localPolicy.scope,
+        allowDestructive: false,
+        sessionId: session1
+      },
+      localPolicy
+    )
+
+    // Session 2 写入同名 scan.txt
+    await executor.execute(
+      { targetRef: 'sandbox', toolName: 'kali_file_write', arguments: { path: 'scan.txt', content: 'session 2 result' } },
+      {
+        signal: new AbortController().signal,
+        workspacePath: '/tmp',
+        scope: localPolicy.scope,
+        allowDestructive: false,
+        sessionId: session2
+      },
+      localPolicy
+    )
+
+    // 检查 mock 中存储的实际路径，验证二者完全隔离未发生覆盖
+    const writeCalls = mock.calls.filter((c) => c.method === 'writeFile')
+    expect(writeCalls).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ path: '/home/kali/workspace/session-uuid-1111/scan.txt', content: 'session 1 result' }),
+        expect.objectContaining({ path: '/home/kali/workspace/session-uuid-2222/scan.txt', content: 'session 2 result' })
+      ])
+    )
+
+    // 读取验证
+    const read1 = await executor.execute(
+      { targetRef: 'sandbox', toolName: 'kali_file_read', arguments: { path: 'scan.txt' } },
+      {
+        signal: new AbortController().signal,
+        workspacePath: '/tmp',
+        scope: localPolicy.scope,
+        allowDestructive: false,
+        sessionId: session1
+      },
+      localPolicy
+    )
+    expect(read1.output).toBe('session 1 result')
+
+    const read2 = await executor.execute(
+      { targetRef: 'sandbox', toolName: 'kali_file_read', arguments: { path: 'scan.txt' } },
+      {
+        signal: new AbortController().signal,
+        workspacePath: '/tmp',
+        scope: localPolicy.scope,
+        allowDestructive: false,
+        sessionId: session2
+      },
+      localPolicy
+    )
+    expect(read2.output).toBe('session 2 result')
   })
 })

@@ -10,6 +10,8 @@
  */
 
 import { spawn } from 'node:child_process'
+import { mkdirSync } from 'node:fs'
+import { resolve } from 'node:path'
 import {
   DEFAULT_SANDBOX_IMAGE,
   DEFAULT_SANDBOX_WORKSPACE,
@@ -77,6 +79,35 @@ export function truncateOutput(text: string, maxBytes: number): { text: string; 
   }
 }
 
+/**
+ * 校验既有容器挂载列表中是否包含指向 targetHostDir 的 targetWorkspaceDir 挂载。
+ * 兼容 Windows（C:\path\to 或 C:/path/to）与 POSIX 路径格式。
+ */
+export function isWorkspaceMountMatching(
+  binds: readonly string[] | undefined,
+  targetHostDir: string,
+  targetWorkspaceDir: string
+): boolean {
+  if (!binds || binds.length === 0) return false
+  const targetHost = resolve(targetHostDir).replaceAll('\\', '/').toLowerCase().replace(/\/+$/, '')
+  const targetContainer = targetWorkspaceDir.replaceAll('\\', '/').replace(/\/+$/, '')
+
+  for (const bind of binds) {
+    // 形式如：/host/path:/home/kali/workspace 或 C:\Users\path:/home/kali/workspace[:options]
+    const match = bind.match(/^(.*?):(\/[^:]+)(?::.*)?$/)
+    if (!match) continue
+    const hostRaw = match[1]
+    const containerRaw = match[2]
+    if (!hostRaw || !containerRaw) continue
+    const hostPart = resolve(hostRaw).replaceAll('\\', '/').toLowerCase().replace(/\/+$/, '')
+    const containerPart = containerRaw.replace(/\/+$/, '')
+    if (containerPart === targetContainer && hostPart === targetHost) {
+      return true
+    }
+  }
+  return false
+}
+
 /** 组装容器内执行脚本：cd → timeout 包裹 → 用户命令。 */
 export function buildExecScript(input: {
   command: string
@@ -84,7 +115,7 @@ export function buildExecScript(input: {
   timeoutSec: number
 }): string {
   const parts: string[] = []
-  if (input.cwd) parts.push(`cd ${shquote(input.cwd)} || exit 125`)
+  if (input.cwd) parts.push(`mkdir -p ${shquote(input.cwd)} && cd ${shquote(input.cwd)} || exit 125`)
   // kill-after 兜底顽固进程（不接受 SIGTERM 的交互式工具）。
   const sec = Math.max(1, Math.ceil(input.timeoutSec))
   parts.push(`timeout --kill-after=${sec + 5} ${sec} bash -c ${shquote(input.command)}`)
@@ -141,6 +172,7 @@ export function createDockerSandboxAdapter(options: DockerSandboxOptions): Runti
   const networkMode = options.networkMode ?? 'host'
   const capAdd = options.capAdd ?? ['NET_RAW', 'NET_ADMIN']
   const workspaceDir = options.workspaceDir ?? DEFAULT_SANDBOX_WORKSPACE
+  const hostWorkspaceDir = options.hostWorkspaceDir
   const dockerBin = options.dockerBin ?? 'docker'
   const execTimeoutMs = options.execTimeoutMs ?? 120_000
   const maxOutputBytes = options.maxOutputBytes ?? 256 * 1024
@@ -151,9 +183,20 @@ export function createDockerSandboxAdapter(options: DockerSandboxOptions): Runti
   const execInContainer = (script: string, timeoutMs: number) =>
     runner(['exec', containerName, 'bash', '-lc', script], { timeoutMs })
 
-  async function inspect(): Promise<{ state: SandboxState; containerId?: string }> {
+  async function inspect(): Promise<{
+    state: SandboxState
+    containerId?: string
+    binds?: string[]
+  }> {
     const result = await runner(
-      ['inspect', '--type', 'container', '--format', '{{.State.Status}}\\n{{.Id}}', containerName],
+      [
+        'inspect',
+        '--type',
+        'container',
+        '--format',
+        '{{.State.Status}}\n{{.Id}}\n{{json .HostConfig.Binds}}',
+        containerName
+      ],
       { timeoutMs: CONTROL_TIMEOUT_MS }
     )
     if (result.exitCode !== 0) {
@@ -161,23 +204,55 @@ export function createDockerSandboxAdapter(options: DockerSandboxOptions): Runti
         return { state: 'missing' }
       throw new Error(`docker inspect failed: ${result.stderr.trim() || `exit ${result.exitCode}`}`)
     }
-    const [status, id] = result.stdout.trim().split('\n')
-    if (status === 'running') return { state: 'running', containerId: id?.trim() }
-    return { state: 'stopped', containerId: id?.trim() }
+    const [status, id, rawBinds] = result.stdout.trim().split('\n')
+    let binds: string[] | undefined
+    if (rawBinds) {
+      try {
+        const parsed = JSON.parse(rawBinds)
+        if (Array.isArray(parsed)) binds = parsed
+      } catch {
+        // 忽略 binds 反序列化异常
+      }
+    }
+    if (status === 'running') return { state: 'running', containerId: id?.trim(), binds }
+    return { state: 'stopped', containerId: id?.trim(), binds }
   }
 
   async function ensureStarted(): Promise<void> {
     const current = await inspect()
-    if (current.state === 'running') return
-    if (current.state === 'stopped') {
-      const started = await runner(['start', containerName], { timeoutMs: CONTROL_TIMEOUT_MS })
-      if (started.exitCode !== 0) {
-        throw new Error(`docker start ${containerName} failed: ${started.stderr.trim()}`)
+    if (current.state !== 'missing') {
+      // 若指定了 hostWorkspaceDir 且既有容器已带有 binds 记录，检查挂载路径是否匹配
+      if (
+        hostWorkspaceDir &&
+        current.binds !== undefined &&
+        !isWorkspaceMountMatching(current.binds, hostWorkspaceDir, workspaceDir)
+      ) {
+        await runner(['rm', '-f', containerName], { timeoutMs: CONTROL_TIMEOUT_MS })
+      } else if (current.state === 'running') {
+        return
+      } else if (current.state === 'stopped') {
+        const started = await runner(['start', containerName], { timeoutMs: CONTROL_TIMEOUT_MS })
+        if (started.exitCode !== 0) {
+          throw new Error(`docker start ${containerName} failed: ${started.stderr.trim()}`)
+        }
+        return
       }
-      return
     }
+
+    if (hostWorkspaceDir) {
+      try {
+        mkdirSync(hostWorkspaceDir, { recursive: true })
+      } catch {
+        // 忽略创建失败（例如权限问题留待 Docker 报错）
+      }
+    }
+
     const runArgs = ['run', '-d', '--name', containerName, '--network', networkMode]
     for (const cap of capAdd) runArgs.push('--cap-add', cap)
+    if (hostWorkspaceDir) {
+      const mountHost = resolve(hostWorkspaceDir).replaceAll('\\', '/')
+      runArgs.push('-v', `${mountHost}:${workspaceDir}`)
+    }
     runArgs.push(image)
     const created = await runner(runArgs, { timeoutMs: CONTROL_TIMEOUT_MS })
     if (created.exitCode !== 0) {

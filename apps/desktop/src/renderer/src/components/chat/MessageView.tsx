@@ -2,7 +2,7 @@ import { AlertTriangle, Bot, Check, Copy, Pencil, RotateCcw, X } from 'lucide-re
 import { MessagePrimitive, useAui } from '@assistant-ui/react'
 import type { ThreadMessage } from '@assistant-ui/react'
 import { useMemo, useState } from 'react'
-import { Markdown } from '@renderer/components/assistant-ui/elements/markdown-text'
+import { Markdown, MarkdownText } from '@renderer/components/assistant-ui/elements/markdown-text'
 import {
   MessageActions,
   type Reaction
@@ -165,8 +165,8 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
   const timestamp = formatTimestamp(message.createdAt)
   const units = useMemo(() => groupChatBlocks(blocks, anchorId), [blocks, anchorId])
   const content = joinTextBlocks(blocks)
+  const hasSpecialBlocks = blocks.some((block) => block.type !== 'text')
   const hasVisibleContent = blocks.some((block) => {
-    if (!block) return false
     if (block.type === 'reasoning') return Boolean(block.text?.trim())
     if (block.type === 'tool' || block.type === 'skill') return true
     return Boolean(block.text?.trim())
@@ -194,35 +194,39 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
         data-message-id={message.id}
       >
         <div className="chat-assistant-blocks" aria-live={running ? 'polite' : undefined}>
-          {units.map((unit) => {
-            if (unit.type === 'tool_group') {
-              return <ToolGroup key={unit.key} summary={unit.summary} />
-            }
+          {!hasSpecialBlocks ? (
+            <MessagePrimitive.Parts components={{ Text: MarkdownText }} />
+          ) : (
+            units.map((unit) => {
+              if (unit.type === 'tool_group') {
+                return <ToolGroup key={unit.key} summary={unit.summary} />
+              }
 
-            const block = unit.block
-            if (!block) return null
-            if (block.type === 'reasoning') return <ReasoningBlock key={unit.key} block={block} />
-            if (block.type === 'tool') {
-              const taskOrder = singleTaskKeys.indexOf(unit.key)
-              const isTask = taskOrder !== -1
-              const isSuperseded = isTask && taskOrder < totalSingleTasks - 1
+              const block = unit.block
+              if (!block) return null
+              if (block.type === 'reasoning') return <ReasoningBlock key={unit.key} block={block} />
+              if (block.type === 'tool') {
+                const taskOrder = singleTaskKeys.indexOf(unit.key)
+                const isTask = taskOrder !== -1
+                const isSuperseded = isTask && taskOrder < totalSingleTasks - 1
+                return (
+                  <ToolCallBlock
+                    key={unit.key}
+                    block={block}
+                    isSuperseded={isSuperseded}
+                    versionIndex={isTask ? taskOrder + 1 : undefined}
+                    totalVersions={isTask ? totalSingleTasks : undefined}
+                  />
+                )
+              }
+              if (block.type === 'skill') return <SkillMessage key={unit.key} skill={block} />
               return (
-                <ToolCallBlock
-                  key={unit.key}
-                  block={block}
-                  isSuperseded={isSuperseded}
-                  versionIndex={isTask ? taskOrder + 1 : undefined}
-                  totalVersions={isTask ? totalSingleTasks : undefined}
-                />
+                <Markdown key={unit.key} isStreaming={running}>
+                  {block.text ?? ''}
+                </Markdown>
               )
-            }
-            if (block.type === 'skill') return <SkillMessage key={unit.key} skill={block} />
-            return (
-              <Markdown key={unit.key} isStreaming={running}>
-                {block.text ?? ''}
-              </Markdown>
-            )
-          })}
+            })
+          )}
           <ThinkingIndicator running={running} blocks={blocks} />
         </div>
         {!running || metadata.messageEnded ? (

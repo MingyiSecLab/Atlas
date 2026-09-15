@@ -1,6 +1,7 @@
 import { createLocalRuntime, createRuntimeVectorStore } from '@mingyi/runtime'
-import type { LocalRuntimeInstance } from '@mingyi/runtime'
+import type { DockerSandboxConfig, LocalRuntimeInstance } from '@mingyi/runtime'
 import { app } from 'electron'
+import { homedir } from 'node:os'
 import { join, resolve } from 'node:path'
 
 export class DesktopRuntimeManager {
@@ -38,15 +39,30 @@ export class DesktopRuntimeManager {
   }
 
   /**
+   * Kali 沙箱工作区在宿主机的持久化挂载目录。
+   * 优先读 MINGYI_SANDBOX_WORKSPACE_DIR，未指定时默认集中于 Atlas 数据根（~/.atlas/sandbox_workspace）。
+   * 跨平台：macOS/Linux 为 ~/.atlas/sandbox_workspace，Windows 为 %USERPROFILE%\.atlas\sandbox_workspace。
+   * 避免渗透测试生成的 PoC 脚本与扫描结果污染应用源码（如 apps/）。
+   */
+  getSandboxWorkspaceDir(): string {
+    const override = process.env.MINGYI_SANDBOX_WORKSPACE_DIR
+    if (override) return resolve(override)
+    return this.dataRoot
+      ? join(this.dataRoot, 'sandbox_workspace')
+      : join(homedir(), '.atlas', 'sandbox_workspace')
+  }
+
+  /**
    * Kali 沙箱配置（默认启用；容器按需拉起，未调用 kali_* 工具前不触碰 Docker）。
    * 置 MINGYI_SANDBOX_DISABLED=1 可整体关闭沙箱能力。
    */
-  getSandboxConfig(): { containerName: string; image: string; networkMode: string } | undefined {
+  getSandboxConfig(): DockerSandboxConfig | undefined {
     if (process.env.MINGYI_SANDBOX_DISABLED) return undefined
     return {
       containerName: process.env.MINGYI_SANDBOX_CONTAINER || 'mingyi-sandbox',
       image: process.env.MINGYI_SANDBOX_IMAGE || 'mingyi-sandbox:latest',
-      networkMode: process.env.MINGYI_SANDBOX_NETWORK || 'host'
+      networkMode: process.env.MINGYI_SANDBOX_NETWORK || 'host',
+      hostWorkspaceDir: this.getSandboxWorkspaceDir()
     }
   }
 

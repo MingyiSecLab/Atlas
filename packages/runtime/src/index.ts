@@ -143,6 +143,7 @@ export {
   sanitizeSessionName,
   shquote,
   truncateOutput,
+  isWorkspaceMountMatching,
   DEFAULT_SANDBOX_IMAGE,
   DEFAULT_SANDBOX_WORKSPACE
 } from './sandbox/index.js'

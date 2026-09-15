@@ -14,7 +14,7 @@
     "lint": "npm run lint -w mingyi-app",
     "dev": "npm run build -w @mingyi/runtime && npm run dev -w mingyi-app",
     "container:build": "docker build --platform linux/amd64 -t mingyi-sandbox:latest ./container",
-    "container:run": "docker run -d --name mingyi-sandbox --network host --cap-add=NET_RAW --cap-add=NET_ADMIN -v $(pwd)/datas/sandbox_workspace:/home/kali/workspace mingyi-sandbox:latest",
+    "container:run": "node scripts/run-container.mjs",
     "container:smoke": "bash scripts/sandbox-smoke.sh"
   },
   "devDependencies": {
