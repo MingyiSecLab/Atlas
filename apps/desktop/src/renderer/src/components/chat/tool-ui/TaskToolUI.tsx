@@ -179,6 +179,7 @@ export function TaskToolUI({
   if (!items || items.length === 0) {
     return (
       <div
+        data-slot="todo-card"
         className={cn(
           paper,
           'flex w-full flex-col items-center justify-center gap-1.5 rounded-2xl p-4 text-center text-xs text-foreground/45'
@@ -202,6 +203,7 @@ export function TaskToolUI({
       <div className="w-full">
         <button
           type="button"
+          data-slot="todo-snapshot"
           className={cn(
             paper,
             'flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs transition-colors hover:bg-foreground/[0.04] cursor-pointer'
@@ -239,6 +241,7 @@ export function TaskToolUI({
 
   return (
     <div
+      data-slot="todo-card"
       className={cn(
         paper,
         'relative w-full max-w-full rounded-2xl p-4 transition-all',

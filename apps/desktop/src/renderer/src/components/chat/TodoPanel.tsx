@@ -91,6 +91,9 @@ export function TodoPanel({ blocks }: { blocks: readonly ChatBlock[] }): React.R
     <Collapsible
       open={open}
       onOpenChange={setOpen}
+      // 样式钩子：本组件的内边距由 chat-ui.css 的无层规则按此属性补齐
+      // （Tailwind 间距类在 Desktop 被 main.css 顶部的 `*` 重置盖掉）。
+      data-slot="todo-panel"
       className="w-full rounded-t-[inherit] border-b border-border/50 bg-background/80 px-4 py-2 text-xs backdrop-blur-sm transition-all"
     >
       <CollapsibleTrigger className="group flex w-full items-center justify-between py-1 text-muted-foreground hover:text-foreground cursor-pointer outline-none">

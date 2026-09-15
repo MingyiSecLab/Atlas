@@ -270,3 +270,50 @@
 .chat-markdown .aui-md-tr:last-child > .aui-md-td {
   border-bottom-width: 0;
 }
+
+/* ==========================================================================
+   任务清单（TodoPanel / TodoList / TaskToolUI）间距补偿
+   ==========================================================================
+   与上面的 Markdown 补充同一个根因：main.css 顶部的 `* { margin: 0; padding: 0 }`
+   是无层样式，优先级高于 Tailwind v4 的 @layer utilities，所以组件里只设
+   margin/padding 的工具类在 Desktop 中实测计算值全部为 0
+   （px-4 / py-2 / py-1 / pt-2 / pb-1 / py-0.5 / pr-1 / p-4 / px-3 py-2）。
+   受影响的表现只有「内边距消失、内容贴边」这一种：gap、颜色、圆角、字号、
+   border、size-* 都不受重置影响，因此看起来像「样式丢了一半」。
+
+   下面用无层规则补回工具类声明的同一组数值（注释里标注对应的工具类）。
+   改动这些值时请同步组件内的工具类，或以本区块为准 —— 二者不再有任何
+   级联关系，只靠人工保持一致。
+   ========================================================================== */
+
+/* TodoPanel：对话输入框上方的可折叠待办清单 */
+[data-slot='todo-panel'] {
+  padding: 8px 16px; /* py-2 px-4 */
+}
+
+[data-slot='todo-panel'] [data-slot='collapsible-trigger'] {
+  padding-block: 4px; /* py-1 */
+}
+
+[data-slot='todo-panel'] [data-slot='collapsible-content'] {
+  padding-block: 8px 4px; /* pt-2 pb-1 */
+}
+
+/* 列表滚动容器：给滚动条留出间隙，避免贴住右侧文字 */
+[data-slot='todo-panel'] [data-slot='collapsible-content'] > div {
+  padding-inline-end: 4px; /* pr-1 */
+}
+
+/* TodoList 行：无内边距时多行条目会挤成一条，行高完全由 line-height 决定 */
+[data-slot='todo-list'] li {
+  padding-block: 2px; /* py-0.5 */
+}
+
+/* 工具卡内的任务清单（TaskToolUI）：展开卡片 / 空态 / 已取代的快照胶囊 */
+[data-slot='todo-card'] {
+  padding: 16px; /* p-4 */
+}
+
+[data-slot='todo-snapshot'] {
+  padding: 8px 12px; /* py-2 px-3 */
+}
