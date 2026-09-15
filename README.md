@@ -11,19 +11,53 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
 
 ## 工作运行截图
 
-![工作运行截图](docs/screenshots/workflow-execution.png)
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><b>实时渗透测试执行链路与思考</b></td>
+    <td width="50%" align="center"><b>完整工作区、黑板事实与漏洞发现</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/workflow-execution.png" alt="工作运行截图" width="100%" /></td>
+    <td align="center"><img src="docs/screenshots/workspace-execution.png" alt="工作成果截图" width="100%" /></td>
+  </tr>
+</table>
 
 ## 功能截图
 
-| 主界面与步骤执行 | 任务快捷操作 |
-| --- | --- |
-| ![主界面](docs/screenshots/home.png) | ![任务菜单](docs/screenshots/task-menu.png) |
-| **侧栏任务与空间管理** | **内置终端面板 (⌘J)** |
-| ![侧栏任务与空间](docs/screenshots/sidebar.png) | ![终端面板](docs/screenshots/terminal.png) |
-| **统一模型服务配置** | **Pentest 渗透测试工作流** |
-| ![模型服务配置](docs/screenshots/providers.png) | ![Pentest 工作流](docs/screenshots/pentest.png) |
-| **开源致谢与社区贡献** | **扩展中心与专家角色** |
-| ![开源致谢与社区贡献](docs/screenshots/acknowledgements.png) | ![扩展中心与专家角色](docs/screenshots/hub.png) |
+<table width="100%">
+  <tr>
+    <td width="50%" align="center"><b>主界面与步骤执行</b></td>
+    <td width="50%" align="center"><b>任务快捷操作</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/home.png" alt="主界面" width="100%" /></td>
+    <td align="center"><img src="docs/screenshots/task-menu.png" alt="任务菜单" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>侧栏任务与空间管理</b></td>
+    <td align="center"><b>内置终端面板 (⌘J)</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/sidebar.png" alt="侧栏任务与空间" width="100%" /></td>
+    <td align="center"><img src="docs/screenshots/terminal.png" alt="终端面板" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>统一模型服务配置</b></td>
+    <td align="center"><b>Pentest 渗透测试工作流</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/providers.png" alt="模型服务配置" width="100%" /></td>
+    <td align="center"><img src="docs/screenshots/pentest.png" alt="Pentest 工作流" width="100%" /></td>
+  </tr>
+  <tr>
+    <td align="center"><b>开源致谢与社区贡献</b></td>
+    <td align="center"><b>扩展中心与专家角色</b></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/acknowledgements.png" alt="开源致谢与社区贡献" width="100%" /></td>
+    <td align="center"><img src="docs/screenshots/hub.png" alt="扩展中心与专家角色" width="100%" /></td>
+  </tr>
+</table>
 
 ## 仓库结构
 
