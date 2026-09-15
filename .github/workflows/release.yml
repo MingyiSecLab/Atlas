@@ -157,21 +157,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p dist-artifacts
-          cd apps/desktop/dist
+          # 一律用 $GITHUB_WORKSPACE 拼绝对路径：脚本中途会 cd 到 apps/desktop/dist，
+          # 那里再用 `../..` 只能回到 apps/，极易被误当成仓库根（曾因此漏产物）。
+          ARTIFACT_DIR="$GITHUB_WORKSPACE/dist-artifacts"
+          mkdir -p "$ARTIFACT_DIR"
+          cd "$GITHUB_WORKSPACE/apps/desktop/dist"
           # 只按最终安装包的扩展名收集：*.blockmap、builder-*.yml、latest.yml
           # 等中间产物不会被匹配到，天然排除。
           for pattern in ${{ matrix.artifactGlobs }}; do
             for file in $pattern; do
               [ -e "$file" ] || continue
-              cp -f "$file" ../../dist-artifacts/
+              cp -f "$file" "$ARTIFACT_DIR/"
             done
           done
-          cd ../..
           echo "=== 待上传产物 ==="
-          ls -lh dist-artifacts
-          if [ -z "$(ls -A dist-artifacts)" ]; then
+          ls -lh "$ARTIFACT_DIR"
+          if [ -z "$(ls -A "$ARTIFACT_DIR")" ]; then
             echo "::error::electron-builder 未产出任何安装包，请检查上方打包日志"
+            echo "apps/desktop/dist 实际内容："
+            ls -lh "$GITHUB_WORKSPACE/apps/desktop/dist" || true
             exit 1
           fi
 
