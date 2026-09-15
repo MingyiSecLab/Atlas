@@ -56,11 +56,33 @@ Atlas 遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本命�
    - **标记为预发布测试版 (Pre-release)**：可选（适合发布 Beta/RC 版）；
 5. 点击绿色的 **Run workflow** 按钮启动构建。
 
-GitHub Actions 将并行在 `macos-latest` 与 `windows-latest` 虚拟机中构建：
-1. 编译 `@mingyi/runtime` 与 `mingyi-app`；
-2. 产出 macOS（arm64 与 x64）的 DMG 与 ZIP、Windows amd64 的 EXE 与 ZIP；
-3. 自动汇总计算全局 `SHA256SUMS.txt`；
-4. 自动创建 GitHub Release 并附带格式化的版本公告与安装包下载附件。
+流水线分三段执行，核心原则是**先便宜后昂贵**——任何编译不过的提交都必须在启动高计费的
+macOS / Windows 矩阵机之前被拦下：
+
+| 阶段 | Runner | 超时 | 职责 |
+| :--- | :--- | :--- | :--- |
+| **1. Preflight** | `ubuntu-latest` | 20 min | `npm ci` → 编译 `@mingyi/runtime` → Desktop 类型检查 → 运行不依赖 Electron 的纯逻辑用例。**门禁**：不通过则终止流水线，不消耗 mac/win 额度。 |
+| **2. Build** | `macos-latest` / `windows-latest`（并行） | 75 / 60 min | 并行编译 `@mingyi/runtime` 与 `mingyi-app`，再用 electron-builder 打包：macOS 产出 arm64 + x64 的 DMG 与 ZIP，Windows 产出 amd64 的 EXE 与 ZIP。 |
+| **3. Publish** | `ubuntu-latest` | 20 min | 汇总所有产物 → 生成全局 `SHA256SUMS.txt` → 创建 GitHub Release 并附带公告与附件。 |
+
+流水线的性能与稳定性设计：
+
+- **二进制缓存**：缓存 Electron 发行包（`~/Library/Caches/electron` / `%LOCALAPPDATA%\electron\Cache`）
+  与 electron-builder 工具链（winCodeSign、nsis、dmg 等），键值绑定 `package-lock.json` 哈希。
+  缓存命中后无需重复下载，冷启动与热启动差异明显。
+- **锁定式安装**：使用 `npm ci` 严格按 `package-lock.json` 安装，保证发布产物与本地验证一致。
+- **互斥与超时**：发布流水线全局串行（同一时刻只允许一次 Release 运行，且不静默取消进行中的
+  发布）；每个 job 均设有 `timeout-minutes`，避免渲染层构建卡死时持续占用高系数额度。
+- **产物校验**：安装包收集阶段只匹配 `.dmg` / `.zip` / `.exe` 等最终产物（自动排除
+  `*.blockmap`、`builder-*.yml` 等中间文件），并在无产物时直接失败；发布阶段要求附件非空，
+  避免产生一个没有安装包的 Release。
+- **macOS 双架构不拆分 job**：arm64 与 x64 在同一次 electron-builder 调用内串行产出。渲染层
+  打包是主要耗时，若拆成两个 job 会把它完整跑两遍，计费分钟数接近翻倍，只换来墙钟时间的少量
+  缩短，不划算。
+
+> [!TIP]
+> macOS 与 Windows 使用各自的窗口外壳：macOS 走 `hiddenInset` 保留原生红绿灯，Windows 走
+> 无边框 + `titleBarOverlay`。两者由运行时按平台自动切换，因此**无需**为平台分别构建不同产物。
 
 ---
 

@@ -1,5 +1,19 @@
 name: Release
 
+# ── 流水线设计要点（改动前请先读完）─────────────────────────────────────────
+# 1) 仅手动触发（Workflow Dispatch）。Electron 打包要占用 macOS / Windows 高计费
+#    系数的矩阵机，手动触发可彻底避免打错 tag、本地试推 tag 带来的误触发与额度浪费。
+# 2) preflight 门禁：先在廉价的 ubuntu runner 上做类型检查 + 纯逻辑用例，确认代码
+#    可编译且无回归后，才允许启动昂贵的 mac / win 打包。坏提交不会烧掉矩阵额度。
+# 3) 二进制缓存：缓存 Electron 发行包与 electron-builder 工具链（winCodeSign /
+#    nsis / dmg 等），免去每次重新下载，单次可省数百 MB 流量与数分钟等待。
+# 4) 超时保护：矩阵任务显式 timeout-minutes。渲染层构建内存峰值高、打包耗时长，
+#    一旦卡死会持续占用高系数额度，超时即失败比挂满 6 小时划算。
+# 5) macOS 双架构同机产出：arm64 与 x64 放在同一次 electron-builder 调用里串行打包，
+#    而不是拆成两个 job —— 渲染层打包是主要耗时，拆 job 会把它完整跑两遍，
+#    计费分钟数接近翻倍，只换来墙钟时间的少量缩短，不划算。
+# ────────────────────────────────────────────────────────────────────────────
+
 on:
   workflow_dispatch:
     inputs:
@@ -23,14 +37,68 @@ on:
 permissions:
   contents: write
 
+# 发布流水线全局串行：同时只允许一次 Release 在跑，且不静默取消进行中的发布。
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
+  # 廉价门禁：类型检查 + 纯逻辑用例（不启动 Electron / 浏览器，秒级完成）。
+  # 让它挡在矩阵之前，避免编译不过的提交直接烧掉 macOS / Windows 额度。
+  preflight:
+    name: Preflight (typecheck & unit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      # preflight 的 npm ci 会触发 apps/desktop 的 install-app-deps（原生模块重建），
+      # 过程中需要下载 Linux 版 Electron 发行包，缓存后免去重复下载。
+      - name: Restore Electron cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/electron
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Runtime package
+        run: npm run build -w @mingyi/runtime
+
+      - name: Typecheck Desktop
+        run: npm run typecheck -w mingyi-app
+
+      - name: Run pure-logic desktop specs
+        working-directory: apps/desktop
+        run: |
+          npx playwright test \
+            tests/tool-group.spec.ts \
+            tests/chat-aui-converter.spec.ts \
+            tests/chat-tool-timing.spec.ts \
+            --reporter=line
+
   build:
     name: Build (${{ matrix.platform }})
+    needs: preflight
     runs-on: ${{ matrix.os }}
+    timeout-minutes: ${{ matrix.timeout }}
     # renderer 构建包含 1w+ 模块与内嵌终端字体（base64 woff2），
     # 峰值内存超过 Node 默认 ~2GB 堆限制，需显式提高（mac runner 7GB 内存，win 16GB）
     env:
       NODE_OPTIONS: --max-old-space-size=${{ matrix.platform == 'mac' && 4096 || 8192 }}
+      # 本项目不配置代码签名证书：关掉 electron-builder 的钥匙串身份探测，
+      # 省去每次打包前的签名身份扫描。
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
     strategy:
       fail-fast: false
       matrix:
@@ -38,58 +106,83 @@ jobs:
           - os: macos-latest
             platform: mac
             target: '--mac --arm64 --x64'
+            timeout: 75
+            artifactGlobs: '*.dmg *.zip'
+            cachePaths: |
+              ~/Library/Caches/electron
+              ~/Library/Caches/electron-builder
           - os: windows-latest
             platform: win
             target: '--win --x64'
+            timeout: 60
+            artifactGlobs: '*.exe *.zip'
+            cachePaths: |
+              ~/AppData/Local/electron/Cache
+              ~/AppData/Local/electron-builder/Cache
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: 'npm'
 
+      # 必须放在 npm ci 之前：electron 的 postinstall 会从这里取发行包，
+      # 命中缓存就不再走网络下载。
+      - name: Restore Electron / electron-builder cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ matrix.cachePaths }}
+          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-
+
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
-      - name: Build Runtime package
-        run: npm run build -w @mingyi/runtime
-
-      - name: Build Desktop application
-        run: npm run build -w mingyi-app
+      # 根 build 脚本即「runtime → desktop(typecheck + electron-vite build)」，
+      # 用一条命令代替原来拆开的两步，避免脚本链两处漂移。
+      - name: Build Runtime and Desktop
+        run: npm run build
 
       - name: Package with electron-builder
+        working-directory: apps/desktop
         shell: bash
-        run: |
-          cd apps/desktop
-          npx electron-builder ${{ matrix.target }} --publish never
+        run: npx electron-builder ${{ matrix.target }} --publish never
 
-      - name: Prepare build artifacts (macOS)
-        if: matrix.platform == 'mac'
+      - name: Collect installers
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p dist-artifacts
-          cp apps/desktop/dist/*.dmg dist-artifacts/ 2>/dev/null || true
-          cp apps/desktop/dist/*.zip dist-artifacts/ 2>/dev/null || true
-          ls -lh dist-artifacts/
-
-      - name: Prepare build artifacts (Windows)
-        if: matrix.platform == 'win'
-        shell: bash
-        run: |
-          mkdir -p dist-artifacts
-          cp apps/desktop/dist/*.exe dist-artifacts/ 2>/dev/null || true
-          cp apps/desktop/dist/*.zip dist-artifacts/ 2>/dev/null || true
-          ls -lh dist-artifacts/
+          cd apps/desktop/dist
+          # 只按最终安装包的扩展名收集：*.blockmap、builder-*.yml、latest.yml
+          # 等中间产物不会被匹配到，天然排除。
+          for pattern in ${{ matrix.artifactGlobs }}; do
+            for file in $pattern; do
+              [ -e "$file" ] || continue
+              cp -f "$file" ../../dist-artifacts/
+            done
+          done
+          cd ../..
+          echo "=== 待上传产物 ==="
+          ls -lh dist-artifacts
+          if [ -z "$(ls -A dist-artifacts)" ]; then
+            echo "::error::electron-builder 未产出任何安装包，请检查上方打包日志"
+            exit 1
+          fi
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: atlas-artifacts-${{ matrix.platform }}
           path: dist-artifacts/*
+          # 安装包本身已是压缩格式，再走一次 zip 压缩收益接近于零，
+          # 设 0 只打包不压缩，显著加快上传。
+          compression-level: 0
           if-no-files-found: error
           retention-days: 2
 
@@ -97,6 +190,7 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -109,6 +203,7 @@ jobs:
       - name: Flatten and verify artifacts
         shell: bash
         run: |
+          set -euo pipefail
           mkdir -p release-files
           find all-artifacts -type f -exec mv -f {} release-files/ \;
           cd release-files
@@ -117,6 +212,10 @@ jobs:
           echo "=== Generating SHA256SUMS.txt ==="
           sha256sum * > SHA256SUMS.txt
           cat SHA256SUMS.txt
+          if [ ! -s SHA256SUMS.txt ]; then
+            echo "::error::SHA256SUMS.txt 为空，产物收集异常"
+            exit 1
+          fi
 
       - name: Determine tag and title
         id: get_tag
@@ -194,6 +293,8 @@ jobs:
           name: ${{ steps.get_tag.outputs.title }}
           body_path: release_body.md
           files: release-files/*
+          # 产物缺失时直接失败，避免发出一个没有附件的 Release
+          fail_on_unmatched_files: true
           draft: ${{ github.event.inputs.draft }}
           prerelease: ${{ github.event.inputs.prerelease }}
         env:
