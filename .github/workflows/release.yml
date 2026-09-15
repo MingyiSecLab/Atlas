@@ -157,25 +157,35 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # 一律用 $GITHUB_WORKSPACE 拼绝对路径：脚本中途会 cd 到 apps/desktop/dist，
-          # 那里再用 `../..` 只能回到 apps/，极易被误当成仓库根（曾因此漏产物）。
-          ARTIFACT_DIR="$GITHUB_WORKSPACE/dist-artifacts"
+          # 全程不 cd、不数 `..`：步骤起始 cwd 就是仓库根（= github.workspace），
+          # 直接取 $PWD 拼绝对路径。用 $PWD 而非 $GITHUB_WORKSPACE 是因为前者在
+          # Windows Git Bash 下是 `/d/a/...` 的 POSIX 形式，不带盘符与反斜杠，
+          # 不给 MSYS 的路径转换留歧义。
+          REPO_ROOT="$PWD"
+          SRC_DIR="$REPO_ROOT/apps/desktop/dist"
+          ARTIFACT_DIR="$REPO_ROOT/dist-artifacts"
           mkdir -p "$ARTIFACT_DIR"
-          cd "$GITHUB_WORKSPACE/apps/desktop/dist"
+
+          if [ ! -d "$SRC_DIR" ]; then
+            echo "::error::打包输出目录不存在：$SRC_DIR"
+            exit 1
+          fi
+
           # 只按最终安装包的扩展名收集：*.blockmap、builder-*.yml、latest.yml
-          # 等中间产物不会被匹配到，天然排除。
+          # 等中间产物不会被匹配到，天然排除。glob 的目录前缀加引号、通配符不加引号。
           for pattern in ${{ matrix.artifactGlobs }}; do
-            for file in $pattern; do
+            for file in "$SRC_DIR"/$pattern; do
               [ -e "$file" ] || continue
               cp -f "$file" "$ARTIFACT_DIR/"
             done
           done
+
           echo "=== 待上传产物 ==="
           ls -lh "$ARTIFACT_DIR"
           if [ -z "$(ls -A "$ARTIFACT_DIR")" ]; then
             echo "::error::electron-builder 未产出任何安装包，请检查上方打包日志"
-            echo "apps/desktop/dist 实际内容："
-            ls -lh "$GITHUB_WORKSPACE/apps/desktop/dist" || true
+            echo "--- $SRC_DIR 实际内容 ---"
+            ls -la "$SRC_DIR" || true
             exit 1
           fi
 
