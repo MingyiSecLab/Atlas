@@ -88,6 +88,9 @@ function serializeResult(result: unknown): string | undefined {
 /** 已结算的工具耗时（毫秒），key 为 toolCallId；经 providerMetadata.mingyi 传递 */
 export type ToolTimingMap = ReadonlyMap<string, number>
 
+/** 工具首次被观测到的时间戳（毫秒），key 为 toolCallId；经 providerMetadata.mingyi 传递 */
+export type ToolStartMap = ReadonlyMap<string, number>
+
 /**
  * Runtime wire blocks → assistant-ui parts。
  * 过滤空文本/推理块（空尾随 part 会提前终结前序 part 的流式状态）。
@@ -96,7 +99,8 @@ export function runtimeBlocksToParts(
   blocks: readonly RuntimeSessionMessageBlock[],
   role: 'user' | 'assistant',
   overlay?: ToolStatusOverlay,
-  timing?: ToolTimingMap
+  timing?: ToolTimingMap,
+  startedAt?: ToolStartMap
 ): ThreadAssistantMessagePart[] {
   const parts: ThreadAssistantMessagePart[] = []
   for (const block of blocks) {
@@ -127,6 +131,10 @@ export function runtimeBlocksToParts(
     const finished = status === 'success' || status === 'error'
     const result = finished ? toolResult(block.output) : undefined
     const elapsedMs = timing?.get(block.id)
+    const blockStartedAt = startedAt?.get(block.id)
+    const mingyiMetadata: Record<string, number> = {}
+    if (elapsedMs !== undefined) mingyiMetadata.elapsedMs = elapsedMs
+    if (blockStartedAt !== undefined) mingyiMetadata.startedAt = blockStartedAt
     parts.push({
       type: 'tool-call',
       toolCallId: block.id,
@@ -140,8 +148,12 @@ export function runtimeBlocksToParts(
         : waiting
           ? { approval: { id: block.id } }
           : {}),
-      ...(elapsedMs !== undefined
-        ? { providerMetadata: { mingyi: { elapsedMs } } as ToolCallMessagePart['providerMetadata'] }
+      ...(Object.keys(mingyiMetadata).length > 0
+        ? {
+            providerMetadata: {
+              mingyi: mingyiMetadata
+            } as ToolCallMessagePart['providerMetadata']
+          }
         : {})
     })
   }
@@ -201,6 +213,12 @@ function readElapsedMs(part: ToolCallMessagePart): number | undefined {
   return typeof mingyi?.elapsedMs === 'number' ? mingyi.elapsedMs : undefined
 }
 
+/** 从 part.providerMetadata.mingyi 读出起始时间戳 */
+function readStartedAt(part: ToolCallMessagePart): number | undefined {
+  const mingyi = part.providerMetadata?.['mingyi'] as { startedAt?: unknown } | undefined
+  return typeof mingyi?.startedAt === 'number' ? mingyi.startedAt : undefined
+}
+
 /** assistant-ui parts → 现有渲染层的 ChatBlock[]（工具 UI 子系统原样复用） */
 export function partsToChatBlocks(
   parts: ThreadMessage['content'],
@@ -217,6 +235,7 @@ export function partsToChatBlocks(
     } else if (part.type === 'tool-call') {
       const output = serializeResult(part.result)
       const elapsedMs = readElapsedMs(part)
+      const blockStartedAt = readStartedAt(part)
       blocks.push({
         type: 'tool',
         id: part.toolCallId,
@@ -224,7 +243,8 @@ export function partsToChatBlocks(
         ...(part.argsText ? { input: part.argsText } : {}),
         ...(output !== undefined ? { output } : {}),
         status: toolStatusFromPart(part),
-        ...(elapsedMs !== undefined ? { elapsedMs } : {})
+        ...(elapsedMs !== undefined ? { elapsedMs } : {}),
+        ...(blockStartedAt !== undefined ? { startedAt: blockStartedAt } : {})
       })
     } else if (part.type === 'data' && part.name === 'skill') {
       const skill = part.data as SkillBlock | undefined

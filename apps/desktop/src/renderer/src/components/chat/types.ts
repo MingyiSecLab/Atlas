@@ -29,8 +29,16 @@ export interface ToolBlock {
   outputTruncated?: boolean
   outputCaptureTruncated?: boolean
   status: ToolStatus
-  /** 执行耗时（毫秒）；仅实时流路径计算，历史消息无此数据 */
+  /**
+   * 执行耗时（毫秒）；仅实时流路径且在步骤结算后写入，历史消息无此数据。
+   * 运行中步骤没有该值，改用 startedAt 现场推算。
+   */
   elapsedMs?: number
+  /**
+   * 该工具在渲染层首次被观测到的时间戳（毫秒）；仅实时流路径写入。
+   * 与 elapsedMs 配合：运行中步骤用 now - startedAt 得到实时耗时。
+   */
+  startedAt?: number
 }
 
 export interface SkillBlock {

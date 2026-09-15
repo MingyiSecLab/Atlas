@@ -15,6 +15,8 @@ import type {
 } from '../shared/runtime-ipc'
 
 interface MingyiDesktopApi {
+  /** 窗口外壳的平台标识（只读），供顶栏做平台留白与窗口按钮让位。 */
+  platform: NodeJS.Platform
   createTerminal: (
     id: string,
     options?: { cols?: number; rows?: number; cwd?: string; shell?: string }

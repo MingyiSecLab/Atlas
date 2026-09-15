@@ -163,3 +163,110 @@
 [data-slot='collapsible-content'][data-state] {
   --collapsible-panel-height: var(--radix-collapsible-content-height);
 }
+
+/* ==========================================================================
+   Chat Markdown 排版补充（必须写成无层 / unlayered 规则）
+   ==========================================================================
+   main.css 顶部的 `* { margin: 0; padding: 0 }` 是无层样式，而 Tailwind v4 的
+   间距工具类位于 @layer utilities：按 CSS 级联层规则，无层声明优先级高于任何
+   @layer 内的声明，因此 markdown-text.tsx 里写的 px-3 / py-2 / my-(--density-gap)
+   这类“只设置 margin/padding”的工具类在 Desktop 里全部失效
+   （实测 computed padding、margin 全为 0，表格没有内边距、段落之间没有间距）。
+   下面用无层规则显式补齐 markdown 的间距与内边距。
+   ========================================================================== */
+
+.chat-markdown .aui-md-p {
+  margin-block: 10px;
+}
+
+.chat-markdown .aui-md-blockquote {
+  margin-block: 12px;
+  padding-inline-start: 14px;
+}
+
+.chat-markdown .aui-md-hr {
+  margin-block: 16px;
+}
+
+.chat-markdown .aui-md-table-wrapper {
+  margin-block: 12px;
+  padding: 0;
+}
+
+.chat-markdown .aui-md-th,
+.chat-markdown .aui-md-td {
+  padding: 7px 12px;
+}
+
+.chat-markdown .aui-md-pre {
+  margin-block: 12px;
+  padding: 14px;
+}
+
+.chat-markdown .aui-md-inline-code {
+  padding: 2px 5px;
+}
+
+.chat-markdown .aui-md-h1,
+.chat-markdown .aui-md-h2 {
+  margin-block: 18px 8px;
+}
+
+.chat-markdown .aui-md-h3 {
+  margin-block: 16px 6px;
+}
+
+.chat-markdown .aui-md-h4 {
+  margin-block: 14px 5px;
+}
+
+.chat-markdown .aui-md-h5,
+.chat-markdown .aui-md-h6 {
+  margin-block: 12px 4px;
+}
+
+.chat-markdown
+  :is(
+    .aui-md-p,
+    .aui-md-h1,
+    .aui-md-h2,
+    .aui-md-h3,
+    .aui-md-h4,
+    .aui-md-h5,
+    .aui-md-h6
+  ):first-child {
+  margin-block-start: 0;
+}
+
+.chat-markdown
+  :is(
+    .aui-md-p,
+    .aui-md-h1,
+    .aui-md-h2,
+    .aui-md-h3,
+    .aui-md-h4,
+    .aui-md-h5,
+    .aui-md-h6
+  ):last-child {
+  margin-block-end: 0;
+}
+
+/* 单元格保留最小列宽：避免宽表把 impossible / IPv4 这类单词和被连字符分割的
+   技术串挤成 1 字符一条；整体超宽时由 .aui-md-table-wrapper 横向滚动。
+   断词策略以 main.css 的 .chat-markdown th/td 规则为准（不硬拆单词）。 */
+.chat-markdown .aui-md-th,
+.chat-markdown .aui-md-td {
+  min-width: 5.5rem;
+}
+
+/* 宽表（≥6 列）收紧字号与内边距：7 列的测试/发现表在对话列宽下必然超出，
+   收紧后可以完整放下，避免最后一列被裁切、必须横向滚动才能看全。 */
+.chat-markdown .aui-md-table:has(thead tr > th:nth-child(6)) :is(.aui-md-th, .aui-md-td) {
+  min-width: 4rem;
+  padding: 5px 8px;
+  font-size: 12px;
+}
+
+.chat-markdown .aui-md-tr:last-child > .aui-md-td {
+  border-bottom-width: 0;
+}

@@ -8,6 +8,7 @@ import {
   CollapsibleTrigger
 } from '@renderer/components/ui/collapsible'
 import { cn } from '@renderer/lib/utils'
+import { mono } from './surfaces'
 
 const ANIMATION_DURATION = 200
 
@@ -83,12 +84,15 @@ export type ToolGroupTriggerProps = React.ComponentProps<typeof CollapsibleTrigg
   count?: number
   active?: boolean
   label?: React.ReactNode
+  /** 运行耗时文案（如 "12s"）；传入即渲染，运行中由调用方每秒刷新 */
+  elapsed?: string
 }
 
 function ToolGroupTrigger({
   count = 0,
   active = false,
   label,
+  elapsed,
   className,
   ...props
 }: ToolGroupTriggerProps): React.ReactNode {
@@ -125,6 +129,17 @@ function ToolGroupTrigger({
       >
         {displayLabel}
       </span>
+      {elapsed !== undefined ? (
+        <span
+          data-slot="tool-group-trigger-elapsed"
+          className={cn(
+            'aui-tool-group-trigger-elapsed text-foreground/40 shrink-0 tabular-nums',
+            mono
+          )}
+        >
+          {elapsed}
+        </span>
+      ) : null}
       <ChevronDownIcon
         data-slot="tool-group-trigger-chevron"
         className={cn(

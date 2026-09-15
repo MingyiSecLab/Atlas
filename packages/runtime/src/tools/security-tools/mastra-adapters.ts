@@ -77,15 +77,22 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
   const httpRequestTool = createTool({
     id: 'http_request',
     description:
-      '发送 HTTP 请求并获取响应状态、头部信息与正文。支持持久化会话 Cookie 与自动跟随重定向。用于连通性探测、登录验证与接口测试。' +
-      '参数：url (必填), method (GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS, 默认 GET), headers (可选 JSON 字符串), body (可选请求体), followRedirects (默认 true), timeout (可选超时毫秒数)。',
+      '发送 HTTP 请求并获取响应状态、头部信息、耗时、重定向链与正文。支持持久化会话 Cookie（含 Domain/Path/Secure/HttpOnly/SameSite/过期语义）与自动跟随重定向；' +
+      '超长正文与二进制正文会落盘到 .agents/pentest/http/ 并回传文件路径供 view/search_content 查阅。用于连通性探测、登录验证与接口测试。' +
+      '参数：url (必填), method (GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS, 默认 GET), headers (可选 JSON 字符串), body (字符串请求体),' +
+      'jsonBody (对象或 JSON 字符串, 自动设置 Content-Type: application/json), form (对象, 自动编码为 application/x-www-form-urlencoded),' +
+      'followRedirects (默认 true), maxRedirects (默认 5), timeout (可选超时毫秒数), saveResponse (默认 true)。',
     inputSchema: z.object({
       url: z.string().describe('目标 HTTP/HTTPS URL'),
       method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'HEAD', 'OPTIONS']).optional().default('GET'),
       headers: z.string().optional().describe('JSON 格式的请求头键值对，例如 "{\\"Authorization\\":\\"Bearer ...\\"}"'),
-      body: z.string().optional().describe('POST/PUT/PATCH 请求体字符串'),
+      body: z.string().optional().describe('POST/PUT/PATCH 请求体字符串（不能与 jsonBody/form 同时使用）'),
+      jsonBody: z.union([z.record(z.string(), z.unknown()), z.string()]).optional().describe('JSON 请求体：对象会被序列化，自动补齐 Content-Type: application/json（已有 content-type 头时不覆盖）'),
+      form: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])).optional().describe('表单字段对象，自动编码为 application/x-www-form-urlencoded 请求体（适合登录表单/CSRF 提交）'),
       followRedirects: z.boolean().optional().default(true).describe('是否自动跟随 3xx 重定向并自动保持传递会话 Cookie。登录验证时建议开启。默认为 true。'),
-      timeout: z.number().optional().default(10000).describe('超时时间 (毫秒)')
+      maxRedirects: z.number().optional().default(5).describe('跟随重定向的最大跳数，默认 5'),
+      timeout: z.number().optional().default(10000).describe('超时时间 (毫秒)，上限 25000'),
+      saveResponse: z.boolean().optional().default(true).describe('超长/二进制响应正文是否落盘到 .agents/pentest/http/，默认 true')
     }),
     execute: async (inputData) => {
       const { url, ...args } = inputData

@@ -106,7 +106,10 @@ ENV TZ=Asia/Shanghai
 ENV PLAYWRIGHT_MCP_BROWSER=chromium
 ENV PYTHONUNBUFFERED=1
 
-COPY ./AGENTS.md /home/kali/workspace/AGENTS.md
+# 注意：不要放在 /home/kali/workspace 下 —— 该路径会被宿主工作区 bind mount
+# （-v ~/.atlas/sandbox_workspace:/home/kali/workspace）整体遮蔽，镜像里的文件在
+# 运行时会完全不可见。放在 $HOME 根下才能被 kali_file_read 按绝对路径读到。
+COPY ./AGENTS.md /home/kali/AGENTS.md
 
 WORKDIR /home/kali/workspace
 

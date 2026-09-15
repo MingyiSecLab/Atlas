@@ -1,9 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import {
-  createSecurityMastraTools,
-  createControllerConfig,
-  pentestMode
-} from '../src/index.js'
+import { createSecurityMastraTools, createControllerConfig, pentestMode } from '../src/index.js'
 
 describe('security mastra tools integration', () => {
   it('creates full set of security tools with proper tool shapes', () => {
@@ -74,10 +70,14 @@ describe('security mastra tools integration', () => {
       expect(resolved.custom_func_tool).toBe(dummyTool)
     }
   })
-  it('pentestMode includes bash and security tools in availableTools', () => {
+  it('pentestMode includes read-only workspace and security tools in availableTools', () => {
     expect(pentestMode.availableTools).toContain('init_pentest_engagement')
     expect(pentestMode.availableTools).toContain('record_pentest_finding')
-    expect(pentestMode.availableTools).toContain('bash')
+    // 工作区工具的真实暴露名（非 read/grep/find，见 @mastra/code-sdk TOOL_NAME_OVERRIDES）
+    expect(pentestMode.availableTools).toContain('view')
+    expect(pentestMode.availableTools).toContain('search_content')
+    expect(pentestMode.availableTools).toContain('find_files')
+    expect(pentestMode.availableTools).toContain('file_stat')
     expect(pentestMode.availableTools).toContain('http_request')
     expect(pentestMode.availableTools).toContain('extract_js_endpoints')
     expect(pentestMode.availableTools).toContain('detect_auth_scheme')
@@ -96,7 +96,7 @@ describe('security mastra tools integration', () => {
     expect(pentestMode.instructions).toContain('record_pentest_finding')
     expect(pentestMode.instructions).toContain('http_request')
     expect(pentestMode.instructions).toContain('extract_js_endpoints')
-    expect(pentestMode.instructions).toContain('bash')
+    expect(pentestMode.instructions).toContain('view / search_content')
     expect(pentestMode.instructions).toContain('Tool Call')
   })
 
@@ -208,10 +208,51 @@ describe('security mastra tools integration', () => {
     }
   })
 
+  it('forwards jsonBody, form, and response options through the mastra adapter', async () => {
+    const { createServer } = await import('node:http')
+    const { AddressInfo } = await import('node:net')
+
+    const server = createServer((req, res) => {
+      let raw = ''
+      req.on('data', (chunk) => {
+        raw += chunk
+      })
+      req.on('end', () => {
+        res.writeHead(200, { 'content-type': 'text/plain' })
+        res.end(`ct=${req.headers['content-type']} body=${raw}`)
+      })
+    })
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', () => resolve()))
+    const port = (server.address() as AddressInfo).port
+
+    try {
+      const tools = createSecurityMastraTools({ workspacePath: '/tmp/test-workspace' })
+
+      const json = await tools.http_request.execute({
+        url: `http://127.0.0.1:${port}/echo`,
+        method: 'POST',
+        jsonBody: { user: 'admin' },
+        saveResponse: false
+      })
+      expect(json).toContain('ct=application/json')
+      expect(json).toContain('body={"user":"admin"}')
+
+      const form = await tools.http_request.execute({
+        url: `http://127.0.0.1:${port}/echo`,
+        method: 'POST',
+        form: { user: 'admin', remember: true },
+        maxRedirects: 2
+      })
+      expect(form).toContain('ct=application/x-www-form-urlencoded')
+      expect(form).toContain('body=user=admin&remember=true')
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+    }
+  })
+
   it('isolates pentest document artifacts under ~/.atlas/sessions/<sessionId> when no project is selected', async () => {
-    const { resolvePentestArtifactsRoot, createDocumentAppTool, createDocumentEndpointTool } = await import(
-      '../src/index.js'
-    )
+    const { resolvePentestArtifactsRoot, createDocumentAppTool, createDocumentEndpointTool } =
+      await import('../src/index.js')
 
     // 1. 无项目工程（开发目录或默认工作区） -> 隔离至 ~/.atlas/sessions/<sessionId>
     const sessionRoot = resolvePentestArtifactsRoot({
@@ -229,4 +270,3 @@ describe('security mastra tools integration', () => {
     expect(projectRoot).toBe('/Users/test/workspace/my-target-project')
   })
 })
-

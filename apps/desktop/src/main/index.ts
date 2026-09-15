@@ -50,18 +50,42 @@ async function shutdownServices(): Promise<void> {
   }
 }
 
+// 自定义标题栏高度。必须与渲染层 TopHeader 的 height（42px）保持一致：
+// Windows 下它同时作为 titleBarOverlay 的高度，让系统绘制的窗口按钮与顶栏对齐。
+const WINDOW_TITLEBAR_HEIGHT = 42
+
 function createWindow(): void {
+  const isMac = process.platform === 'darwin'
+  const isWindows = process.platform === 'win32'
+  const isLinux = process.platform === 'linux'
+
   // Create the browser window.
   const mainWindow = new BrowserWindow({
     width: 1180,
     height: 780,
     minWidth: 900,
     minHeight: 600,
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 16, y: 15 },
     show: false,
     autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    // 窗口外壳按平台展开差异项，公共配置只写一次（避免 if/else 复制两套窗口参数）：
+    // - macOS：hiddenInset 保留原生红绿灯，trafficLightPosition 仅在 darwin 生效；
+    // - Windows：无边框 + titleBarOverlay，窗口按钮仍由系统绘制，因此 Snap Layouts、
+    //   系统右键菜单、高 DPI 缩放全部保留；按钮区宽度由渲染层读
+    //   env(titlebar-area-*) 让位，不需要主进程回传像素值；
+    // - Linux：维持系统原生边框（窗口装饰交给桌面环境），只补任务栏图标。
+    ...(isMac && {
+      titleBarStyle: 'hiddenInset' as const,
+      trafficLightPosition: { x: 16, y: 15 }
+    }),
+    ...(isWindows && {
+      frame: false,
+      titleBarOverlay: {
+        height: WINDOW_TITLEBAR_HEIGHT,
+        color: '#00000000', // 透明，让渲染层顶栏背景透上来
+        symbolColor: '#3f3f46' // 图标色跟随应用浅色主题；置灰避免在浅色顶栏上过曝
+      }
+    }),
+    ...(isLinux && { icon }),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,

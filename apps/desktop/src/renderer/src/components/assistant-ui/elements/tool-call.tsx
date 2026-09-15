@@ -19,6 +19,8 @@ export interface ToolCallProps {
   onOpenChange: (open: boolean) => void
   detail?: ReactNode
   isError?: boolean
+  /** 耗时文案（如 "3.2s" / 运行中的 "12s"）；调用方决定取值口径 */
+  elapsed?: string
   className?: string
 }
 
@@ -33,6 +35,7 @@ export function ToolCall({
   onOpenChange,
   detail,
   isError = false,
+  elapsed,
   className
 }: ToolCallProps): React.ReactNode {
   return (
@@ -66,13 +69,18 @@ export function ToolCall({
             {query}
           </span>
         )}
-        <span className="ms-auto flex w-4 items-center justify-end">
-          {!running &&
-            (isError ? (
-              <XIcon className="fade-in zoom-in-90 animate-in size-3.5 text-red-600 duration-200 dark:text-red-400" />
-            ) : (
-              <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 text-emerald-500 duration-200" />
-            ))}
+        <span className="ms-auto flex shrink-0 items-center gap-1.5">
+          {elapsed !== undefined ? (
+            <span className={cn(mono, 'text-foreground/40 tabular-nums')}>{elapsed}</span>
+          ) : null}
+          <span className="flex w-4 items-center justify-end">
+            {!running &&
+              (isError ? (
+                <XIcon className="fade-in zoom-in-90 animate-in size-3.5 text-red-600 duration-200 dark:text-red-400" />
+              ) : (
+                <CheckIcon className="fade-in zoom-in-90 animate-in size-3.5 text-emerald-500 duration-200" />
+              ))}
+          </span>
         </span>
       </CollapsibleTrigger>
       <CollapsibleContent className={cn(collapsePanel, 'outline-none')}>
@@ -96,7 +104,7 @@ export function ToolCall({
             ) : null}
             <div className="px-3.5 pt-2 pb-2.5">
               <p className={cn(mono, 'text-foreground/35 mb-1')}>输出</p>
-              <p className="text-foreground/90 font-mono whitespace-pre-wrap break-all">
+              <p className="text-foreground/90 font-mono break-words whitespace-pre-wrap">
                 {result || '无输出'}
               </p>
             </div>

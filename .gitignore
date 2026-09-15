@@ -25,6 +25,8 @@ apps/desktop/out/
 playwright-report/
 test-results/
 .mingyi/
+# electron-vite 转译 electron.vite.config.ts 时在同目录生成的临时配置副本
+apps/desktop/electron.vite.config.*.mjs
 
 # Operating system metadata
 .DS_Store

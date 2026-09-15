@@ -6,6 +6,7 @@ import {
   ToolGroupContent
 } from '@renderer/components/assistant-ui/elements/tool-group'
 import { ToolCallCard } from './ToolCallCard'
+import { formatLiveElapsedMs, useRunningClock } from '../useRunningClock'
 import type { ToolGroupSummary } from './types'
 
 interface ToolGroupProps {
@@ -15,6 +16,7 @@ interface ToolGroupProps {
 
 export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.ReactNode {
   const isRunning = summary.status === 'running'
+  const clock = useRunningClock(isRunning)
 
   // 如果正在运行且未明确指定，默认展开；完成后默认折叠
   const [isOpen, setIsOpen] = useState(() => {
@@ -40,6 +42,17 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
   }, [summary.steps])
   const totalTaskSteps = taskStepIndices.length
 
+  // 实时总耗时 = 已结算步骤耗时之和 + 当前步骤已运行时长
+  // （单个步骤自身的计时由各自的 ToolCallCard 自行维护）
+  const runningStepStartedAt = summary.runningStepStartedAt
+  const liveElapsedLabel =
+    clock !== null
+      ? formatLiveElapsedMs(
+          summary.totalElapsedMs +
+            (runningStepStartedAt !== undefined ? Math.max(0, clock - runningStepStartedAt) : 0)
+        )
+      : undefined
+
   // 生成幽灵模式 (ghost) 下更具语义的触发标签
   const triggerLabel = useMemo(() => {
     const count = summary.totalCount
@@ -59,6 +72,10 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
     return isRunning ? `正在执行 ${count} 项工具调用...` : `${count} 项工具调用`
   }, [isAllSecurity, hasSecurity, isRunning, securityCount, summary.headline, summary.totalCount])
 
+  // 有实时计时时去掉省略号，避免「正在执行… 12s」两种进行时信号叠加
+  const displayLabel =
+    liveElapsedLabel !== undefined ? triggerLabel.replace(/\.{3}$/, '') : triggerLabel
+
   return (
     <div className="chat-tool-group-wrapper w-full">
       <ToolGroupRoot
@@ -67,7 +84,12 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
         onOpenChange={setIsOpen}
         className="transition-colors"
       >
-        <ToolGroupTrigger count={summary.totalCount} active={isRunning} label={triggerLabel} />
+        <ToolGroupTrigger
+          count={summary.totalCount}
+          active={isRunning}
+          label={displayLabel}
+          elapsed={liveElapsedLabel}
+        />
         <ToolGroupContent>
           {summary.steps.map((step, stepIndex) => {
             const orderInTasks = taskStepIndices.indexOf(stepIndex)

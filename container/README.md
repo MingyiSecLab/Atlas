@@ -47,6 +47,7 @@ docker run -d ^
 
 * `--network host`：使沙箱能直接访问宿主机网络及宿主机可达的内网/靶场；
 * `-v ...`：将工作区挂载到宿主机（默认集中于 `~/.atlas/sandbox_workspace`），便于实时查看生成的日志、扫描报告与截获的凭据，且与项目源码彻底隔离。
+  * ⚠️ 该挂载会**整体遮蔽**镜像内的 `/home/kali/workspace` 目录，因此不要把任何需要保留的文件放在镜像的该路径下（沙箱资产清单因此安装在 `/home/kali/AGENTS.md`）。
 
 ### 3. 测试验证
 
@@ -65,7 +66,7 @@ docker exec -it mingyi-sandbox rg -i "sqli" /home/kali/knowledges/PayloadsAllThe
 
 ## 预置资产一览
 
-详见 [AGENTS.md](./AGENTS.md)：
+详见 [AGENTS.md](./AGENTS.md)（同一份清单随镜像安装于容器内 `/home/kali/AGENTS.md`，模型可用 `kali_file_read` 读取）：
 * **知识库**：`/home/kali/knowledges/`（PayloadsAllTheThings, HackTricks 等）
 * **PoC 库**：`/home/kali/pocs/`（CVE-PoC, exphub, Awesome-POC, vulhub）
 * **工具库**：`/home/kali/tools/`（ysoserial, jwt_tool 等）

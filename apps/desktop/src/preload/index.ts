@@ -34,6 +34,12 @@ import type {
 
 // Custom APIs for renderer
 const api = {
+  /**
+   * 窗口外壳的平台标识（只读）。
+   * 仅用于顶栏留白、系统窗口按钮让位这类外壳差异；业务逻辑不要依赖它，
+   * 需要跨平台行为差异时优先在主进程收敛（例如 BrowserWindow 的按平台展开）。
+   */
+  platform: process.platform,
   createTerminal: (
     id: string,
     options?: { cols?: number; rows?: number; cwd?: string; shell?: string }

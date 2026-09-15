@@ -73,12 +73,23 @@ export class AssistantRunAccumulator {
     return this.elapsed
   }
 
+  /** 各工具首次被观测到的时间戳（毫秒），key 为 toolCallId；运行中步骤据此推算实时耗时 */
+  get startedAt(): ReadonlyMap<string, number> {
+    return this.firstSeenAt
+  }
+
   /** 合并后的全部 part（按消息首见顺序展开，应用状态 overlay 与耗时） */
   get parts(): ThreadAssistantMessagePart[] {
     const parts: ThreadAssistantMessagePart[] = []
     for (const message of this.messages.values()) {
       parts.push(
-        ...runtimeBlocksToParts(message.blocks ?? [], 'assistant', this.overlay, this.elapsed)
+        ...runtimeBlocksToParts(
+          message.blocks ?? [],
+          'assistant',
+          this.overlay,
+          this.elapsed,
+          this.firstSeenAt
+        )
       )
     }
     return parts

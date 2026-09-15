@@ -56,6 +56,80 @@ a,
   -webkit-app-region: no-drag !important;
 }
 
+/* ==========================================================================
+   窗口外壳平台适配（自定义标题栏）
+   ==========================================================================
+   主进程按平台创建窗口：macOS 用 hiddenInset 保留原生红绿灯，Windows 用
+   frame:false + titleBarOverlay 让系统绘制窗口按钮，Linux 维持原生边框。
+
+   渲染层只负责让出「系统窗口控件」占用的区域，平台差异只保留在右侧
+   （.topheader--win32 读 WCO 环境变量）；左侧按钮组在各平台位置一致，
+   统一右对齐到侧边栏内容右缘，不再分叉。
+
+   这些规则必须保持"无层"（不放进 @layer），否则会被本文件顶部的
+   `* { margin: 0; padding: 0 }` 重置盖掉。同理，不要在组件里用 Tailwind 的
+   padding/margin 工具类来写这些留白。 */
+
+/* 顶栏的水平留白。
+   左侧刻意不按平台分叉：按钮组右对齐到侧边栏内容右缘，同一个数值同时满足
+   两个平台的原因 ——
+   - macOS：红绿灯从 x=16 起、宽约 54px，136px 保证按钮组落在其右侧；
+   - Windows / Linux：左侧没有系统控件，136px 纯粹用来贴合侧边栏菜单。
+   侧边栏宽度或按钮数量变化时，只改下面两个变量。 */
+.topheader {
+  /* 左侧按钮组水平位置的两个输入：
+     - 侧边栏内容区右缘 = 侧边栏宽度 240px − 自身 8px 内边距（Sidebar.tsx）；
+     - 按钮组宽度 = 3 × 28px 按钮 + 2 × 6px gap（.topheader-left-rail 的 gap）。
+     两者相减 = 136px。 */
+  --topheader-sidebar-content-right: 232px;
+  --topheader-left-rail-width: 96px;
+
+  /* Windows 窗口按钮区宽度。窗口按钮覆盖在右上角，宽度随 DPI、缩放与窗口状态
+     变化，交给 WCO 环境变量计算；env() 不可用时回退到 100vw 即归零。
+     这里用 vw 而不是 %：百分比相对"包含块"解析，一旦有人给顶栏祖先加上
+     position: relative 就会静默算错；vw 恒定等于窗口宽度（body 已 overflow: hidden，
+     不存在滚动条误差）。 */
+  --topheader-controls-width: 0px;
+
+  padding-left: calc(var(--topheader-sidebar-content-right) - var(--topheader-left-rail-width));
+}
+
+.topheader--win32 {
+  --topheader-controls-width: calc(100vw - env(titlebar-area-width, 100vw));
+}
+
+/* 全屏时系统绘制窗口按钮，控件区归零，避免留出一条空带 */
+@media (display-mode: fullscreen) {
+  .topheader--win32 {
+    --topheader-controls-width: 0px;
+  }
+}
+
+/* 侧边栏收起后没有可对齐的内容右缘，按钮组整体左移 40px；
+   仍保留红绿灯余量，所以两平台同值。 */
+.topheader.is-sidebar-collapsed {
+  padding-left: 96px;
+}
+
+/* 右留白（非 contextual 布局下顶栏右栏是普通 flex 子元素，靠 padding 让位）：
+   Windows 需要绕开系统窗口按钮区。 */
+.topheader--darwin,
+.topheader--linux,
+.topheader--other {
+  padding-right: 16px;
+}
+
+.topheader--win32 {
+  padding-right: calc(8px + var(--topheader-controls-width));
+}
+
+/* contextual 布局下的右栏是绝对定位（right: 0），此时 padding 不产生偏移，
+   改为在栏内部让位：栏背景仍覆盖到窗口右边缘、遮住按钮下方的面板内容，
+   只把按钮推离系统窗口按钮区。 */
+.topheader--win32 .topheader-right-rail.is-contextual {
+  padding-right: calc(10px + var(--topheader-controls-width));
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
@@ -3778,77 +3852,13 @@ button.tree-row {
 }
 
 .pentest-report-content {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
   font-size: 11.5px;
   line-height: 1.6;
   color: #1e293b;
 }
 
-.report-h1 {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 4px 0 8px;
-  border-bottom: 1px solid #e2e8f0;
-  padding-bottom: 6px;
-}
-
-.report-h2 {
-  font-size: 13px;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 8px 0 4px;
-}
-
-.report-h3 {
-  font-size: 12px;
-  font-weight: 600;
-  color: #334155;
-  margin: 6px 0 2px;
-}
-
-.report-quote {
-  border-left: 3px solid #3b82f6;
-  background: #eff6ff;
-  padding: 6px 10px;
-  border-radius: 0 4px 4px 0;
-  color: #1e40af;
-  font-size: 11px;
-  margin: 4px 0;
-}
-
-.report-bullet {
-  margin: 0;
-  padding-left: 8px;
-}
-
-.report-step {
-  margin: 0;
-  padding-left: 16px;
-}
-
-.report-p {
-  margin: 0;
-}
-
-.report-divider {
-  border: none;
-  border-top: 1px solid #e2e8f0;
-  margin: 12px 0;
-}
-
-.pentest-report-codeblock {
-  padding: 8px 10px;
-  background: #0f172a;
-  color: #e2e8f0;
-  border-radius: 6px;
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9px;
-  overflow-x: auto;
-  line-height: 1.45;
-  margin: 4px 0;
+.dark .pentest-report-content {
+  color: #f4f4f5;
 }
 
 .pentest-empty-note {
@@ -3975,9 +3985,6 @@ button.tree-row {
 .dark .pentest-flow-node-title,
 .dark .pentest-asset-node-value,
 .dark .pentest-finding-title,
-.dark .report-h1,
-.dark .report-h2,
-.dark .report-h3,
 .dark .pentest-drawer-title,
 .dark .pentest-drawer-dd,
 .dark .asset-row-value {
@@ -4032,17 +4039,6 @@ button.tree-row {
 .dark .pentest-mode-toggle-btn.is-active {
   background: #27272a;
   color: #ffffff;
-}
-
-.dark .report-quote {
-  background: rgba(37, 99, 235, 0.15);
-  border-color: #3b82f6;
-  color: #93c5fd;
-}
-
-.dark .report-h1,
-.dark .report-divider {
-  border-color: rgba(255, 255, 255, 0.08);
 }
 
 .dark .pentest-report-btn {
@@ -5615,6 +5611,21 @@ button.tree-row {
   max-width: 100%;
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+/* 表格内禁止 anywhere 断词：列宽由内容决定，超宽时交给 .aui-md-table-wrapper 横向滚动，
+   避免 medium / impossible 这类单词被硬拆成 medi-u-m */
+.chat-markdown table,
+.aui-md table {
+  table-layout: auto;
+}
+
+.chat-markdown th,
+.chat-markdown td,
+.aui-md th,
+.aui-md td {
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .chat-markdown ul,

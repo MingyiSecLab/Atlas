@@ -45,6 +45,8 @@ export interface ToolGroupSummary {
   errorCount: number
   runningIndex?: number // 1-based 当前运行步骤编号
   runningStepName?: string
+  /** 当前运行步骤的起始时间戳（毫秒）；用于推算实时耗时 */
+  runningStepStartedAt?: number
   categoryPills: string[]
   headline: string
   /** 已结算步骤的耗时总和（毫秒）；0 表示无计时数据 */
@@ -183,6 +185,7 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
 
   // 2. 文件操作类别
   if (
+    name === 'view' ||
     name === 'view_file' ||
     name === 'read_file' ||
     name === 'write_to_file' ||
@@ -371,6 +374,7 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
   let isRunning = false
   let runningIndex: number | undefined
   let runningStepName: string | undefined
+  let runningStepStartedAt: number | undefined
 
   const categoryMap = new Map<string, number>()
   // 收集并合并每个文件的 diff 统计 (assistant-ui Tool Timeline Stats)
@@ -382,6 +386,7 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
       isRunning = true
       if (runningIndex === undefined) {
         runningIndex = idx + 1
+        runningStepStartedAt = step.toolBlock.startedAt
         const actionDesc = step.parsed.verb
           ? `${step.parsed.verb} ${step.parsed.chip}`
           : step.parsed.displayName || step.toolBlock.name
@@ -451,6 +456,7 @@ export function calculateToolGroupSummary(steps: ToolGroupStep[]): ToolGroupSumm
     errorCount,
     runningIndex,
     runningStepName,
+    runningStepStartedAt,
     categoryPills,
     headline,
     totalElapsedMs,

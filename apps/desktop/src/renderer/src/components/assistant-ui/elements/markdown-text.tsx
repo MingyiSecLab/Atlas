@@ -165,7 +165,7 @@ const defaultComponents = {
   ul: ({ className, ...props }) => (
     <ul
       className={cn(
-        'aui-md-ul marker:text-muted-foreground my-(--density-gap) ps-6 list-outside list-disc space-y-1 [&_ul]:my-1 [&_ul]:ps-5 [&_ol]:my-1 [&_ol]:ps-5',
+        'aui-md-ul marker:text-muted-foreground my-(--density-gap) ps-6 list-outside list-disc space-y-1.5 [&_ul]:my-1 [&_ul]:ps-5 [&_ol]:my-1 [&_ol]:ps-5',
         className
       )}
       {...props}
@@ -174,7 +174,7 @@ const defaultComponents = {
   ol: ({ className, ...props }) => (
     <ol
       className={cn(
-        'aui-md-ol marker:text-muted-foreground my-(--density-gap) ps-6.5 list-outside list-decimal space-y-1 [&_ul]:my-1 [&_ul]:ps-5 [&_ol]:my-1 [&_ol]:ps-5',
+        'aui-md-ol marker:text-muted-foreground my-(--density-gap) ps-6.5 list-outside list-decimal space-y-1.5 [&_ul]:my-1 [&_ul]:ps-5 [&_ol]:my-1 [&_ol]:ps-5',
         className
       )}
       {...props}
@@ -196,9 +196,14 @@ const defaultComponents = {
     />
   ),
   table: ({ className, ...props }) => (
-    <div className="aui-md-table-wrapper my-(--density-gap) overflow-x-auto">
+    // 注意：这里的 px-3 / py-2 / my-(--density-gap) 等“仅设置间距”的 Tailwind
+    // 工具类在 Desktop 里不生效 —— main.css 顶部的 `* { margin: 0; padding: 0 }`
+    // 是无层样式，优先级高于 @layer utilities。markdown 的间距统一在
+    // src/renderer/src/assets/chat-ui.css 的「Chat Markdown 排版补充」区块用
+    // 无层规则维护，改间距请改那里。
+    <div className="aui-md-table-wrapper my-(--density-gap) overflow-x-auto rounded-xl border border-border/80 bg-card p-1 shadow-sm">
       <table
-        className={cn('aui-md-table w-full border-separate border-spacing-0', className)}
+        className={cn('aui-md-table w-full border-collapse text-[13px]', className)}
         {...props}
       />
     </div>
@@ -206,7 +211,7 @@ const defaultComponents = {
   th: ({ className, ...props }) => (
     <th
       className={cn(
-        'aui-md-th bg-muted px-3 py-1.5 text-start font-medium first:rounded-ss-lg last:rounded-se-lg [[align=center]]:text-center [[align=right]]:text-right',
+        'aui-md-th border-b border-r border-border/80 bg-muted/90 px-3 py-2 text-start text-[13px] font-semibold whitespace-nowrap text-foreground/90 last:border-r-0 [[align=center]]:text-center [[align=right]]:text-right',
         className
       )}
       {...props}
@@ -215,7 +220,7 @@ const defaultComponents = {
   td: ({ className, ...props }) => (
     <td
       className={cn(
-        'aui-md-td border-muted-foreground/20 border-s border-b px-3 py-1.5 text-start last:border-e [[align=center]]:text-center [[align=right]]:text-right',
+        'aui-md-td border-b border-r border-border/50 px-3 py-2 text-start align-top text-foreground/90 last:border-r-0 [[align=center]]:text-center [[align=right]]:text-right',
         className
       )}
       {...props}
@@ -223,10 +228,7 @@ const defaultComponents = {
   ),
   tr: ({ className, ...props }) => (
     <tr
-      className={cn(
-        'aui-md-tr m-0 border-b p-0 first:border-t [&:last-child>td:first-child]:rounded-es-lg [&:last-child>td:last-child]:rounded-ee-lg',
-        className
-      )}
+      className={cn('aui-md-tr m-0 p-0 transition-colors hover:bg-muted/40', className)}
       {...props}
     />
   ),

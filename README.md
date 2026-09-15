@@ -20,6 +20,12 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
     <td align="center"><img src="docs/screenshots/workflow-execution.png" alt="工作运行截图" width="100%" /></td>
     <td align="center"><img src="docs/screenshots/workspace-execution.png" alt="工作成果截图" width="100%" /></td>
   </tr>
+  <tr>
+    <td colspan="2" align="center"><b>多安全等级实证验证与漏洞发现面板</b></td>
+  </tr>
+  <tr>
+    <td colspan="2" align="center"><img src="docs/screenshots/pentest-verification.png" alt="渗透测试多等级验证结果与漏洞发现面板" width="100%" /></td>
+  </tr>
 </table>
 
 ## 功能截图

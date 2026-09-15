@@ -7,7 +7,8 @@ import { PentestToolUI } from './PentestToolUI'
 import { SearchToolUI } from './SearchToolUI'
 import { TaskToolUI } from './TaskToolUI'
 import { TerminalToolUI } from './TerminalToolUI'
-import { analyzeToolCall } from './types'
+import { analyzeToolCall, formatElapsedMs } from './types'
+import { formatLiveElapsedMs, useRunningClock } from '../useRunningClock'
 
 interface ToolCallCardProps {
   block: ToolBlock
@@ -27,6 +28,19 @@ export function ToolCallCard({
   const [isOpen, setIsOpen] = useState(defaultOpen)
   const parsed = useMemo(() => analyzeToolCall(block), [block])
   const hasContent = Boolean(block.input || block.output || block.outputArtifact)
+
+  // 运行中步骤没有结算耗时，用 startedAt + 秒级时钟现场推算；结算后回落到 elapsedMs。
+  // 卡片自己持有计时，分组外的单个工具调用也能获得同样的实时反馈。
+  const clock = useRunningClock(block.status === 'running')
+  const liveElapsedLabel =
+    clock !== null && block.startedAt !== undefined
+      ? formatLiveElapsedMs(Math.max(0, clock - block.startedAt))
+      : undefined
+  const settledElapsedLabel =
+    block.elapsedMs !== undefined && block.elapsedMs > 0
+      ? formatElapsedMs(block.elapsedMs)
+      : undefined
+  const elapsedLabel = liveElapsedLabel ?? settledElapsedLabel
 
   const renderToolBody = (): React.ReactNode => {
     switch (parsed.category) {
@@ -84,6 +98,7 @@ export function ToolCallCard({
         result={block.output || ''}
         running={block.status === 'running'}
         isError={isError}
+        elapsed={elapsedLabel}
         open={isOpen}
         onOpenChange={setIsOpen}
         detail={hasContent ? renderToolBody() : undefined}

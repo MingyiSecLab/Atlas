@@ -2,6 +2,9 @@
 
 本容器是 Mingyi 智能体专属的安全评估与渗透测试隔离沙箱。大脑运行在宿主桌面端，本环境提供开箱即用的专业命令行工具链、离线知识库与漏洞利用 PoC 库。
 
+> 本文件随镜像安装于 `/home/kali/AGENTS.md`（由 `container/Dockerfile` 的 `COPY` 指令落位），可通过 `kali_file_read /home/kali/AGENTS.md` 读取。
+> 切勿改放到 `/home/kali/workspace/` 下：该路径会被宿主工作区 bind mount（`-v ~/.atlas/sandbox_workspace:/home/kali/workspace`）整体遮蔽，镜像内的文件在运行时会完全不可见。
+
 ---
 
 ## 1. 核心工作区
@@ -24,13 +27,14 @@
   * `exphub`: 知名框架与应用漏洞利用合集
   * `Awesome-POC`: 优质 PoC 汇总
   * `vulhub`: 常见漏洞靶场复现参考与配套利用
+  * `2023Hvv_`: 护网实战漏洞利用与技战法合集
 
 * **辅助工具**：`/home/kali/tools/`
   * `ysoserial.jar`: Java 反序列化 Payload 生成器
   * `jwt_tool`: JWT 令牌安全性审计与伪造
   * `jdwp-shellifier`: JDWP 调试端口 RCE 脚本
 
-* **Nuclei 漏洞扫描模板**：`/home/kali/.local/nuclei-templates/`
+* **Nuclei 漏洞扫描模板**：`/home/kali/.local/nuclei-templates/`（已在 `/home/kali/.config/nuclei/config.yaml` 设为默认模板目录并关闭更新检查，**勿联网更新模板**）
 
 ---
 
@@ -38,12 +42,13 @@
 * **Web 与资产发现**：`nuclei`, `katana`, `dalfox`, `dirsearch`, `nikto`, `naabu`, `gitleaks`, `sqlmap`, `gobuster`
 * **网络与协议审计**：`nmap`, `ncat`, `chisel`, `proxychains4`, `hydra`, `sshpass`, `rlwrap`
 * **内网与域安全**：`bloodyad`, `coercer`, `enum4linux-ng`, `pwncat`, `netexec`, `/usr/bin/impacket-*`, `kerbrute`
-* **二进制路径说明**：
-  * `chisel` 位于 `/usr/share/chisel-common-binaries/` 或系统 PATH
-  * `kerbrute` 位于 `/usr/local/bin/kerbrute`
-  * `impacket` 系列工具位于 `/usr/bin/impacket-*`
-* **高性能检索**：`rg` (ripgrep), `fd`
-* **动态抓取**：`playwright-cli` (Chromium 已就绪)
+* **二进制路径说明（已在运行容器内实测）**：
+  * `chisel` **不在 PATH**：`chisel-common-binaries` 只提供带版本号的二进制，位于 `/usr/share/chisel-common-binaries/chisel_<version>_linux_amd64`（amd64 镜像为 `chisel_1.12.0-rc3_linux_amd64`，调用前先 `ls` 确认版本）
+  * `kerbrute` 位于 `/usr/local/bin/kerbrute`（仅 amd64 构建包含；`npm run container:build` 使用 `--platform linux/amd64`）
+  * `impacket` 系列工具位于 `/usr/bin/impacket-*`（共 61 个）
+  * `cloudfox` 位于 `/usr/local/bin/cloudfox`；`tccli` / `awscli` 由 pip 安装
+* **高性能检索**：`rg` (ripgrep), `fd` —— 检索知识库应先用 `rg` 定位文件与行号，不要直接整文件读取巨型 Markdown
+* **动态抓取**：`playwright-cli` (Chromium 已就绪，位于 `/home/kali/.cache/ms-playwright/`)，用于 SPA 渲染、DOM XSS 验证等需要 JS 执行的场景
 
 ---
 
