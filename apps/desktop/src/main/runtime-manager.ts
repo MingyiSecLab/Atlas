@@ -10,10 +10,13 @@ export class DesktopRuntimeManager {
   private lifecycle: Promise<void> = Promise.resolve()
 
   constructor(
-    workspacePath = process.cwd(),
+    workspacePath?: string,
     private readonly dataRoot?: string
   ) {
-    this.workspacePath = resolve(workspacePath)
+    const fallback = this.dataRoot
+      ? join(this.dataRoot, 'workspace')
+      : join(homedir(), '.atlas', 'workspace')
+    this.workspacePath = resolve(workspacePath || fallback)
   }
 
   getWorkspacePath(): string {

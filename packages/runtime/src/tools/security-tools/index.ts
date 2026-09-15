@@ -7,7 +7,7 @@
  */
 export { createCrawlAuthenticatedTool } from './crawlAuthenticated.js'
 export { createDetectAuthSchemeTool } from './detectAuthScheme.js'
-export { createDocumentAppTool } from './documentApp.js'
+export { createDocumentAppTool, resolvePentestArtifactsRoot } from './documentApp.js'
 export { createDocumentEndpointTool } from './documentEndpoint.js'
 export { createExtractJsEndpointsTool } from './extract-js-endpoints.js'
 export { createHttpRequestTool } from './http-request.js'

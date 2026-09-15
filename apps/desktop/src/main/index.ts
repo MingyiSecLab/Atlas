@@ -26,7 +26,8 @@ let disposeProviderService = (): void => undefined
 let disposeRuntimeService = (): void => undefined
 let disposePentestService = (): void => undefined
 let disposeFileService = (): void => undefined
-const runtimeManager = new DesktopRuntimeManager(process.env.MINGYI_WORKSPACE_PATH, atlasHome)
+const defaultWorkspace = process.env.MINGYI_WORKSPACE_PATH || join(atlasHome, 'workspace')
+const runtimeManager = new DesktopRuntimeManager(defaultWorkspace, atlasHome)
 let shutdownStarted = false
 let servicesStopped = false
 

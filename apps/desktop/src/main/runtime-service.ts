@@ -14,7 +14,7 @@ import type {
 } from '@mingyi/runtime'
 import type { WebContents } from 'electron'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import { stat } from 'node:fs/promises'
+import { mkdir, stat } from 'node:fs/promises'
 import { basename, resolve } from 'node:path'
 import { RUNTIME_IPC, type DesktopWorkspaceInfo } from '../shared/runtime-ipc'
 import type { DesktopRuntimeManager } from './runtime-manager'
@@ -290,6 +290,7 @@ function mcpDisabledInput(value: unknown): {
 
 async function validateWorkspace(path: string): Promise<string> {
   const resolved = resolve(path)
+  await mkdir(resolved, { recursive: true })
   const detail = await stat(resolved)
   if (!detail.isDirectory()) throw new Error('Workspace path must be a directory.')
   return resolved

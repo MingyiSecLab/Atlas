@@ -207,5 +207,26 @@ describe('security mastra tools integration', () => {
       await new Promise<void>((resolve) => server.close(() => resolve()))
     }
   })
+
+  it('isolates pentest document artifacts under ~/.atlas/sessions/<sessionId> when no project is selected', async () => {
+    const { resolvePentestArtifactsRoot, createDocumentAppTool, createDocumentEndpointTool } = await import(
+      '../src/index.js'
+    )
+
+    // 1. 无项目工程（开发目录或默认工作区） -> 隔离至 ~/.atlas/sessions/<sessionId>
+    const sessionRoot = resolvePentestArtifactsRoot({
+      workspacePath: '/Users/test/workspace/mingyi-tot/apps/desktop',
+      sessionId: 'session-uuid-1234'
+    })
+    expect(sessionRoot).toContain('.atlas')
+    expect(sessionRoot).toContain('sessions/session-uuid-1234')
+
+    // 2. 明确选定了特定项目文件夹 -> 正常落入项目根目录
+    const projectRoot = resolvePentestArtifactsRoot({
+      workspacePath: '/Users/test/workspace/my-target-project',
+      sessionId: 'session-uuid-1234'
+    })
+    expect(projectRoot).toBe('/Users/test/workspace/my-target-project')
+  })
 })
 

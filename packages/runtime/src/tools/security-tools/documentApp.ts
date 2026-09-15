@@ -8,8 +8,10 @@
  * - 严格防路径逃逸（path traversal 拦截），保障只写在当前工作区内
  */
 import { mkdir, writeFile } from 'node:fs/promises'
-import { resolve, sep } from 'node:path'
+import { homedir } from 'node:os'
+import { join, resolve, sep } from 'node:path'
 import type { RuntimePentestTool } from '../../pentest/tools.js'
+import { sanitizeSessionDirName } from './kali-sandbox.js'
 
 const DOCUMENT_APP_DESCRIPTION = [
   'Document an identified application asset (web application, API service, cloud resource, admin panel)',
@@ -21,6 +23,26 @@ const DOCUMENT_APP_DESCRIPTION = [
 
 function sanitizeName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9-_.]/g, '_')
+}
+
+/**
+ * 解析 Pentest 资产产物持久化根目录。
+ * 契约规则：
+ * 1. 若当前会话关联了真实项目文件夹（用户在桌面端选择了文件夹项目），则存储在该工程的根目录下：`<projectRoot>/.agents/pentest/`
+ * 2. 若当前会话未关联项目文件夹（普通独立对话），则存储在系统全局用户目录中，按会话 UUID 隔离：`~/.atlas/sessions/<sessionId>/.agents/pentest/`
+ */
+export function resolvePentestArtifactsRoot(context: { workspacePath: string; sessionId?: string }): string {
+  const root = resolve(context.workspacePath)
+  const isDefaultOrDevDir =
+    root.includes('apps/desktop') ||
+    root.endsWith('mingyi-tot') ||
+    root.endsWith('.atlas') ||
+    root.endsWith('.atlas/workspace')
+  if (context.sessionId && isDefaultOrDevDir) {
+    const atlasHome = process.env.MASTRA_APP_DATA_DIR || join(homedir(), '.atlas')
+    return join(atlasHome, 'sessions', sanitizeSessionDirName(context.sessionId))
+  }
+  return root
 }
 
 export function createDocumentAppTool(): RuntimePentestTool {
@@ -59,7 +81,7 @@ export function createDocumentAppTool(): RuntimePentestTool {
         }
       }
 
-      const root = resolve(context.workspacePath)
+      const root = resolvePentestArtifactsRoot(context)
       const appsDir = resolve(root, '.agents', 'pentest', 'apps')
       if (appsDir !== root && !appsDir.startsWith(root + sep)) {
         throw new Error('Apps directory escapes the workspace root.')

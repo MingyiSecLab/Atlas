@@ -10,6 +10,7 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { resolve, sep } from 'node:path'
 import type { RuntimePentestTool } from '../../pentest/tools.js'
+import { resolvePentestArtifactsRoot } from './documentApp.js'
 
 const DOCUMENT_ENDPOINT_DESCRIPTION = [
   'Document a discovered endpoint during attack surface reconnaissance into the workspace pentest artifact repository.',
@@ -101,7 +102,7 @@ export function createDocumentEndpointTool(): RuntimePentestTool {
 
       const riskScore = computeBlackboxRiskScore(riskLevel, routePath, authRequired, method)
 
-      const root = resolve(context.workspacePath)
+      const root = resolvePentestArtifactsRoot(context)
       const targetDir = resolve(root, '.agents', 'pentest', 'endpoints', sanitizeName(appName))
       if (targetDir !== root && !targetDir.startsWith(root + sep)) {
         throw new Error('Endpoint directory escapes the workspace root.')

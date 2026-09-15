@@ -128,7 +128,7 @@ export {
   DestructiveActionError,
   isTargetInScope
 } from './pentest/index.js'
-export { createSecurityMastraTools } from './tools/security-tools/index.js'
+export { createSecurityMastraTools, resolvePentestArtifactsRoot } from './tools/security-tools/index.js'
 export {
   createKaliSandboxTools,
   KALI_SANDBOX_LOCAL_TARGET
