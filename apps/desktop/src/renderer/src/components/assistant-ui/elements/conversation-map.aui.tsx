@@ -132,20 +132,45 @@ export const ConversationMapAui: FC<ConversationMapAuiProps> = ({ side = 'left',
   const contextViewport = useThreadViewport((s) => s.element.viewport)
   const contextViewportHeight = useThreadViewport((s) => s.height.viewport)
   const [domViewport, setDomViewport] = useState<HTMLElement | null>(null)
+  const [viewportHeight, setViewportHeight] = useState(0)
 
-  useEffect(() => {
-    if (contextViewport) return
-    if (railRef.current) {
+  /**
+   * 挂载期的 effect 在这里必然失效：首屏会话还没加载完，`entries.length < 2`
+   * 让组件返回 null，effect 只能读到空 ref，而它的依赖（contextViewport）之后
+   * 再也不会变，于是永远不重跑。后果是高度停在 `100%`，父级却是 `h-0` 的 sticky
+   * 盒子 —— 刻度全部被压到视口顶端裁掉，导轨等于从未出现过。
+   * 换成 ref 回调：节点只要出现就会被捕获，之后卸载重挂也算数。
+   */
+  const attachRail = useCallback(
+    (node: HTMLDivElement | null) => {
+      railRef.current = node
+      if (!node || contextViewport) return
       const found =
-        railRef.current.closest<HTMLElement>('.chat-scroll') ??
-        railRef.current.closest<HTMLElement>('[data-markdown-scroll-container]')?.parentElement ??
-        (railRef.current.parentElement as HTMLElement | null)
-      setDomViewport(found)
-    }
-  }, [contextViewport])
+        node.closest<HTMLElement>('.chat-scroll') ??
+        node.closest<HTMLElement>('[data-markdown-scroll-container]')?.parentElement ??
+        (node.parentElement as HTMLElement | null)
+      setDomViewport((previous) => (previous === found ? previous : found))
+      setViewportHeight(found?.clientHeight ?? 0)
+    },
+    [contextViewport]
+  )
 
   const viewport = contextViewport ?? domViewport
-  const resolvedHeight = contextViewportHeight || (viewport ? `${viewport.clientHeight}px` : '100%')
+
+  // 窗口缩放、右能力面板开合都会改滚动视口高度。没有这个观察器，高度只会在
+  // 别的原因触发的重渲染里偶然刷新，刻度会停在旧尺寸算出的中心点上。
+  useEffect(() => {
+    if (!viewport) return undefined
+    const observer = new ResizeObserver(() => setViewportHeight(viewport.clientHeight))
+    observer.observe(viewport)
+    return () => observer.disconnect()
+  }, [viewport])
+
+  const resolvedHeight = contextViewportHeight
+    ? `${contextViewportHeight}px`
+    : viewportHeight
+      ? `${viewportHeight}px`
+      : '100%'
 
   const [activeId, setActiveId] = useState<string | undefined>(undefined)
   const [visibleIds, setVisibleIds] = useState<readonly string[]>([])
@@ -247,16 +272,21 @@ export const ConversationMapAui: FC<ConversationMapAuiProps> = ({ side = 'left',
 
   return (
     <div
-      ref={railRef}
+      ref={attachRail}
       data-slot="conversation-map-rail"
       className={cn('pointer-events-none sticky top-0 z-10 h-0 w-full', className)}
     >
       <div
         className={cn(
-          'pointer-events-auto absolute top-0 px-3 py-10',
+          'pointer-events-auto absolute top-0',
           side === 'right' ? 'right-0' : 'left-0'
         )}
-        style={{ height: resolvedHeight }}
+        // 留白写成内联样式而不是 px-3 py-10：历史原因是 main.css 的无层
+        // `* { margin/padding: 0 }` 会吃掉 Tailwind 的 @layer utilities（该重置
+        // 现已移入 @layer base，工具类恢复生效）。这里仍保留内联样式，是为了
+        // 让留白与高度写在一起、避免与 JS 计算的高度各漂移一处。
+        // 若要换成工具类，需确认计算值一致（padding: 40px 12px = py-10 px-3）。
+        style={{ height: resolvedHeight, padding: '40px 12px' }}
       >
         <ConversationMap
           entries={entries}

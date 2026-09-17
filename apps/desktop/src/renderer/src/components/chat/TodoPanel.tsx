@@ -91,8 +91,10 @@ export function TodoPanel({ blocks }: { blocks: readonly ChatBlock[] }): React.R
     <Collapsible
       open={open}
       onOpenChange={setOpen}
-      // 样式钩子：本组件的内边距由 chat-ui.css 的无层规则按此属性补齐
-      // （Tailwind 间距类在 Desktop 被 main.css 顶部的 `*` 重置盖掉）。
+      // 样式钩子：本组件的内边距以 chat-ui.css 的无层规则（按此属性命中）为准，
+      // 下面的 px-4 py-2 只作为兜底、数值需与之保持一致。
+      // （历史原因：main.css 的无层 `*` 重置曾让所有 Tailwind 间距类失效，
+      //  该重置现已在 @layer base 内，工具类恢复生效。）
       data-slot="todo-panel"
       className="w-full rounded-t-[inherit] border-b border-border/50 bg-background/80 px-4 py-2 text-xs backdrop-blur-sm transition-all"
     >

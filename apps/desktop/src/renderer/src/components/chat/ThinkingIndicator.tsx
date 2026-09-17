@@ -62,20 +62,43 @@ export function ThinkingIndicator({ running, blocks }: ThinkingIndicatorProps): 
     return null
   }
 
+  function getToolLabel(toolName?: string): string {
+    if (!toolName) return '正在执行工具...'
+    const name = toolName.toLowerCase()
+    const map: Record<string, string> = {
+      bash: '正在执行终端命令...',
+      terminal: '正在执行终端命令...',
+      read: '正在检索并读取文件...',
+      write: '正在创建文件...',
+      edit: '正在修改代码...',
+      grep: '正在搜索代码模式...',
+      glob: '正在扫描项目文件...',
+      todo: '正在整理任务清单...',
+      browser_subagent: '正在通过浏览器检索...',
+      web_search: '正在检索网络资料...',
+      search_web: '正在检索网络资料...',
+      pentest_analyze: '正在进行安全风险分析...',
+      pentest_execute: '正在执行授权安全验证...'
+    }
+    if (map[name]) return map[name]
+    if (name.startsWith('pentest')) return `正在执行安全测试: ${toolName}`
+    return `正在执行: ${toolName}`
+  }
+
   let iconNode: React.ReactNode
   let statusText = '正在思考...'
 
   if (runningTool) {
     if (runningTool.status === 'waiting_approval') {
-      iconNode = <ShieldAlert size={14} className="text-amber-500 shrink-0" />
-      statusText = `等待授权审批: ${runningTool.name || '工具'}`
+      iconNode = <ShieldAlert size={14} className="text-amber-500 shrink-0 animate-pulse" />
+      statusText = `等待安全授权审批: ${runningTool.name || '工具'}`
     } else {
       iconNode = <Wrench size={14} className="text-blue-500 shrink-0 animate-spin" />
-      statusText = `正在执行工具: ${runningTool.name || '操作'}`
+      statusText = getToolLabel(runningTool.name)
     }
   } else if (isReasoningActive || (hasActiveReasoning && !hasTextOutput)) {
     iconNode = <Sparkles size={14} className="text-purple-500 shrink-0 animate-pulse" />
-    statusText = '正在深度思考'
+    statusText = '正在深度思考...'
   } else if (!hasTextOutput) {
     iconNode = <Loader2 size={14} className="text-blue-500 shrink-0 animate-spin" />
     statusText = '正在组织思路...'

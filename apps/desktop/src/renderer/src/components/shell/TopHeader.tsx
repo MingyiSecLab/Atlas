@@ -175,7 +175,7 @@ export const TopHeader: React.FC<TopHeaderProps> = ({
         // 左右内边距刻意留在 main.css 的 `.topheader--<platform>` 规则里：
         // macOS 让出红绿灯、Windows 让出系统窗口按钮区（env(titlebar-area-*)）。
         // 不要搬回内联样式，也不要换成 Tailwind 的 padding 工具类 ——
-        // main.css 顶部的无层 `* { padding: 0 }` 会吃掉所有 Tailwind 间距类。
+        // 平台差异需要在此集中维护，且要与主进程 WCO 变量保持一一对应。
         userSelect: 'none',
         pointerEvents: 'none',
         zIndex: 200,

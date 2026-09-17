@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { RuntimeTokenUsage } from '@mingyi/runtime'
+import { cn } from '@renderer/lib/utils'
 import { formatTokenCount, getModelContextLimit } from './token-counter'
 
 export interface ContextGaugeProps {
@@ -43,36 +44,42 @@ export const ContextGauge: React.FC<ContextGaugeProps> = ({
   const displayProgress = Math.min(1, Math.max(0.04, usageRatio))
   const strokeOffset = circumference * (1 - displayProgress)
 
+  // 当无 token 使用量或总量为 0 时（如新会话 / 未产生消耗），不显示突兀的占位
+  if (totalTokens === 0) {
+    return null
+  }
+
   return (
     <div
-      className={`context-gauge-container ${className || ''}`}
+      className={`relative inline-flex items-center ${className || ''}`}
       onMouseEnter={() => setIsOpen(true)}
       onMouseLeave={() => setIsOpen(false)}
     >
       {/* 触发芯片 */}
       <button
         type="button"
-        className={`context-gauge-chip is-${statusLevel} ${isOpen ? 'is-active' : ''}`}
+        className={cn(
+          'relative inline-flex h-7 items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted px-2.5 text-xs font-mono font-medium transition-colors cursor-pointer select-none active:scale-95',
+          statusLevel === 'normal' && 'text-muted-foreground hover:text-foreground',
+          statusLevel === 'warning' && 'border-amber-500/30 text-amber-500 hover:bg-amber-500/10',
+          statusLevel === 'danger' &&
+            'border-destructive/30 text-destructive hover:bg-destructive/10',
+          isOpen && 'bg-muted text-foreground ring-1 ring-primary/30'
+        )}
         aria-label={`Token 消耗: ${formatTokenCount(totalTokens)} / ${formatTokenCount(contextLimit)} (${usagePercent}%)`}
         aria-expanded={isOpen}
         onClick={() => setIsOpen((prev) => !prev)}
       >
-        <svg
-          className={`context-gauge-ring is-${statusLevel}`}
-          width="16"
-          height="16"
-          viewBox="0 0 20 20"
-        >
+        <svg className="size-4 shrink-0 -rotate-90" viewBox="0 0 20 20">
           <circle
-            className="context-gauge-ring-bg"
             cx="10"
             cy="10"
             r={radius}
             fill="none"
             strokeWidth="2.2"
+            className="stroke-muted/40"
           />
           <circle
-            className={`context-gauge-ring-progress is-${statusLevel}`}
             cx="10"
             cy="10"
             r={radius}
@@ -81,17 +88,22 @@ export const ContextGauge: React.FC<ContextGaugeProps> = ({
             strokeDasharray={circumference}
             strokeDashoffset={strokeOffset}
             strokeLinecap="round"
-            transform="rotate(-90 10 10)"
+            className={cn(
+              'transition-all duration-300',
+              statusLevel === 'normal' && 'stroke-primary',
+              statusLevel === 'warning' && 'stroke-amber-500',
+              statusLevel === 'danger' && 'stroke-destructive'
+            )}
           />
         </svg>
-        <span className="context-gauge-label">{formatTokenCount(totalTokens)}</span>
+        <span className="text-[11px] font-mono leading-none">{formatTokenCount(totalTokens)}</span>
       </button>
 
       {/* 悬浮展开的毛玻璃卡片 */}
       <AnimatePresence>
         {isOpen ? (
           <motion.div
-            className="context-gauge-popover is-right"
+            className="absolute bottom-full right-0 mb-2 z-50 w-64 rounded-xl border border-border/80 bg-popover/95 p-3.5 text-xs text-popover-foreground shadow-xl backdrop-blur-md select-none"
             role="tooltip"
             initial={reducedMotion ? false : { opacity: 0, scale: 0.96, y: 6 }}
             animate={{
@@ -111,23 +123,35 @@ export const ContextGauge: React.FC<ContextGaugeProps> = ({
                 : { duration: 0.1, ease: [0.4, 0, 0.2, 1] }
             }}
           >
-            <div className="context-gauge-header">
-              <span className="context-gauge-title">上下文容量监控</span>
-              <span className={`context-gauge-badge is-${statusLevel}`}>{usagePercent}%</span>
+            <div className="flex items-center justify-between pb-2 border-b border-border/50">
+              <span className="text-xs font-semibold text-foreground">上下文容量监控</span>
+              <span
+                className={cn(
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                  statusLevel === 'normal' && 'bg-primary/10 text-primary',
+                  statusLevel === 'warning' && 'bg-amber-500/10 text-amber-500',
+                  statusLevel === 'danger' && 'bg-destructive/10 text-destructive'
+                )}
+              >
+                {usagePercent}%
+              </span>
             </div>
 
             {/* 多段分色进度条 */}
-            <div className="context-gauge-bar-track" title={`已用: ${usagePercent}%`}>
+            <div
+              className="mt-2.5 flex h-2 w-full overflow-hidden rounded-full bg-muted/60"
+              title={`已用: ${usagePercent}%`}
+            >
               {promptTokens > 0 && contextLimit > 0 ? (
                 <div
-                  className="context-gauge-bar-segment is-prompt"
+                  className="bg-primary transition-all duration-300"
                   style={{ width: `${Math.min(100, (promptTokens / contextLimit) * 100)}%` }}
                   title={`Prompt 输入: ${promptTokens.toLocaleString()}`}
                 />
               ) : null}
               {completionTokens > 0 && contextLimit > 0 ? (
                 <div
-                  className="context-gauge-bar-segment is-completion"
+                  className="bg-sky-500 transition-all duration-300"
                   style={{ width: `${Math.min(100, (completionTokens / contextLimit) * 100)}%` }}
                   title={`Completion 输出: ${completionTokens.toLocaleString()}`}
                 />
@@ -135,50 +159,66 @@ export const ContextGauge: React.FC<ContextGaugeProps> = ({
             </div>
 
             {/* 明细项 */}
-            <div className="context-gauge-details">
-              <div className="context-gauge-row">
-                <span className="context-gauge-dot is-prompt" />
-                <span className="context-gauge-name">输入 (Prompt):</span>
-                <strong className="context-gauge-val">{promptTokens.toLocaleString()}</strong>
+            <div className="mt-3 flex flex-col gap-1.5 text-[11px]">
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="size-2 rounded-full bg-primary" />
+                  输入 (Prompt):
+                </span>
+                <strong className="font-mono text-foreground">
+                  {promptTokens.toLocaleString()}
+                </strong>
               </div>
-              <div className="context-gauge-row">
-                <span className="context-gauge-dot is-completion" />
-                <span className="context-gauge-name">输出 (Completion):</span>
-                <strong className="context-gauge-val">{completionTokens.toLocaleString()}</strong>
+              <div className="flex items-center justify-between">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="size-2 rounded-full bg-sky-500" />
+                  输出 (Completion):
+                </span>
+                <strong className="font-mono text-foreground">
+                  {completionTokens.toLocaleString()}
+                </strong>
               </div>
               {reasoningTokens > 0 ? (
-                <div className="context-gauge-row">
-                  <span className="context-gauge-dot is-reasoning" />
-                  <span className="context-gauge-name">深度思考 (Reasoning):</span>
-                  <strong className="context-gauge-val">{reasoningTokens.toLocaleString()}</strong>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="size-2 rounded-full bg-purple-500" />
+                    深度思考 (Reasoning):
+                  </span>
+                  <strong className="font-mono text-foreground">
+                    {reasoningTokens.toLocaleString()}
+                  </strong>
                 </div>
               ) : null}
               {cachedTokens > 0 ? (
-                <div className="context-gauge-row">
-                  <span className="context-gauge-dot is-cached" />
-                  <span className="context-gauge-name">缓存命中 (Cache):</span>
-                  <strong className="context-gauge-val">{cachedTokens.toLocaleString()}</strong>
+                <div className="flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                    缓存命中 (Cache):
+                  </span>
+                  <strong className="font-mono text-foreground">
+                    {cachedTokens.toLocaleString()}
+                  </strong>
                 </div>
               ) : null}
             </div>
 
-            <div className="context-gauge-divider" />
+            <div className="my-2.5 h-px bg-border/50" />
 
             {/* 汇总与剩余量 */}
-            <div className="context-gauge-summary">
-              <div className="context-gauge-row is-highlight">
+            <div className="flex flex-col gap-1 text-[11px]">
+              <div className="flex items-center justify-between text-xs font-semibold text-foreground">
                 <span>会话消耗:</span>
-                <strong>{totalTokens.toLocaleString()} tokens</strong>
+                <strong className="font-mono">{totalTokens.toLocaleString()} tokens</strong>
               </div>
-              <div className="context-gauge-row">
+              <div className="flex items-center justify-between text-muted-foreground">
                 <span>可用余量:</span>
-                <span className="context-gauge-remaining">
+                <span className="font-mono text-emerald-600 dark:text-emerald-400">
                   {remainingTokens.toLocaleString()} ({Math.max(0, 100 - usagePercent)}%)
                 </span>
               </div>
-              <div className="context-gauge-row is-subtle">
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground/70">
                 <span>模型上限:</span>
-                <span>{contextLimit.toLocaleString()} tokens</span>
+                <span className="font-mono">{contextLimit.toLocaleString()} tokens</span>
               </div>
             </div>
           </motion.div>

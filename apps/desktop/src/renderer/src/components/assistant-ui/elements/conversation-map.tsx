@@ -113,7 +113,9 @@ export function ConversationMap({
                       'group-hover:w-6! group-focus-visible:w-6!',
                       onScreen
                         ? 'bg-foreground/50 group-focus-within/rail:w-[18px] group-hover/rail:w-[18px]'
-                        : 'bg-foreground/15'
+                        : // 上游是 /15：那在宽空隙里只是一条 12×2px、几乎看不见的淡痕。
+                          // 提到 /25 保住"越靠后越淡"的层级，同时让静止态读得出是条导轨。
+                          'bg-foreground/25'
                     )
               )}
             />

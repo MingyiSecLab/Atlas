@@ -45,4 +45,4 @@
 | 项目 | 架构 | 设计 | ADR | 计划 | 任务 | 运行手册 | 外部集成 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | `runtime` | [`architecture/runtime/`](architecture/runtime/) | [`design/runtime/`](design/runtime/) | [`adr/runtime/`](adr/runtime/) | - | [`tasks/runtime/`](tasks/runtime/) | - | [`integrations/mastra/`](integrations/mastra/) |
-| `desktop` | - | [`design/desktop/`](design/desktop/) | - | - | - | - | [`integrations/mastra/`](integrations/mastra/) |
+| `desktop` | - | [`design/desktop/`](design/desktop/) | - | [`plans/2026-09-17-assistant-ui-migration.md`](plans/2026-09-17-assistant-ui-migration.md) | [`tasks/desktop/assistant-ui-migration-todo.md`](tasks/desktop/assistant-ui-migration-todo.md) | - | [`integrations/mastra/`](integrations/mastra/) |

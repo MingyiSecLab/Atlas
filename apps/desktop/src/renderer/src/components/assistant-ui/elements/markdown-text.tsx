@@ -197,10 +197,11 @@ const defaultComponents = {
   ),
   table: ({ className, ...props }) => (
     // 注意：这里的 px-3 / py-2 / my-(--density-gap) 等“仅设置间距”的 Tailwind
-    // 工具类在 Desktop 里不生效 —— main.css 顶部的 `* { margin: 0; padding: 0 }`
-    // 是无层样式，优先级高于 @layer utilities。markdown 的间距统一在
-    // src/renderer/src/assets/chat-ui.css 的「Chat Markdown 排版补充」区块用
-    // 无层规则维护，改间距请改那里。
+    // 工具类只提供兜底值 —— main.css 的无层 `* { margin: 0; padding: 0 }` 重置
+    // 已移入 @layer base，工具类恢复生效；但 markdown 的最终间距仍以
+    // src/renderer/src/assets/chat-ui.css 的「Chat Markdown 排版补充」区块为准
+    // （无层规则优先级高于 @layer utilities，会覆盖这里的工具类）。
+    // 改间距请改 chat-ui.css，并同步这里的工具类。
     <div className="aui-md-table-wrapper my-(--density-gap) overflow-x-auto rounded-xl border border-border/80 bg-card p-1 shadow-sm">
       <table
         className={cn('aui-md-table w-full border-collapse text-[13px]', className)}

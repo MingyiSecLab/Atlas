@@ -73,7 +73,7 @@ export function ToolCallCard({
   // 对于已被后续版本取代的任务清单，直接作为独立微型胶囊条呈现，避免双层折叠嵌套
   if (parsed.category === 'task' && isSuperseded) {
     return (
-      <div className="chat-single-tool-text-wrapper">
+      <div className="w-full my-0.5">
         <TaskToolUI
           block={block}
           parsed={parsed}
@@ -89,7 +89,7 @@ export function ToolCallCard({
   const isError = block.status === 'error' || block.status === 'denied'
 
   return (
-    <div className="chat-single-tool-text-wrapper w-full">
+    <div className="w-full my-0.5">
       <ToolCall
         label={title}
         activeLabel={runningLabel}

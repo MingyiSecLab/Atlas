@@ -23,7 +23,7 @@ export const ScrollToBottomPill: React.FC<ScrollToBottomPillProps> = ({
     <AnimatePresence>
       {visible ? (
         <motion.div
-          className={`scroll-to-bottom-pill-wrapper ${className || ''}`}
+          className={`pointer-events-none absolute bottom-[calc(var(--chat-composer-height,120px)+1rem)] left-1/2 z-20 -translate-x-1/2 ${className || ''}`}
           initial={reducedMotion ? false : { opacity: 0, y: 10, scale: 0.94 }}
           animate={{
             opacity: 1,
@@ -42,25 +42,25 @@ export const ScrollToBottomPill: React.FC<ScrollToBottomPillProps> = ({
         >
           <button
             type="button"
-            className={`scroll-to-bottom-pill ${isStreaming ? 'is-streaming' : ''}`}
+            className="pointer-events-auto inline-flex h-8 items-center gap-1.5 rounded-full border border-border/70 bg-card/90 px-3.5 text-xs font-medium text-foreground shadow-lg backdrop-blur-md transition-all hover:bg-accent hover:text-accent-foreground active:scale-95 cursor-pointer"
             onClick={onClick}
             aria-label="滚动到底部查看最新消息"
           >
             {isStreaming ? (
               <>
-                <Sparkles size={13} className="scroll-to-bottom-icon is-pulsing" />
-                <span className="scroll-to-bottom-text">正在生成最新内容</span>
-                <ArrowDown size={12} className="scroll-to-bottom-arrow is-bouncing" />
+                <Sparkles size={13} className="text-primary animate-pulse" />
+                <span className="font-medium text-foreground">正在生成最新内容</span>
+                <ArrowDown size={12} className="text-muted-foreground animate-bounce" />
               </>
             ) : unreadCount > 0 ? (
               <>
-                <ArrowDown size={13} className="scroll-to-bottom-arrow" />
-                <span className="scroll-to-bottom-text">{unreadCount} 条新消息</span>
+                <ArrowDown size={13} className="text-primary" />
+                <span>{unreadCount} 条新消息</span>
               </>
             ) : (
               <>
-                <ArrowDown size={13} className="scroll-to-bottom-arrow" />
-                <span className="scroll-to-bottom-text">回到底部</span>
+                <ArrowDown size={13} className="text-muted-foreground" />
+                <span>回到底部</span>
               </>
             )}
           </button>

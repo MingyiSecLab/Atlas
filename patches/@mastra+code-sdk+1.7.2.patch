@@ -84,7 +84,7 @@ index d9dd796..b8df0ae 100644
  }
  function upsertCustomProviderInSettings(settings, provider, previousProviderId) {
 diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
-index 60a3305..db19f45 100644
+index 9b6c883..ba2a7f2 100644
 --- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
 +++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
 @@ -20,6 +20,13 @@ export interface CustomProviderSetting {
@@ -102,10 +102,10 @@ index 60a3305..db19f45 100644
  /** Storage backend type. */
  export type StorageBackend = 'libsql' | 'pg';
 diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
-index 9896444..37247bb 100644
+index c04fff4..05890ec 100644
 --- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
 +++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
-@@ -273,11 +273,13 @@ function parseCustomProviders(rawProviders) {
+@@ -288,11 +288,13 @@ function parseCustomProviders(rawProviders) {
  			return model;
  		}))].filter((model) => model.length > 0) : [];
  		const apiKey = typeof candidate.apiKey === "string" && candidate.apiKey.trim().length > 0 ? candidate.apiKey.trim() : void 0;

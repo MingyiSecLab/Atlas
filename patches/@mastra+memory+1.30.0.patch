@@ -1,0 +1,171 @@
+diff --git a/node_modules/@mastra/memory/dist/src-Dt8oPiQN.js b/node_modules/@mastra/memory/dist/src-Dt8oPiQN.js
+index 69c0cfa..18393eb 100644
+--- a/node_modules/@mastra/memory/dist/src-Dt8oPiQN.js
++++ b/node_modules/@mastra/memory/dist/src-Dt8oPiQN.js
+@@ -19134,6 +19134,137 @@ function formatObserverMessage(msg, counter, options) {
+ 		attachments
+ 	};
+ }
++//#region Mingyi patch (observer input budget)
++/**
++ * Mingyi patch (observer input budget).
++ *
++ * Mastra's main observation path calls `formatMessagesForObserver` /
++ * `buildObserverHistoryMessage` without `maxPartLength`, so text and reasoning
++ * parts are never truncated — only tool results are (10k tokens). One oversized
++ * payload, or a backlog left behind by a failed cycle, can therefore exceed the
++ * Observer model's context window and abort the entire run with
++ * `Observational memory observation run failed`.
++ *
++ * These clamps bound the payload at the source. They shrink content but never
++ * drop a message, so nothing gets marked as observed without being seen.
++ * Overridable via MINGYI_OM_MAX_PART_CHARS / MINGYI_OM_MAX_TOOL_RESULT_TOKENS /
++ * MINGYI_OM_TOTAL_CHARS.
++ */
++const OM_OBSERVER_MAX_PART_CHARS = (() => {
++	const raw = Number.parseInt(process.env.MINGYI_OM_MAX_PART_CHARS ?? "", 10);
++	return Number.isFinite(raw) && raw > 0 ? raw : 2e4;
++})();
++const OM_OBSERVER_MAX_TOOL_RESULT_TOKENS = (() => {
++	const raw = Number.parseInt(process.env.MINGYI_OM_MAX_TOOL_RESULT_TOKENS ?? "", 10);
++	return Number.isFinite(raw) && raw > 0 ? raw : 4e3;
++})();
++const OM_OBSERVER_TOTAL_CHARS = (() => {
++	const raw = Number.parseInt(process.env.MINGYI_OM_TOTAL_CHARS ?? "", 10);
++	return Number.isFinite(raw) && raw > 0 ? raw : 4e5;
++})();
++/** Head-keep budget for messages that no longer fit the total budget. */
++const OM_OBSERVER_OLD_PART_CHARS = 500;
++function safeTailSlice(str, len) {
++	if (len <= 0) return "";
++	if (len >= str.length) return str;
++	const start = str.length - len;
++	const code = str.charCodeAt(start);
++	return code >= 56320 && code <= 57343 ? str.slice(start + 1) : str.slice(start);
++}
++/** Keep head and tail — conclusions usually live at the end. */
++function clampOmText(value, maxChars) {
++	if (typeof value !== "string" || value.length <= maxChars) return value;
++	const head = Math.max(1, Math.ceil(maxChars * 0.6));
++	const headText = safeSlice(value, head);
++	const tailText = safeTailSlice(value, Math.max(0, maxChars - head));
++	const dropped = value.length - headText.length - tailText.length;
++	return `${headText}\n... [Mingyi OM budget: truncated ${dropped} characters] ...\n${tailText}`;
++}
++function clampOmMessageParts(message, maxChars) {
++	const content = message?.content;
++	if (!content || typeof content !== "object" || !Array.isArray(content.parts)) return message;
++	let changed = false;
++	const parts = content.parts.map((part) => {
++		if (!part || typeof part !== "object") return part;
++		if (part.type === "text" && typeof part.text === "string" && part.text.length > maxChars) {
++			changed = true;
++			return {
++				...part,
++				text: clampOmText(part.text, maxChars)
++			};
++		}
++		if (part.type === "reasoning" && typeof part.reasoning === "string" && part.reasoning.length > maxChars) {
++			changed = true;
++			return {
++				...part,
++				reasoning: clampOmText(part.reasoning, maxChars)
++			};
++		}
++		return part;
++	});
++	if (!changed) return message;
++	return {
++		...message,
++		content: {
++			...content,
++			parts
++		}
++	};
++}
++function estimateOmMessageChars(message) {
++	const content = message?.content;
++	if (typeof content === "string") return content.length;
++	if (!content || typeof content !== "object" || !Array.isArray(content.parts)) return 0;
++	let size = 0;
++	for (const part of content.parts) {
++		if (!part || typeof part !== "object") continue;
++		if (part.type === "text" && typeof part.text === "string") size += part.text.length;
++		else if (part.type === "reasoning" && typeof part.reasoning === "string") size += part.reasoning.length;
++		else if (part.type === "tool-invocation") {
++			let serialized = "";
++			try {
++				serialized = JSON.stringify(part.toolInvocation ?? {});
++			} catch {
++				serialized = "";
++			}
++			size += Math.min(serialized.length, OM_OBSERVER_MAX_TOOL_RESULT_TOKENS * 4);
++		}
++	}
++	return size;
++}
++/**
++ * Walk newest → oldest on a character budget. Messages that no longer fit are
++ * shrunk to a short head instead of being discarded, keeping the Observer
++ * payload bounded while every message stays represented.
++ */
++function clampObserverInput(messages) {
++	if (!Array.isArray(messages) || messages.length === 0) return messages;
++	const clamped = messages.map((message) => clampOmMessageParts(message, OM_OBSERVER_MAX_PART_CHARS));
++	/**
++	 * Worst-case footprint of a message we may still have to shrink. Reserving
++	 * this for every remaining older message keeps the final payload inside the
++	 * budget even when the backlog is hundreds of messages long.
++	 */
++	const minimumPerMessage = OM_OBSERVER_OLD_PART_CHARS + 128;
++	let used = 0;
++	let shrunk = 0;
++	const result = new Array(clamped.length);
++	for (let i = clamped.length - 1; i >= 0; i -= 1) {
++		const size = estimateOmMessageChars(clamped[i]);
++		if (used + size + i * minimumPerMessage <= OM_OBSERVER_TOTAL_CHARS) {
++			used += size;
++			result[i] = clamped[i];
++			continue;
++		}
++		const shrunkMessage = clampOmMessageParts(clamped[i], OM_OBSERVER_OLD_PART_CHARS);
++		result[i] = shrunkMessage;
++		used += estimateOmMessageChars(shrunkMessage);
++		shrunk += 1;
++	}
++	if (shrunk > 0) omDebug(`[OM:budget] exceeded ${OM_OBSERVER_TOTAL_CHARS} chars; shrank ${shrunk} older message(s) to ${OM_OBSERVER_OLD_PART_CHARS} chars/part`);
++	return result;
++}
++//#endregion Mingyi patch (observer input budget)
+ function formatMessagesForObserver(messages, options) {
+ 	const counter = {
+ 		nextImageId: 1,
+@@ -19955,7 +20086,10 @@ var ObserverRunner = class {
+ 			resourceId: options?.resourceId,
+ 			trigger: options?.trigger
+ 		};
+-		const messages = await applyBeforeObservation(this.hooks, messagesToObserve, context);
++		// Mingyi patch (observer input budget): bound the payload handed to the
++		// Observer so a runaway observation backlog can never exceed the model's
++		// context window and abort the whole run.
++		const messages = clampObserverInput(await applyBeforeObservation(this.hooks, messagesToObserve, context));
+ 		if (messages.length === 0) {
+ 			omDebug("[OM:callObserver] beforeObservation returned no messages, skipping observer call");
+ 			return { observations: "" };
+@@ -19998,7 +20132,15 @@ var ObserverRunner = class {
+ 				includeThreadTitle: this.observationConfig.threadTitle,
+ 				extractors: activeExtractors
+ 			})
+-		}, buildObserverHistoryMessage(messagesToObserve, { attachmentFilter })];
++		}, buildObserverHistoryMessage(messagesToObserve, {
++			attachmentFilter,
++			// Mingyi patch (observer input budget): Mastra leaves these unset on the
++			// main observation path, which means text/reasoning parts are never
++			// truncated. Reuse the same knobs Mastra itself passes on the extractor
++			// path (maxPartLength: 500) with a budget sized for a full transcript.
++			maxPartLength: OM_OBSERVER_MAX_PART_CHARS,
++			maxToolResultTokens: OM_OBSERVER_MAX_TOOL_RESULT_TOKENS
++		})];
+ 		const doGenerate = async () => {
+ 			return withRetry(() => withOmTracingSpan({
+ 				phase: "observer",

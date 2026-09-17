@@ -3,6 +3,8 @@ import { useState } from 'react'
 import type { ToolBlock } from '../types'
 import { HighlightedCode } from '../HighlightedCode'
 import type { ParsedToolCall } from './types'
+import { paper } from '@renderer/components/assistant-ui/elements/surfaces'
+import { cn } from '@renderer/lib/utils'
 
 interface FileOpToolUIProps {
   block: ToolBlock
@@ -63,17 +65,17 @@ export function FileOpToolUI({ block, parsed }: FileOpToolUIProps): React.ReactN
   }
 
   return (
-    <div className="aui-file-op-container">
+    <div className="flex flex-col gap-2.5 p-1 text-xs">
       {/* File Path & Meta bar */}
       {filePath ? (
-        <div className="aui-file-meta-bar">
-          <div className="aui-file-path-group">
-            <FileCode size={13} className="aui-file-icon" />
-            <span className="aui-file-path-text" title={filePath}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0 font-mono text-[11.5px] text-foreground/90">
+            <FileCode size={13} className="text-primary shrink-0" />
+            <span className="truncate font-medium" title={filePath}>
               {filePath}
             </span>
             {startLine !== undefined ? (
-              <span className="aui-file-line-range">
+              <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground font-sans">
                 L{startLine}
                 {endLine && endLine !== startLine ? `-L${endLine}` : ''}
               </span>
@@ -81,45 +83,65 @@ export function FileOpToolUI({ block, parsed }: FileOpToolUIProps): React.ReactN
           </div>
           <button
             type="button"
-            className="aui-file-path-copy-btn"
+            className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors cursor-pointer shrink-0"
             onClick={handleCopyPath}
             title="复制文件路径"
           >
-            {copiedPath ? <Check size={12} className="is-success" /> : <Copy size={12} />}
+            {copiedPath ? (
+              <>
+                <Check size={11} className="text-emerald-500" />
+                <span className="text-[10px] text-emerald-500 font-medium">已复制</span>
+              </>
+            ) : (
+              <>
+                <Copy size={11} />
+                <span className="text-[10px]">复制路径</span>
+              </>
+            )}
           </button>
         </div>
       ) : null}
 
       {/* Instruction or Action Summary */}
       {instruction ? (
-        <div className="aui-file-instruction">
-          <span className="aui-file-instruction-label">说明:</span>
+        <div className="rounded-lg bg-muted/60 px-3 py-1.5 text-xs text-foreground/85 leading-relaxed">
+          <span className="font-medium text-muted-foreground mr-1.5">说明:</span>
           <span>{instruction}</span>
         </div>
       ) : null}
 
       {/* Input Code / Target Replacement */}
       {codeContent ? (
-        <div className="aui-file-code-section">
-          <div className="aui-file-section-label">代码内容</div>
-          <div className="aui-file-code-wrapper">
-            <HighlightedCode code={codeContent} language={lang} />
+        <div className="flex flex-col gap-1.5">
+          <div className="text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
+            代码内容
+          </div>
+          <div className={cn(paper, 'rounded-xl overflow-hidden')}>
+            <div className="max-h-72 overflow-auto p-3 font-mono text-[11.5px] leading-relaxed">
+              <HighlightedCode code={codeContent} language={lang} />
+            </div>
           </div>
         </div>
       ) : null}
 
       {/* Execution Output */}
       {output ? (
-        <div className="aui-file-code-section">
-          <div className="aui-file-section-label">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-[11px] font-semibold text-muted-foreground/70 uppercase tracking-wider">
             <span>执行结果</span>
-            {block.outputTruncated ? <small>（已截断摘要）</small> : null}
+            {block.outputTruncated ? (
+              <small className="text-muted-foreground/60 font-normal lowercase tracking-normal">
+                （已截断摘要）
+              </small>
+            ) : null}
           </div>
-          <div className="aui-file-code-wrapper">
-            <HighlightedCode
-              code={output}
-              language={lang === 'typescript' ? 'typescript' : 'text'}
-            />
+          <div className={cn(paper, 'rounded-xl overflow-hidden')}>
+            <div className="max-h-64 overflow-auto p-3 font-mono text-[11.5px] leading-relaxed">
+              <HighlightedCode
+                code={output}
+                language={lang === 'typescript' ? 'typescript' : 'text'}
+              />
+            </div>
           </div>
         </div>
       ) : null}

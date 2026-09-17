@@ -161,24 +161,33 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
 
   const currentContextLimit = useMemo(() => getModelContextLimit(model), [model])
 
+  const cleanModelLabel = useMemo(() => {
+    if (!model) return '选择模型'
+    if (model.includes('/')) {
+      const parts = model.split('/')
+      return parts[parts.length - 1]
+    }
+    return model
+  }, [model])
+
   return (
     <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className={`chat-composer-chip chat-composer-subtle-chip model-picker-trigger cursor-pointer ${
-            open ? 'is-active' : ''
+          className={`inline-flex h-7 items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted px-2.5 text-xs font-medium text-foreground/85 transition-colors active:scale-95 cursor-pointer select-none ${
+            open ? 'bg-muted ring-1 ring-primary/30' : ''
           } ${className || ''}`}
           type="button"
           aria-label="模型"
           aria-expanded={open}
         >
           <ModelBrandIcon model={model} size={13} />
-          <span className="model-picker-trigger-label" title={model}>
-            {model}
+          <span className="max-w-[130px] truncate text-[11.5px]" title={model}>
+            {cleanModelLabel}
           </span>
           <ChevronDown
             size={11}
-            className={`chat-composer-chip-chevron model-picker-chevron transition-transform duration-200 ${open ? 'is-open rotate-180' : ''}`}
+            className={`text-muted-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           />
         </button>
       </PopoverTrigger>
@@ -186,19 +195,19 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
         align="end"
         side="top"
         sideOffset={6}
-        className="model-picker-dropdown is-right p-0 border border-border/70 bg-popover shadow-xl z-50 outline-none w-80 rounded-2xl"
+        className="w-80 rounded-2xl border border-border/80 bg-popover p-0 text-popover-foreground shadow-xl backdrop-blur-md z-50 outline-none overflow-hidden select-none"
         role="menu"
         aria-label="模型"
         onKeyDown={handleKeyDown}
       >
-        <div ref={containerRef} className="w-full">
+        <div ref={containerRef} className="flex flex-col">
           {/* 顶部轻量搜索框 */}
-          <div className="model-picker-search-bar">
-            <Search size={13} className="model-picker-search-icon" />
+          <div className="flex items-center gap-2 border-b border-border/60 bg-muted/20 px-3 py-2 text-xs">
+            <Search size={13} className="text-muted-foreground shrink-0" />
             <input
               ref={searchInputRef}
               type="text"
-              className="model-picker-search-input"
+              className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none"
               placeholder="搜索模型或提供商..."
               value={search}
               onChange={(e) => {
@@ -209,7 +218,7 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
             {search ? (
               <button
                 type="button"
-                className="model-picker-search-clear"
+                className="size-4 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground cursor-pointer"
                 onClick={() => {
                   setSearch('')
                   searchInputRef.current?.focus()
@@ -222,15 +231,17 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           </div>
 
           {/* 模型列表 */}
-          <div className="model-picker-list" ref={listRef}>
+          <div className="max-h-72 overflow-y-auto p-1.5" ref={listRef}>
             {filteredModels.length === 0 ? (
-              <div className="model-picker-empty">
+              <div className="py-6 text-center text-xs text-muted-foreground">
                 <span>未找到匹配的模型</span>
               </div>
             ) : (
               Object.entries(groupedModels).map(([providerName, items]) => (
-                <div key={providerName} className="model-picker-group">
-                  <div className="model-picker-group-title">{providerName}</div>
+                <div key={providerName} className="mb-2 last:mb-0">
+                  <div className="px-2 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
+                    {providerName}
+                  </div>
                   {items.map((item) => {
                     const isSelected = item.id === model
                     const globalIdx = filteredModels.indexOf(item)
@@ -242,8 +253,12 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                         type="button"
                         role="menuitemradio"
                         aria-checked={isSelected}
-                        className={`model-picker-item ${isSelected ? 'is-selected' : ''} ${
-                          isHighlighted ? 'is-highlighted' : ''
+                        className={`group relative flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2 text-left text-xs transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-accent text-accent-foreground font-medium'
+                            : isHighlighted
+                              ? 'bg-muted/70 text-foreground'
+                              : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                         }`}
                         onClick={() => {
                           onChange(item.id)
@@ -251,46 +266,52 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
                         }}
                         onMouseEnter={() => setHighlightIndex(globalIdx)}
                       >
-                        <div className="model-picker-item-icon">
+                        <div className="mt-0.5 shrink-0">
                           <ModelBrandIcon model={item.id} size={15} />
                         </div>
 
-                        <div className="model-picker-item-content">
-                          <div className="model-picker-item-title-row">
-                            <span className="model-picker-item-name" title={item.id}>
+                        <div className="flex flex-1 flex-col gap-1 min-w-0">
+                          <div className="flex items-center justify-between gap-1.5">
+                            <span
+                              className="truncate text-xs text-foreground font-medium"
+                              title={item.id}
+                            >
                               {item.id}
                             </span>
                             {isSelected ? (
-                              <Check size={13} className="model-picker-check-icon" />
+                              <Check size={13} className="text-primary shrink-0" />
                             ) : null}
                           </div>
 
-                          <div className="model-picker-item-badges">
+                          <div className="flex flex-wrap items-center gap-1">
                             {item.isReasoning ? (
                               <span
-                                className="model-picker-badge is-reasoning"
+                                className="inline-flex items-center gap-0.5 rounded-md bg-purple-500/10 px-1.5 py-0.5 text-[9px] font-medium text-purple-600 dark:text-purple-400"
                                 title="支持深度思考推理"
                               >
-                                <Brain size={10} />
+                                <Brain size={9} />
                                 推理
                               </span>
                             ) : null}
                             {item.isVision ? (
                               <span
-                                className="model-picker-badge is-vision"
+                                className="inline-flex items-center gap-0.5 rounded-md bg-blue-500/10 px-1.5 py-0.5 text-[9px] font-medium text-blue-600 dark:text-blue-400"
                                 title="支持图像与视觉分析"
                               >
-                                <Eye size={10} />
+                                <Eye size={9} />
                                 视觉
                               </span>
                             ) : null}
                             {item.isFast ? (
-                              <span className="model-picker-badge is-fast" title="轻量极速响应">
-                                <Zap size={10} />
+                              <span
+                                className="inline-flex items-center gap-0.5 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-medium text-amber-600 dark:text-amber-400"
+                                title="轻量极速响应"
+                              >
+                                <Zap size={9} />
                                 快速
                               </span>
                             ) : null}
-                            <span className="model-picker-badge is-limit">
+                            <span className="inline-flex items-center rounded-md bg-muted px-1.5 py-0.5 text-[9px] font-mono text-muted-foreground">
                               {formatTokenCount(item.contextLimit)}
                             </span>
                           </div>
@@ -304,13 +325,18 @@ export const ModelPicker: React.FC<ModelPickerProps> = ({
           </div>
 
           {/* 底部信息条 */}
-          <div className="model-picker-footer">
-            <div className="model-picker-footer-limit">
-              <span>上下文上限:</span>
-              <strong>{currentContextLimit.toLocaleString()} tokens</strong>
+          <div className="flex items-center justify-between border-t border-border/60 bg-muted/20 px-3 py-2 text-[11px] text-muted-foreground">
+            <div className="flex items-center gap-1">
+              <span>上限:</span>
+              <strong className="font-mono text-foreground">
+                {currentContextLimit.toLocaleString()}
+              </strong>
             </div>
-            <div className="model-picker-footer-hint">
-              <kbd>Esc</kbd> 关闭
+            <div className="text-[10px] text-muted-foreground/60">
+              <kbd className="rounded border border-border/60 bg-muted px-1 py-0.5 font-mono text-[9px]">
+                Esc
+              </kbd>{' '}
+              关闭
             </div>
           </div>
         </div>

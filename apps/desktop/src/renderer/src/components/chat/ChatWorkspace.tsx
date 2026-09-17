@@ -20,6 +20,7 @@ import { RetryConnectingBar } from './RetryConnectingBar'
 import { StoppedRunCard } from './StoppedRunCard'
 import { SelectionToolbar } from './SelectionToolbar'
 import { ScrollToBottomPill } from './ScrollToBottomPill'
+import { useStickToBottom } from './use-stick-to-bottom'
 import { ConversationMapAui } from '@renderer/components/assistant-ui/elements/conversation-map.aui'
 import { DayDivider } from '@renderer/components/assistant-ui/elements/day-separator'
 import { isSameDay } from '@renderer/lib/date'
@@ -162,7 +163,6 @@ function ChatWorkspaceInner({
   const [pentestIntent, setPentestIntent] = useState<RuntimePentestCreationIntent | null>(null)
   const [pentestIntentBusy, setPentestIntentBusy] = useState(false)
   const [pentestIntentError, setPentestIntentError] = useState<string | null>(null)
-  const [showScrollButton, setShowScrollButton] = useState(false)
   const [accessRequests, setAccessRequests] = useState(initialAccessRequests)
   const [errorItems, setErrorItems] = useState<ChatError[]>([])
   const [retryStatus, setRetryStatus] = useState<{
@@ -173,10 +173,8 @@ function ChatWorkspaceInner({
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0)
   const [wasStopped, setWasStopped] = useState(false)
   const workspaceRef = useRef<HTMLElement>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
   const composerHeightRef = useRef(112)
   const composerResizeFrameRef = useRef<number | null>(null)
-  const shouldFollowRef = useRef(true)
 
   const model = snapshot?.modelId ?? '未选择模型'
   const permission = snapshot?.permissionProfileId ?? 'Pentest'
@@ -197,7 +195,6 @@ function ChatWorkspaceInner({
     }
   }, [isStreaming])
 
-  // 审批请求与错误事件由本组件独立订阅（不进入消息流）
   useEffect(() => {
     const unsubscribe = window.api.sessions.onEvent((event: RuntimeSessionEvent) => {
       if (event.type === 'session_changed') return
@@ -213,14 +210,12 @@ function ChatWorkspaceInner({
         )
       } else if (event.type === 'error') {
         if (event.retryable) {
-          // 网络抖动重试中：展示轻量进度条，不塞入聊天流刷屏
           setRetryStatus({
             attempt: event.retryAttempt ?? 1,
             maxRetries: event.maxRetries ?? 10,
             message: event.message
           })
         } else {
-          // 最终不可恢复错误：清除重试条，并在聊天流显示最终错误
           setRetryStatus(null)
           if (event.message === 'terminated') {
             setWasStopped(true)
@@ -232,44 +227,29 @@ function ChatWorkspaceInner({
           ])
         }
       } else if (event.type === 'message' || (event.type === 'run_state' && !event.isRunning)) {
-        // 重连成功产生新消息，或会话结束，清除重试条
         setRetryStatus(null)
       }
     })
     return unsubscribe
   }, [taskId])
 
-  const scrollConversationToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
-    const element = scrollRef.current
-    if (!element) return
-    element.scrollTo({ top: element.scrollHeight, behavior })
-  }, [])
-
-  useEffect(() => {
-    if (!shouldFollowRef.current) return
-    window.requestAnimationFrame(() => scrollConversationToBottom())
-  }, [scrollConversationToBottom, messages, errorItems])
-
-  const updateDistanceFromBottom = useCallback(() => {
-    const element = scrollRef.current
-    if (!element) return
-    const distance = element.scrollHeight - element.scrollTop - element.clientHeight
-    shouldFollowRef.current = distance < 100
-    setShowScrollButton(distance >= 140)
-  }, [])
+  const { scrollRef, isAtBottom, scrollToBottom } = useStickToBottom({
+    threshold: 80,
+    autoScroll: isStreaming
+  })
 
   const updateComposerHeight = useCallback(
     (height: number) => {
       if (height === composerHeightRef.current) return
       composerHeightRef.current = height
       workspaceRef.current?.style.setProperty('--chat-composer-height', `${height}px`)
-      if (!shouldFollowRef.current || composerResizeFrameRef.current !== null) return
+      if (!isAtBottom || composerResizeFrameRef.current !== null) return
       composerResizeFrameRef.current = window.requestAnimationFrame(() => {
         composerResizeFrameRef.current = null
-        scrollConversationToBottom()
+        scrollToBottom('auto')
       })
     },
-    [scrollConversationToBottom]
+    [isAtBottom, scrollToBottom]
   )
 
   useEffect(
@@ -322,7 +302,7 @@ function ChatWorkspaceInner({
       if (!skillName && !text && attachments.length === 0) return
       setWasStopped(false)
       setErrorItems([])
-      shouldFollowRef.current = true
+      scrollToBottom('auto')
 
       const imageParts = attachments.map((attachment) => ({
         type: 'image' as const,
@@ -382,7 +362,7 @@ function ChatWorkspaceInner({
           })
       }
     },
-    [aui, pentestIntent]
+    [aui, pentestIntent, scrollToBottom]
   )
 
   const handleRetryLast = useCallback(() => {
@@ -461,9 +441,11 @@ function ChatWorkspaceInner({
         ref={workspaceRef}
         className={`chat-workspace${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
       >
-        <div ref={scrollRef} className="chat-scroll relative" onScroll={updateDistanceFromBottom}>
+        <div ref={scrollRef} className="chat-scroll relative">
           <ThreadPrimitive.ViewportProvider>
-            <ConversationMapAui side="right" />
+            {/* 对话导轨：坐在消息列左侧的空隙里，按轮次索引整段对话。
+                空隙不够时由 main.css 的容器查询 `chat-workspace` 自动隐藏。 */}
+            <ConversationMapAui side="left" />
             <div className="chat-timeline" data-markdown-scroll-container>
               <ThreadPrimitive.Messages>
                 {({ message }) => <ChatTimelineMessage message={message} />}
@@ -512,12 +494,9 @@ function ChatWorkspaceInner({
         </div>
         {!activeAccessRequest ? (
           <ScrollToBottomPill
-            visible={showScrollButton}
+            visible={!isAtBottom}
             isStreaming={isStreaming}
-            onClick={() => {
-              shouldFollowRef.current = true
-              scrollConversationToBottom('smooth')
-            }}
+            onClick={() => scrollToBottom('smooth')}
           />
         ) : null}
         {activeAccessRequest ? (

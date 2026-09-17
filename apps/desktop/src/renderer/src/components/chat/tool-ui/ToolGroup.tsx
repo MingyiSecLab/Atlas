@@ -77,7 +77,7 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
     liveElapsedLabel !== undefined ? triggerLabel.replace(/\.{3}$/, '') : triggerLabel
 
   return (
-    <div className="chat-tool-group-wrapper w-full">
+    <div className="w-full my-1">
       <ToolGroupRoot
         variant="ghost"
         open={isOpen}
@@ -98,14 +98,14 @@ export function ToolGroup({ summary, defaultOpen }: ToolGroupProps): React.React
             return (
               <div key={step.id} className="flex flex-col gap-1.5">
                 {step.precedingReasoning ? (
-                  <div className="aui-trace-reasoning rounded-lg bg-foreground/[0.02] p-2 text-xs">
-                    <div className="aui-trace-reasoning-header mb-1 flex items-center gap-1.5 text-foreground/45">
+                  <div className="rounded-xl border border-border/40 bg-muted/30 p-2.5 text-xs text-foreground/80 leading-relaxed">
+                    <div className="mb-1 flex items-center gap-1.5 text-foreground/50 text-[11px] font-medium">
                       <Sparkles size={12} className="text-amber-500" />
-                      <span className="font-medium">思考思路</span>
+                      <span>思路分析</span>
                     </div>
-                    <div className="aui-trace-reasoning-body leading-relaxed text-foreground/70">
-                      {step.precedingReasoning}
-                    </div>
+                    {/* whitespace-pre-wrap 保留模型原文换行，break-words 兜住超长
+                        不可断串（路径、token）；宽度由上层消息列锁定。 */}
+                    <div className="whitespace-pre-wrap break-words">{step.precedingReasoning}</div>
                   </div>
                 ) : null}
                 <ToolCallCard

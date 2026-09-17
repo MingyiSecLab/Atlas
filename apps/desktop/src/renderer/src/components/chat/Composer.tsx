@@ -127,7 +127,11 @@ function SelectMenu({
     <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
-          className={cn('chat-composer-chip cursor-pointer', chipClassName)}
+          className={cn(
+            'inline-flex h-7 items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 px-2.5 text-xs font-medium text-foreground/85 transition-colors hover:bg-muted active:scale-95 cursor-pointer select-none',
+            open && 'bg-muted ring-1 ring-primary/30',
+            chipClassName
+          )}
           type="button"
           aria-label={label}
           aria-expanded={open}
@@ -137,7 +141,7 @@ function SelectMenu({
           <ChevronDown
             size={11}
             className={cn(
-              'chat-composer-chip-chevron transition-transform duration-200',
+              'text-muted-foreground transition-transform duration-200',
               open && 'rotate-180'
             )}
           />
@@ -147,12 +151,15 @@ function SelectMenu({
         align={menuAlign === 'right' ? 'end' : 'start'}
         side="top"
         sideOffset={6}
-        className="chat-composer-menu p-1 z-50 rounded-xl border border-border/70 bg-popover text-popover-foreground shadow-lg min-w-[120px] outline-none"
+        className="w-40 rounded-xl border border-border/80 bg-popover p-1 text-popover-foreground shadow-xl backdrop-blur-md z-50 outline-none select-none"
       >
         <div role="menu" className="flex flex-col gap-0.5">
           {options.map((option) => (
             <button
-              className={option === value ? 'is-selected cursor-pointer' : 'cursor-pointer'}
+              className={cn(
+                'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-xs text-muted-foreground hover:bg-muted/70 hover:text-foreground transition-colors cursor-pointer',
+                option === value && 'bg-accent font-medium text-accent-foreground'
+              )}
               type="button"
               role="menuitemradio"
               aria-checked={option === value}
@@ -162,9 +169,11 @@ function SelectMenu({
                 onOpenChange(false)
               }}
             >
-              {renderOptionIcon ? renderOptionIcon(option) : null}
-              <span>{optionLabels?.[option] ?? option}</span>
-              {option === value ? <Check size={12} /> : null}
+              <div className="flex items-center gap-2">
+                {renderOptionIcon ? renderOptionIcon(option) : null}
+                <span>{optionLabels?.[option] ?? option}</span>
+              </div>
+              {option === value ? <Check size={12} className="text-primary" /> : null}
             </button>
           ))}
         </div>
@@ -396,20 +405,23 @@ export function Composer({
   const isPentestMode = permission.toLowerCase() === 'pentest'
   const isAuditMode = permission.toLowerCase() === 'audit'
 
-  const hasCommandMenuOpen =
-    activeMenu === 'add' ||
-    activeMenu === 'skills' ||
-    activeMenu === 'experts' ||
-    showInlineSkillPicker
-
   return (
     <div
       ref={wrapRef}
-      className={`chat-composer-wrap${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}`}
+      className={cn(
+        'chat-composer-wrap relative mx-auto w-full max-w-3xl px-4 pt-1 pb-4 shrink-0 select-none',
+        isPentestMode && 'is-pentest-mode',
+        isAuditMode && 'is-audit-mode'
+      )}
     >
       <div
         ref={composerRef}
-        className={`chat-composer${isDraggingOver ? ' is-dragging' : ''}${isPentestMode ? ' is-pentest-mode' : ''}${isAuditMode ? ' is-audit-mode' : ''}${hasCommandMenuOpen ? ' has-command-menu-open' : ''}`}
+        className={cn(
+          'chat-composer group relative flex flex-col rounded-[24px] border border-border/70 bg-card/95 shadow-[0_2px_8px_rgba(0,0,0,0.04),0_12px_28px_-10px_rgba(0,0,0,0.08)] dark:shadow-[0_1px_2px_rgba(0,0,0,0.3),0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-md transition-all duration-200 focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10 select-text',
+          isDraggingOver && 'ring-2 ring-primary border-primary',
+          isPentestMode && 'border-amber-500/40 dark:border-amber-500/30',
+          isAuditMode && 'border-blue-500/40 dark:border-blue-500/30'
+        )}
         onDragEnter={(event) => {
           event.preventDefault()
           dragCounterRef.current += 1
@@ -430,7 +442,7 @@ export function Composer({
       >
         <input
           ref={fileInputRef}
-          className="chat-composer-file-input"
+          className="hidden"
           type="file"
           aria-label="选择图片"
           accept="image/jpeg,image/png,image/gif,image/webp"
@@ -443,7 +455,7 @@ export function Composer({
         />
         <AttachmentDropzone isActive={isDraggingOver} />
         <div
-          className="chat-composer-command-region"
+          className="relative"
           aria-hidden={
             activeMenu !== 'add' &&
             activeMenu !== 'skills' &&
@@ -462,7 +474,7 @@ export function Composer({
               <motion.div
                 key="add-menu"
                 id="chat-composer-add-menu"
-                className="chat-composer-command-panel"
+                className="overflow-hidden rounded-xl border border-border/80 bg-popover/95 shadow-xl backdrop-blur-md m-2 p-1.5 select-none"
                 role="menu"
                 aria-label="添加到对话"
                 initial={reducedMotion ? false : { height: 0, opacity: 0 }}
@@ -487,90 +499,112 @@ export function Composer({
                       }
                 }}
               >
-                <div className="chat-composer-command-panel-inner">
-                  <div className="chat-composer-command-label">
-                    <span className="chat-composer-command-label-icon">⌘</span>
-                    <span>命令</span>
+                <div className="flex flex-col gap-0.5">
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <span>⌘ 命令与工具</span>
                   </div>
                   <button
                     type="button"
                     role="menuitem"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
                     onClick={() => {
                       setActiveMenu(null)
                       fileInputRef.current?.click()
                     }}
                   >
-                    <Paperclip size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>图片</strong>
-                    </span>
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => insertTrigger('/')}>
-                    <Slash size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>命令</strong>
-                    </span>
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => insertTrigger('@')}>
-                    <AtSign size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>提及</strong>
-                    </span>
+                    <Paperclip size={14} className="text-muted-foreground" />
+                    <span className="font-medium">添加图片附件</span>
                   </button>
                   <button
                     type="button"
                     role="menuitem"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                    onClick={() => insertTrigger('/')}
+                  >
+                    <Slash size={14} className="text-muted-foreground" />
+                    <span className="font-medium">调用命令 /</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
+                    onClick={() => insertTrigger('@')}
+                  >
+                    <AtSign size={14} className="text-muted-foreground" />
+                    <span className="font-medium">提及专家 @</span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
                     onClick={() => {
                       setSkillQuery('')
                       setActiveMenu('skills')
                     }}
                   >
-                    <BookOpen size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>Skills</strong>
-                      <span className="chat-composer-command-hint">搜索并显式调用工作区 Skill</span>
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      <BookOpen size={14} className="text-muted-foreground" />
+                      <div className="flex flex-col text-left">
+                        <strong className="font-medium">Skills</strong>
+                        <span className="text-[10px] text-muted-foreground">
+                          搜索并显式调用工作区 Skill
+                        </span>
+                      </div>
+                    </div>
                   </button>
                   <button
                     type="button"
                     role="menuitem"
+                    className="flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer"
                     onClick={() => {
                       setExpertQuery('')
                       setActiveMenu('experts')
                     }}
                   >
-                    <UserCheck size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>专家</strong>
-                      <span className="chat-composer-command-hint">
-                        选择全栈架构、代码审查、测试QA等专家
-                      </span>
-                    </span>
+                    <div className="flex items-center gap-2.5">
+                      <UserCheck size={14} className="text-muted-foreground" />
+                      <div className="flex flex-col text-left">
+                        <strong className="font-medium">专家角色</strong>
+                        <span className="text-[10px] text-muted-foreground">
+                          架构、代码审查、安全等专家
+                        </span>
+                      </div>
+                    </div>
                   </button>
                   <button
-                    className={goalMode ? 'is-selected' : undefined}
                     type="button"
                     role="menuitemcheckbox"
                     aria-checked={goalMode}
+                    className={cn(
+                      'flex w-full items-center justify-between gap-2.5 rounded-lg px-2.5 py-1.5 text-xs text-foreground hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer',
+                      goalMode && 'bg-primary/10 text-primary'
+                    )}
                     onClick={() => {
                       setGoalMode((current) => !current)
                       setActiveMenu(null)
                       textareaRef.current?.focus()
                     }}
                   >
-                    <Target size={16} />
-                    <span className="chat-composer-command-item-main">
-                      <strong>Goal</strong>
-                      <span className="chat-composer-command-hint">持续执行直到目标完成</span>
-                    </span>
-                    {goalMode ? <Check className="chat-composer-command-check" size={15} /> : null}
+                    <div className="flex items-center gap-2.5">
+                      <Target
+                        size={14}
+                        className={goalMode ? 'text-primary' : 'text-muted-foreground'}
+                      />
+                      <div className="flex flex-col text-left">
+                        <strong className="font-medium">Goal 模式</strong>
+                        <span className="text-[10px] text-muted-foreground">
+                          持续自主循环直至完成目标
+                        </span>
+                      </div>
+                    </div>
+                    {goalMode ? <Check size={14} className="text-primary" /> : null}
                   </button>
                 </div>
               </motion.div>
             ) : activeMenu === 'skills' || showInlineSkillPicker ? (
               <motion.div
                 key="skills-panel"
-                className="chat-composer-skill-panel"
+                className="overflow-hidden rounded-xl border border-border/80 bg-popover/95 shadow-xl backdrop-blur-md m-2 p-1.5"
                 initial={reducedMotion ? false : { height: 0, opacity: 0 }}
                 animate={{
                   height: 'auto',
@@ -593,7 +627,7 @@ export function Composer({
                       }
                 }}
               >
-                <div className="chat-composer-skill-panel-inner">
+                <div className="p-1">
                   <SkillPicker
                     ref={skillPickerRef}
                     sessionId={sessionId}
@@ -612,7 +646,7 @@ export function Composer({
             ) : activeMenu === 'experts' ? (
               <motion.div
                 key="experts-panel"
-                className="chat-composer-skill-panel chat-composer-expert-panel"
+                className="overflow-hidden rounded-xl border border-border/80 bg-popover/95 shadow-xl backdrop-blur-md m-2 p-1.5"
                 initial={reducedMotion ? false : { height: 0, opacity: 0 }}
                 animate={{
                   height: 'auto',
@@ -635,7 +669,7 @@ export function Composer({
                       }
                 }}
               >
-                <div className="chat-composer-skill-panel-inner">
+                <div className="p-1">
                   <ExpertPicker
                     ref={expertPickerRef}
                     query={expertQuery}
@@ -652,14 +686,19 @@ export function Composer({
             ) : null}
           </AnimatePresence>
         </div>
-        <div className="chat-composer-card">
+        <div className="flex flex-col p-3">
           {activeBlocks && activeBlocks.length > 0 ? <TodoPanel blocks={activeBlocks} /> : null}
           {selectedSkill ? (
-            <div className="chat-composer-selected-skill" role="group" aria-label="已选择 Skill">
-              <BookOpen size={14} />
+            <div
+              className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-purple-500/30 bg-purple-500/10 px-2.5 py-1 text-xs font-medium text-purple-600 dark:text-purple-400 self-start"
+              role="group"
+              aria-label="已选择 Skill"
+            >
+              <BookOpen size={13} />
               <span>{selectedSkill.name}</span>
               <button
                 type="button"
+                className="hover:opacity-70 cursor-pointer"
                 aria-label={`移除 Skill ${selectedSkill.name}`}
                 onClick={onSkillClear}
               >
@@ -669,15 +708,16 @@ export function Composer({
           ) : null}
           {selectedExpert ? (
             <div
-              className="chat-composer-selected-skill chat-composer-selected-expert"
+              className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-blue-500/30 bg-blue-500/10 px-2.5 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 self-start"
               role="group"
               aria-label="已选择专家"
             >
-              <UserCheck size={14} />
+              <UserCheck size={13} />
               <span>{selectedExpert.name}</span>
-              <small style={{ opacity: 0.7, marginLeft: 6 }}>{selectedExpert.title}</small>
+              <span className="text-[10px] opacity-70">({selectedExpert.title})</span>
               <button
                 type="button"
+                className="hover:opacity-70 cursor-pointer"
                 aria-label={`移除专家 ${selectedExpert.name}`}
                 onClick={() => setSelectedExpert(undefined)}
               >
@@ -687,14 +727,15 @@ export function Composer({
           ) : null}
           {goalMode ? (
             <div
-              className="chat-composer-selected-skill chat-composer-selected-goal"
+              className="mb-2 inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary self-start"
               role="group"
               aria-label="已开启 Goal 模式"
             >
-              <Target size={14} />
-              <span>Goal 模式</span>
+              <Target size={13} />
+              <span>Goal 模式运行中</span>
               <button
                 type="button"
+                className="hover:opacity-70 cursor-pointer"
                 aria-label="关闭 Goal 模式"
                 title="关闭 Goal 模式"
                 onClick={() => setGoalMode(false)}
@@ -706,7 +747,7 @@ export function Composer({
           <AnimatePresence initial={false}>
             {attachments.length > 0 ? (
               <motion.div
-                className="chat-composer-attachments-region"
+                className="mb-2"
                 initial={reducedMotion ? false : { height: 0, opacity: 0 }}
                 animate={{
                   height: 'auto',
@@ -729,11 +770,11 @@ export function Composer({
                       }
                 }}
               >
-                <div className="chat-composer-attachments" aria-label="已添加图片">
+                <div className="flex flex-wrap items-center gap-2" aria-label="已添加图片">
                   <AnimatePresence initial={false}>
                     {attachments.map((attachment) => (
                       <motion.div
-                        className={`chat-composer-attachment is-${attachment.status}`}
+                        className="chat-composer-attachment relative flex items-center gap-2 rounded-xl border border-border/70 bg-muted/40 p-1.5 text-xs text-foreground shadow-2xs group"
                         key={attachment.id}
                         title={attachment.errorMessage ?? attachment.name}
                         layout
@@ -747,28 +788,38 @@ export function Composer({
                         }
                       >
                         {attachment.url ? (
-                          <img src={attachment.url} alt={attachment.name} />
+                          <img
+                            src={attachment.url}
+                            alt={attachment.name}
+                            className="size-10 rounded-lg object-cover"
+                          />
                         ) : (
-                          <span className="chat-composer-attachment-placeholder">
+                          <div className="size-10 rounded-lg bg-muted flex items-center justify-center text-muted-foreground">
                             {attachment.status === 'failed' ? (
-                              <AlertCircle size={18} />
+                              <AlertCircle size={16} className="text-destructive" />
                             ) : (
-                              <FileImage size={18} />
+                              <FileImage size={16} />
                             )}
-                          </span>
+                          </div>
                         )}
-                        {attachment.sizeBytes ? (
-                          <span className="chat-composer-attachment-size">
-                            {formatFileSize(attachment.sizeBytes)}
+                        <div className="flex flex-col pr-5">
+                          <span className="max-w-[100px] truncate text-[11px] font-medium">
+                            {attachment.name}
                           </span>
-                        ) : null}
-                        {attachment.status !== 'ready' ? (
-                          <span className="chat-composer-attachment-status">
-                            {attachment.status === 'pending' ? '处理中…' : '失败'}
-                          </span>
-                        ) : null}
+                          {attachment.sizeBytes ? (
+                            <span className="text-[10px] text-muted-foreground font-mono">
+                              {formatFileSize(attachment.sizeBytes)}
+                            </span>
+                          ) : null}
+                          {attachment.status !== 'ready' ? (
+                            <span className="text-[10px] text-amber-500 font-medium">
+                              {attachment.status === 'pending' ? '处理中…' : '失败'}
+                            </span>
+                          ) : null}
+                        </div>
                         <button
                           type="button"
+                          className="absolute top-1 right-1 size-5 rounded-full bg-background/80 hover:bg-destructive hover:text-white flex items-center justify-center text-muted-foreground transition-colors cursor-pointer"
                           aria-label={`移除图片 ${attachment.name}`}
                           title="移除图片"
                           onClick={() => {
@@ -778,7 +829,7 @@ export function Composer({
                             setAttachmentError(null)
                           }}
                         >
-                          <X size={12} />
+                          <X size={10} />
                         </button>
                       </motion.div>
                     ))}
@@ -788,7 +839,10 @@ export function Composer({
             ) : null}
           </AnimatePresence>
           {attachmentError ? (
-            <div className="chat-composer-attachment-error" role="alert">
+            <div
+              className="mb-2 flex items-center gap-1.5 text-xs text-destructive font-medium"
+              role="alert"
+            >
               <AlertCircle size={13} />
               <span>{attachmentError}</span>
             </div>
@@ -799,6 +853,7 @@ export function Composer({
             rows={1}
             aria-label="发送消息"
             placeholder="提出后续修改要求 / 描述任务，或输入 / 唤出技能..."
+            className="w-full resize-none bg-transparent px-3 pt-2.5 pb-1 text-sm leading-relaxed text-foreground placeholder:text-muted-foreground/50 focus:outline-none min-h-[44px]"
             onChange={(event) => onChange(event.currentTarget.value)}
             onPaste={(event) => {
               const files = Array.from(event.clipboardData.files)
@@ -836,10 +891,10 @@ export function Composer({
               }
             }}
           />
-          <div className="chat-composer-toolbar">
-            <div className="chat-composer-options">
+          <div className="flex flex-wrap items-center justify-between gap-2 px-1.5 pb-1 pt-1 select-none">
+            <div className="flex items-center gap-1.5">
               <button
-                className="chat-composer-attach"
+                className="inline-flex size-7.5 items-center justify-center rounded-full text-muted-foreground/70 transition-colors hover:bg-muted hover:text-foreground active:scale-95 cursor-pointer"
                 type="button"
                 aria-label="添加内容"
                 aria-expanded={activeMenu === 'add'}
@@ -853,7 +908,6 @@ export function Composer({
                 label="Agent 模式"
                 value={permission}
                 options={modeOptions && modeOptions.length > 0 ? modeOptions : AGENT_MODES}
-                chipClassName="chat-composer-shield-chip"
                 open={activeMenu === 'permission'}
                 reducedMotion={reducedMotion}
                 onOpenChange={(open) => setActiveMenu(open ? 'permission' : null)}
@@ -862,7 +916,6 @@ export function Composer({
               <AnimatePresence initial={false}>
                 {goalMode ? (
                   <motion.span
-                    className="chat-composer-mode-control"
                     initial={reducedMotion ? false : { opacity: 0, x: -4 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -3 }}
@@ -870,16 +923,15 @@ export function Composer({
                       reducedMotion ? { duration: 0 } : { duration: 0.15, ease: [0.23, 1, 0.32, 1] }
                     }
                   >
-                    <span className="chat-composer-mode-divider" aria-hidden="true" />
                     <button
-                      className="chat-composer-mode-chip is-goal-active"
+                      className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 text-xs font-medium text-primary hover:bg-primary/20 transition-colors cursor-pointer"
                       type="button"
                       aria-label="退出 Goal 模式"
                       aria-pressed="true"
                       title="退出 Goal 模式"
                       onClick={() => setGoalMode(false)}
                     >
-                      <Target size={14} />
+                      <Target size={13} />
                       <span>Goal</span>
                       <X size={11} />
                     </button>
@@ -887,7 +939,7 @@ export function Composer({
                 ) : null}
               </AnimatePresence>
             </div>
-            <div className="chat-composer-actions">
+            <div className="flex items-center gap-1.5 ml-auto">
               {/* ContextGauge 环形容量健康度指示器 */}
               <ContextGauge model={model} tokenUsage={tokenUsage} reducedMotion={reducedMotion} />
 
@@ -901,24 +953,24 @@ export function Composer({
                 reducedMotion={reducedMotion}
               />
 
-              {/* 思考深度 / 推理级别选择器 🧠 高 ∨ */}
+              {/* 思考深度 / 推理级别选择器 */}
               <Popover
                 open={activeMenu === 'reasoning'}
                 onOpenChange={(open) => setActiveMenu(open ? 'reasoning' : null)}
               >
                 <PopoverTrigger asChild>
                   <button
-                    className="chat-composer-chip chat-composer-subtle-chip cursor-pointer"
+                    className="inline-flex h-7 items-center gap-1.5 rounded-full border border-border/60 bg-muted/40 hover:bg-muted px-2.5 text-xs font-medium text-foreground/85 transition-colors active:scale-95 cursor-pointer select-none"
                     type="button"
                     aria-label="思考深度"
                     aria-expanded={activeMenu === 'reasoning'}
                   >
-                    <Brain size={13} />
+                    <Brain size={12} className="text-purple-500 shrink-0" />
                     <span>{REASONING_LABELS[reasoningEffort]}</span>
                     <ChevronDown
                       size={11}
                       className={cn(
-                        'chat-composer-chip-chevron transition-transform duration-200',
+                        'text-muted-foreground transition-transform duration-200',
                         activeMenu === 'reasoning' && 'rotate-180'
                       )}
                     />
@@ -928,9 +980,9 @@ export function Composer({
                   align="end"
                   side="top"
                   sideOffset={6}
-                  className="chat-composer-menu is-right p-1.5 z-50 rounded-xl border border-border/70 bg-popover text-popover-foreground shadow-lg min-w-[140px] outline-none"
+                  className="w-40 rounded-xl border border-border/80 bg-popover p-1.5 text-popover-foreground shadow-xl backdrop-blur-md z-50 outline-none select-none"
                 >
-                  <div className="chat-composer-menu-header px-2 py-1 text-[11px] font-medium text-muted-foreground">
+                  <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground tracking-wider uppercase">
                     思考深度
                   </div>
                   {(['high', 'medium', 'low', 'off'] as const).map((level) => (
@@ -940,41 +992,41 @@ export function Composer({
                       role="menuitemradio"
                       aria-checked={reasoningEffort === level}
                       className={cn(
-                        'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                        reasoningEffort === level && 'is-selected font-medium'
+                        'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors',
+                        reasoningEffort === level && 'bg-accent font-medium text-accent-foreground'
                       )}
                       onClick={() => {
                         setReasoningEffort(level)
                         setActiveMenu(null)
                       }}
                     >
-                      <span className="chat-composer-menu-row flex items-center gap-2">
-                        <Brain size={12} />
+                      <div className="flex items-center gap-2">
+                        <Brain size={12} className="text-purple-500" />
                         <span>{REASONING_LABELS[level]}</span>
-                      </span>
+                      </div>
                       {reasoningEffort === level ? (
                         <Check size={12} className="text-primary" />
                       ) : null}
                     </button>
                   ))}
-                  <div className="chat-composer-menu-divider my-1 h-px bg-border/50" />
+                  <div className="my-1 h-px bg-border/50" />
                   <button
                     type="button"
                     role="menuitemcheckbox"
                     aria-checked={goalMode}
                     className={cn(
-                      'w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer',
-                      goalMode && 'is-selected font-medium'
+                      'w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg text-xs hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors',
+                      goalMode && 'bg-accent font-medium text-accent-foreground'
                     )}
                     onClick={() => {
                       setGoalMode((prev) => !prev)
                       setActiveMenu(null)
                     }}
                   >
-                    <span className="chat-composer-menu-row flex items-center gap-2">
-                      <Target size={12} />
+                    <div className="flex items-center gap-2">
+                      <Target size={12} className="text-primary" />
                       <span>Goal 模式</span>
-                    </span>
+                    </div>
                     {goalMode ? <Check size={12} className="text-primary" /> : null}
                   </button>
                 </PopoverContent>
@@ -982,13 +1034,14 @@ export function Composer({
 
               {/* 发送 / 停止 / 排队按钮 */}
               <button
-                className={
+                className={cn(
+                  'inline-flex size-7.5 items-center justify-center rounded-full shadow-xs transition-all active:scale-95 cursor-pointer',
                   isStreaming
                     ? canSend
-                      ? 'chat-send-button is-queueing'
-                      : 'chat-send-button is-stopping'
-                    : 'chat-send-button'
-                }
+                      ? 'bg-amber-500 text-white hover:bg-amber-600'
+                      : 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
+                    : 'bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-30 disabled:pointer-events-none'
+                )}
                 type="button"
                 aria-label={isStreaming ? (canSend ? '加入排队' : '停止生成') : '发送'}
                 title={
@@ -1003,37 +1056,35 @@ export function Composer({
                 disabled={!isStreaming && !canSend}
                 onClick={isStreaming && !canSend ? onStop : submit}
               >
-                <span className="chat-send-icon" aria-hidden="true">
-                  <AnimatePresence initial={false} mode="wait">
-                    <motion.span
-                      key={isStreaming ? (canSend ? 'queue' : 'stop') : 'send'}
-                      initial={reducedMotion ? false : { opacity: 0, rotate: -12, scale: 0.76 }}
-                      animate={{ opacity: 1, rotate: 0, scale: 1 }}
-                      exit={{ opacity: 0, rotate: 10, scale: 0.76 }}
-                      transition={
-                        reducedMotion
-                          ? { duration: 0 }
-                          : { duration: 0.12, ease: [0.23, 1, 0.32, 1] }
-                      }
-                    >
-                      {isStreaming ? (
-                        canSend ? (
-                          <CornerDownLeft size={14} />
-                        ) : (
-                          <Square size={12} fill="currentColor" />
-                        )
+                <AnimatePresence initial={false} mode="wait">
+                  <motion.span
+                    key={isStreaming ? (canSend ? 'queue' : 'stop') : 'send'}
+                    initial={reducedMotion ? false : { opacity: 0, rotate: -12, scale: 0.76 }}
+                    animate={{ opacity: 1, rotate: 0, scale: 1 }}
+                    exit={{ opacity: 0, rotate: 10, scale: 0.76 }}
+                    transition={
+                      reducedMotion ? { duration: 0 } : { duration: 0.12, ease: [0.23, 1, 0.32, 1] }
+                    }
+                  >
+                    {isStreaming ? (
+                      canSend ? (
+                        <CornerDownLeft size={13} />
                       ) : (
-                        <ArrowUp size={16} />
-                      )}
-                    </motion.span>
-                  </AnimatePresence>
-                </span>
+                        <Square size={11} fill="currentColor" />
+                      )
+                    ) : (
+                      <ArrowUp size={15} />
+                    )}
+                  </motion.span>
+                </AnimatePresence>
               </button>
             </div>
           </div>
         </div>
       </div>
-      <p className="chat-composer-hint">AI 生成内容可能有误，请检查重要信息。</p>
+      <p className="mt-2 text-center text-[11px] text-muted-foreground/55 select-none leading-none">
+        AI 生成内容仅供参考，请核对重要评估结论与风险项。
+      </p>
     </div>
   )
 }

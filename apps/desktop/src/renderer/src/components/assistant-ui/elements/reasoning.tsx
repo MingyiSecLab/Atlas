@@ -165,19 +165,21 @@ function ReasoningTrigger({
     <CollapsibleTrigger
       data-slot="reasoning-trigger"
       className={cn(
-        'aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground flex max-w-[75%] origin-left items-center gap-2 py-0 text-sm transition-[color,scale] active:scale-[0.98]',
+        // ghost 触发行对齐 tests/linkcode chat/disclosure-header.tsx：
+        // icon + 标签 + chevron 紧凑左对齐，仅文字色 hover 反馈，无背景无满宽
+        'aui-reasoning-trigger group/trigger text-muted-foreground hover:text-foreground flex max-w-[75%] origin-left cursor-pointer items-center gap-2 py-1 text-left text-sm transition-[color,scale] active:scale-[0.98]',
         className
       )}
       {...props}
     >
       <BrainIcon
         data-slot="reasoning-trigger-icon"
-        className="aui-reasoning-trigger-icon size-4 shrink-0"
+        className="aui-reasoning-trigger-icon size-3.5 shrink-0"
       />
       <span
         data-slot="reasoning-trigger-label"
         className={cn(
-          'aui-reasoning-trigger-label-wrapper inline-block leading-none tabular-nums',
+          'aui-reasoning-trigger-label-wrapper inline-block font-medium leading-none opacity-80 tabular-nums',
           active && 'shimmer motion-reduce:animate-none'
         )}
       >
@@ -186,7 +188,7 @@ function ReasoningTrigger({
       <ChevronDownIcon
         data-slot="reasoning-trigger-chevron"
         className={cn(
-          'aui-reasoning-trigger-chevron mt-0.5 size-4 shrink-0',
+          'aui-reasoning-trigger-chevron size-3.5 shrink-0',
           'transition-transform duration-(--animation-duration) ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
           '-rotate-90',
           'group-data-open/trigger:rotate-0',
@@ -278,7 +280,9 @@ function ReasoningText({
       ref={scrollRef}
       data-slot="reasoning-text"
       className={cn(
-        'aui-reasoning-text relative z-0 max-h-64 overflow-y-auto ps-6 pt-2 pb-2 leading-relaxed text-pretty',
+        // 内容区对齐 tests/linkcode chat/reasoning.tsx 的 ReasoningContent：
+        // mt-1 + 左侧 2px 中性边线 + pl-3 缩进 + 斜体弱化，max-h-96 限高滚动
+        'aui-reasoning-text relative z-0 mt-1 max-h-96 overflow-y-auto border-l-2 border-border pl-3 text-sm italic opacity-90 text-muted-foreground text-pretty',
         'transform-gpu transition-[transform,opacity] ease-[cubic-bezier(0.32,0.72,0,1)]',
         'motion-reduce:animate-none',
         'group-data-open/collapsible-content:animate-in',
