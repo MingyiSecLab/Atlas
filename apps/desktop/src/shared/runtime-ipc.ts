@@ -68,6 +68,8 @@ export const RUNTIME_IPC = {
   pentestStop: 'runtime:pentest:stop',
   pentestDriverStatus: 'runtime:pentest:driver-status',
   pentestParseIntent: 'runtime:pentest:parse-intent',
+  pentestBindings: 'runtime:pentest:bindings',
+  pentestBind: 'runtime:pentest:bind',
   pentestEvent: 'runtime:pentest:event',
   expertList: 'runtime:expert:list',
   expertSave: 'runtime:expert:save',
@@ -172,6 +174,11 @@ export interface DesktopPentestCreateInput {
   authorizationRef: string
   executionMode?: DesktopPentestExecutionMode
   expiresAt?: number
+  /**
+   * 创建该 engagement 的会话（task）ID；仅 desktop 消费，用于会话级归属绑定，
+   * 不透传给 Runtime。缺省表示无归属（外部脚本/兼容旧流程）。
+   */
+  taskId?: string
 }
 
 export interface DesktopPentestStartInput {
@@ -189,6 +196,8 @@ export interface DesktopPentestEvent {
   engagementId: string
   event?: RuntimePentestEvent
   driver?: RuntimePentestDriverStatus
+  /** 仅创建广播携带：engagement 归属的会话 ID，Renderer 据此决定是否自动切换。 */
+  taskId?: string
 }
 
 export interface RuntimePentestBridge {
@@ -208,6 +217,10 @@ export interface RuntimePentestBridge {
     message: string,
     existingDraft?: RuntimePentestCreationIntent
   ): Promise<RuntimePentestCreationIntent>
+  /** 会话 → engagement 归属映射（跨重启持久化）。 */
+  bindings(): Promise<Record<string, string[]>>
+  /** 把已有 engagement 挂接到指定会话（幂等；后挂接的排最后，作为该会话默认视图）。 */
+  bind(input: { taskId: string; engagementId: string }): Promise<void>
   onEvent(listener: (event: DesktopPentestEvent) => void): () => void
 }
 

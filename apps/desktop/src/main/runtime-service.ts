@@ -296,7 +296,13 @@ async function validateWorkspace(path: string): Promise<string> {
   return resolved
 }
 
-export function registerRuntimeService(runtimeManager: DesktopRuntimeManager): () => void {
+export function registerRuntimeService(
+  runtimeManager: DesktopRuntimeManager,
+  hooks?: {
+    /** 会话删除成功后回调（用于跨服务清理，如 pentest 绑定）。 */
+    onSessionDeleted?: (sessionId: string) => void
+  }
+): () => void {
   const subscribers = new Set<WebContents>()
   let activeRuntime: LocalRuntimeInstance | undefined
   let unsubscribeRuntime = (): void => undefined
@@ -618,7 +624,9 @@ export function registerRuntimeService(runtimeManager: DesktopRuntimeManager): (
   })
   ipcMain.handle(RUNTIME_IPC.sessionDelete, async (event, input: unknown) => {
     const runtime = await getRuntime(event.sender)
-    await runtime.sessions.delete(sessionId(input))
+    const id = sessionId(input)
+    await runtime.sessions.delete(id)
+    hooks?.onSessionDeleted?.(id)
   })
   ipcMain.handle(RUNTIME_IPC.sessionSendMessage, async (event, input: unknown) => {
     const request = sendInput(input)

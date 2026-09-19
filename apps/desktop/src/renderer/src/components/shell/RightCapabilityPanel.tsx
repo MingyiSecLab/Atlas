@@ -9,6 +9,8 @@ interface RightCapabilityPanelProps {
   activeSection: RightPanelSection
   isExpanded: boolean
   width: number
+  /** 当前会话（task）ID：渗透面板据此绑定该会话的 engagement。 */
+  taskId: string | null
   onResize: (width: number) => void
   onSelectSection: (section: RightPanelSection) => void
 }
@@ -24,6 +26,7 @@ export const RightCapabilityPanel: React.FC<RightCapabilityPanelProps> = ({
   activeSection,
   isExpanded,
   width,
+  taskId,
   onResize
 }) => {
   const [isResizing, setIsResizing] = useState(false)
@@ -100,7 +103,7 @@ export const RightCapabilityPanel: React.FC<RightCapabilityPanelProps> = ({
         {activeSection === 'terminal' ? <RightTerminalView /> : null}
         {activeSection === 'browser' ? <BrowserView /> : null}
         {activeSection === 'files' ? <FilesView /> : null}
-        {activeSection === 'pentest' ? <PentestView /> : null}
+        {activeSection === 'pentest' ? <PentestView taskId={taskId} /> : null}
       </div>
     </aside>
   )

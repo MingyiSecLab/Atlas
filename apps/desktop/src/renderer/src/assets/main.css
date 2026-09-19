@@ -6927,6 +6927,35 @@ button.tree-row {
   line-height: 1.5;
 }
 
+/* 会话未关联 engagement 时的空态提示与挂接入口 */
+.pentest-unbound {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-color, rgba(0, 0, 0, 0.15));
+  border-radius: 10px;
+}
+
+.pentest-unbound-attach {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+
+.pentest-unbound-attach select {
+  height: 28px;
+  padding: 0 6px;
+  font-size: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color, rgba(0, 0, 0, 0.12));
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
 .pentest-create-field {
   display: flex;
   flex-direction: column;

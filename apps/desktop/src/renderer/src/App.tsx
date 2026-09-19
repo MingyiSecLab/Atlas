@@ -515,6 +515,7 @@ export const App: React.FC = () => {
                   activeSection={rightPanelSection}
                   isExpanded={isRightPanelExpanded}
                   width={rightPanelWidth}
+                  taskId={currentTaskId}
                   onResize={setRightPanelWidth}
                   onSelectSection={setRightPanelSection}
                 />

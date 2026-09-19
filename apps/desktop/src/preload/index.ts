@@ -203,6 +203,9 @@ const api = {
       ipcRenderer.invoke(RUNTIME_IPC.pentestDriverStatus, engagementId),
     parseIntent: (message: string, existingDraft?: RuntimePentestCreationIntent) =>
       ipcRenderer.invoke(RUNTIME_IPC.pentestParseIntent, { message, existingDraft }),
+    bindings: () => ipcRenderer.invoke(RUNTIME_IPC.pentestBindings),
+    bind: (input: { taskId: string; engagementId: string }) =>
+      ipcRenderer.invoke(RUNTIME_IPC.pentestBind, input),
     onEvent: (listener: (event: DesktopPentestEvent) => void): (() => void) => {
       const handler = (
         _event: Electron.IpcRendererEvent,

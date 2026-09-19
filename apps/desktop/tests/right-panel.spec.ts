@@ -8,6 +8,25 @@ test.describe('Right capability panel', () => {
   let page: Page
   let suiteEnv: NodeJS.ProcessEnv
 
+  const TASK_TITLE = '右侧工作台布局'
+
+  /** 当前渲染器里指定标题会话的 taskId（与 sessionId 同源）。 */
+  const resolveTaskId = async (title: string): Promise<string | null> =>
+    page.evaluate(async (sessionTitle) => {
+      const sessions = await window.api.sessions.list()
+      return sessions.find((session) => session.title === sessionTitle)?.id ?? null
+    }, title)
+
+  const openPentestSection = async (): Promise<ReturnType<Page['getByTestId']>> => {
+    const openBtn = page.getByTitle('打开右侧工作台')
+    if (await openBtn.isVisible().catch(() => false)) await openBtn.click()
+    const sectionStrip = page.getByRole('navigation', { name: '右侧工作台区段' })
+    await sectionStrip.getByRole('button', { name: '渗透', exact: true }).click()
+    const pentest = page.getByTestId('right-panel-pentest')
+    await expect(pentest).toBeVisible()
+    return pentest
+  }
+
   test.beforeAll(async () => {
     suiteEnv = runtimeTestEnv('right-panel')
     electronApp = await electron.launch({
@@ -62,27 +81,23 @@ test.describe('Right capability panel', () => {
   })
 
   test('creates an engagement and shows the real-time blackboard canvas, tabs, and report', async () => {
-    const openBtn = page.getByTitle('打开右侧工作台')
-    if (await openBtn.isVisible()) {
-      await openBtn.click()
-    }
+    const pentest = await openPentestSection()
 
-    const sectionStrip = page.getByRole('navigation', { name: '右侧工作台区段' })
-    await sectionStrip.getByRole('button', { name: '渗透', exact: true }).click()
-
-    const pentest = page.getByTestId('right-panel-pentest')
-    await expect(pentest).toBeVisible()
-
-    // 0. 右侧不再承载表单：测试用 IPC 建立真实 engagement。
-    await page.evaluate(() =>
-      window.api.pentest.create({
-        title: '黑板视图验证评估',
-        goal: '验证黑板实时视图数据流',
-        origin: 'workspace://',
-        scope: ['workspace://'],
-        principal: 'security-team',
-        authorizationRef: 'ENG-E2E-001'
-      })
+    // 0. 右侧不再承载表单：测试用 IPC 建立真实 engagement（与聊天确认卡一致，带会话归属）。
+    const taskId = await resolveTaskId(TASK_TITLE)
+    expect(taskId).not.toBeNull()
+    await page.evaluate(
+      (ownerTaskId) =>
+        window.api.pentest.create({
+          title: '黑板视图验证评估',
+          goal: '验证黑板实时视图数据流',
+          origin: 'workspace://',
+          scope: ['workspace://'],
+          principal: 'security-team',
+          authorizationRef: 'ENG-E2E-001',
+          taskId: ownerTaskId ?? undefined
+        }),
+      taskId
     )
     await expect(pentest.getByTestId('pentest-subtabs')).toBeVisible()
 
@@ -126,29 +141,29 @@ test.describe('Right capability panel', () => {
 
   test('restores the engagement after an app restart instead of showing the create form', async () => {
     test.setTimeout(120_000)
-    const openBtn = page.getByTitle('打开右侧工作台')
-    if (await openBtn.isVisible()) await openBtn.click()
-    const sectionStrip = page.getByRole('navigation', { name: '右侧工作台区段' })
-    await sectionStrip.getByRole('button', { name: '渗透', exact: true }).click()
-    const pentest = page.getByTestId('right-panel-pentest')
-    await expect(pentest).toBeVisible()
+    const pentest = await openPentestSection()
 
-    // 自包含准备：无任务时通过 IPC 建立 engagement（生产流程由聊天确认卡完成）。
+    // 自包含准备：当前会话无绑定任务时通过 IPC 建立 engagement（生产流程由聊天确认卡完成）。
     if (
       await pentest
-        .getByTestId('pentest-chat-onboarding')
+        .getByTestId('pentest-unbound-hint')
         .isVisible()
         .catch(() => false)
     ) {
-      await page.evaluate(() =>
-        window.api.pentest.create({
-          title: '重启恢复评估',
-          goal: '验证重启后 engagement 恢复',
-          origin: 'workspace://',
-          scope: ['workspace://'],
-          principal: 'security-team',
-          authorizationRef: 'ENG-RESTART'
-        })
+      const taskId = await resolveTaskId(TASK_TITLE)
+      expect(taskId).not.toBeNull()
+      await page.evaluate(
+        (ownerTaskId) =>
+          window.api.pentest.create({
+            title: '重启恢复评估',
+            goal: '验证重启后 engagement 恢复',
+            origin: 'workspace://',
+            scope: ['workspace://'],
+            principal: 'security-team',
+            authorizationRef: 'ENG-RESTART',
+            taskId: ownerTaskId ?? undefined
+          }),
+        taskId
       )
     }
     await expect(pentest.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
@@ -186,6 +201,76 @@ test.describe('Right capability panel', () => {
     const restoredIds = await page.evaluate(() => window.api.pentest.list())
     expect(restoredIds).toEqual(persistedIds)
     await page.screenshot({ path: 'test-results/pentest-restored-after-restart.png' })
+  })
+
+  test('binds engagements to the owning conversation and never bleeds across sessions', async () => {
+    test.setTimeout(90_000)
+    // 前置：任务 A 在上面的用例中已绑定 engagement，面板直接进入黑板视图。
+    const pentestA = await openPentestSection()
+    await expect(pentestA.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
+
+    // 新建会话 B 并切换过去：面板必须回到未关联空态，而不是继续展示 A 的任务。
+    await page.evaluate(() => window.api.sessions.create({ title: '渗透会话隔离B' }))
+    await page.reload()
+    await page.getByText('渗透会话隔离B', { exact: true }).first().click()
+    await expect(page.locator('.chat-workspace')).toBeVisible()
+
+    const pentestB = await openPentestSection()
+    await expect(pentestB.getByTestId('pentest-unbound-hint')).toBeVisible({ timeout: 15_000 })
+
+    // 在 B 里创建任务：面板只跟随当前会话的创建，自动切到 B 的黑板。
+    const taskIdB = await resolveTaskId('渗透会话隔离B')
+    expect(taskIdB).not.toBeNull()
+    await page.evaluate(
+      (ownerTaskId) =>
+        window.api.pentest.create({
+          title: '隔离验证评估B',
+          goal: '验证会话级绑定不串数据',
+          origin: 'workspace://',
+          scope: ['workspace://'],
+          principal: 'security-team',
+          authorizationRef: 'ENG-ISOLATION-B',
+          taskId: ownerTaskId ?? undefined
+        }),
+      taskIdB
+    )
+    await expect(pentestB.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
+    await expect(pentestB.getByTestId('pentest-unbound-hint')).toHaveCount(0)
+
+    // 切回 A：面板恢复 A 绑定的 engagement（不是 B 的，也不是空态）。
+    await page.getByText(TASK_TITLE, { exact: true }).first().click()
+    await expect(page.locator('.chat-workspace')).toBeVisible()
+    const pentestAgain = await openPentestSection()
+    await expect(pentestAgain.getByTestId('pentest-subtabs')).toBeVisible({ timeout: 15_000 })
+  })
+
+  test('cleans up pentest bindings when the owning session is deleted', async () => {
+    // API 级验证：创建会话与绑定 → 删除会话 → 主进程 sessionDelete 钩子清理绑定。
+    const created = await page.evaluate(() =>
+      window.api.sessions.create({ title: '绑定清理会话C' })
+    )
+    const engagement = await page.evaluate(
+      (ownerTaskId) =>
+        window.api.pentest.create({
+          title: '绑定清理评估C',
+          goal: '验证会话删除后绑定清理',
+          origin: 'workspace://',
+          scope: ['workspace://'],
+          principal: 'security-team',
+          authorizationRef: 'ENG-CLEANUP-C',
+          taskId: ownerTaskId
+        }),
+      created.id
+    )
+    const bindingsFor = (ownerTaskId: string): Promise<string[] | undefined> =>
+      page.evaluate(
+        (sessionId) => window.api.pentest.bindings().then((map) => map[sessionId]),
+        ownerTaskId
+      )
+    expect(await bindingsFor(created.id)).toContain(engagement.id)
+
+    await page.evaluate((ownerTaskId) => window.api.sessions.delete(ownerTaskId), created.id)
+    expect(await bindingsFor(created.id)).toBeUndefined()
   })
 
   test('supports expand, restore and close controls', async () => {

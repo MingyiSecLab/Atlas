@@ -13,7 +13,8 @@ import { registerFileService } from './file-service'
 // 应用级数据统一落盘 ~/.atlas（desktop 动态计算，无需 .env 配置）：
 //   atlas.db（SQLite：任务/会话历史/消息流/状态机）、vectors.db（向量记忆与检索索引）、
 //   observability.duckdb（Trace）、auth.json（Provider 凭证）、settings.json（全局设置）、
-//   agents/（用户级专家）、projects/（项目登记）、blobs/（大文件分流）、pentest/（engagement 快照）。
+//   agents/（用户级专家）、projects/（项目登记）、blobs/（大文件分流）、
+//   pentest/（engagement 快照 + 会话归属映射 desktop-bindings.json）。
 // 以下均为 code-sdk 原生环境变量，必须在 runtime 首次 boot 之前设置；
 // 用 ||= 保留外部显式设置（调试用途），正常使用零配置。
 const atlasHome = join(homedir(), '.atlas')
@@ -130,8 +131,12 @@ app
 
     disposeTerminalService = registerTerminalService(join(atlasHome, 'blobs'))
     disposeProviderService = registerProviderService(runtimeManager)
-    disposeRuntimeService = registerRuntimeService(runtimeManager)
-    disposePentestService = registerPentestService(runtimeManager)
+    const pentestService = registerPentestService(runtimeManager)
+    disposePentestService = () => pentestService.dispose()
+    disposeRuntimeService = registerRuntimeService(runtimeManager, {
+      // 会话删除后清理其 engagement 绑定，避免残留指向已删除会话的映射
+      onSessionDeleted: (sessionId) => pentestService.removeTaskBindings(sessionId)
+    })
     disposeFileService = registerFileService(runtimeManager)
 
     if (process.platform === 'darwin' && app.dock) {

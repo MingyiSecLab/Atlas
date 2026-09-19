@@ -482,7 +482,8 @@ function ChatWorkspaceInner({
                     setPentestIntentError(null)
                   }}
                   onConfirm={async (draft) => {
-                    await window.api.pentest.create(draft)
+                    // 带上当前会话 ID：右侧渗透面板按会话绑定该任务，避免跨会话串数据。
+                    await window.api.pentest.create({ ...draft, taskId })
                     setPentestIntent(null)
                     setPentestIntentError(null)
                   }}
