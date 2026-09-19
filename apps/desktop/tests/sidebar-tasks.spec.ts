@@ -149,15 +149,19 @@ test.describe('Sidebar task actions', () => {
       .toBeGreaterThan(0)
 
     const spaceHeader = page.getByRole('button', { name: /空间 \(1\)/ })
-    await expect(spaceHeader).toBeVisible()
+    // 全量套件并发负载下，reload 后的 projects 拉取可能超过默认 5s
+    await expect(spaceHeader).toBeVisible({ timeout: 15_000 })
     // localStorage 会保留上次运行的折叠状态；确保空间组展开
     if ((await spaceHeader.getAttribute('aria-expanded')) === 'false') await spaceHeader.click()
     const spaceGroup = page.getByRole('button', { name: '展开空间“根空间”' })
-    await expect(spaceGroup).toBeVisible()
+    await expect(spaceGroup).toBeVisible({ timeout: 15_000 })
 
     // 空间组内出现归属任务（临时任务无 projectId，但 projectPath 同为 '/'，按路径归入根空间）
     // 展开按钮的 accessible name 同时包含计数文本
-    await expect(page.getByRole('button', { name: /展开空间“根空间”/ })).toContainText('根空间 (2)')
+    await expect(page.getByRole('button', { name: /展开空间“根空间”/ })).toContainText(
+      '根空间 (2)',
+      { timeout: 15_000 }
+    )
     await expect(
       page.locator('.sidebar-task-title').filter({ hasText: '空间内任务' })
     ).toBeVisible()

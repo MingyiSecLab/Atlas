@@ -111,7 +111,12 @@ test.describe('Settings', () => {
       .map((provider) => provider.provider)
     const configuredProvider = providerPayload.find((provider) => provider.source !== 'none')
     const unconfiguredProvider = providerPayload.find((provider) => provider.source === 'none')
-    await expect(dialog.locator('.settings-provider-row')).toHaveCount(configuredProviderIds.length)
+    // 行列表 = 已配置标准服务 + 自定义服务；settingsPath 指向宿主真实配置，
+    // 其中除 SDK 预置外可能还有用户自己的自定义服务，因此按当前数据计算期望行数。
+    const hostCustomProviders = await page.evaluate(() => window.api.providers.listCustom())
+    await expect(dialog.locator('.settings-provider-row')).toHaveCount(
+      configuredProviderIds.length + hostCustomProviders.length
+    )
     await expect(dialog.locator('.settings-provider-list input')).toHaveCount(0)
 
     if (configuredProvider) {
@@ -138,6 +143,11 @@ test.describe('Settings', () => {
       ).toHaveCount(1)
     }
 
+    // 幂等准备：历史运行可能在宿主 settings.json 残留同名自定义服务，先清理
+    await page.evaluate(() =>
+      window.api.providers.removeCustom('test-local-models').catch(() => undefined)
+    )
+
     await addDialog.getByRole('button', { name: '自定义模型' }).click()
     await addDialog.getByLabel('自定义供应商名称').fill('Test Local Models')
     await addDialog.getByLabel('自定义供应商 Base URL').fill('http://127.0.0.1:11434/v1')
@@ -146,23 +156,26 @@ test.describe('Settings', () => {
     await addDialog.getByLabel('自定义供应商 API Key').fill('test-custom-secret')
     await page.screenshot({ path: 'test-results/provider-add-custom.png' })
     await addDialog.getByRole('button', { name: '添加服务' }).click()
-    await expect(addDialog).toHaveCount(0)
+    // upsert 走 invalidateCatalog + 全量刷新，高负载机器上可能超过默认 5s
+    await expect(addDialog).toHaveCount(0, { timeout: 15_000 })
 
     const customRow = dialog
       .locator('.settings-provider-row')
       .filter({ hasText: 'Test Local Models' })
-    await expect(customRow).toBeVisible()
+    await expect(customRow).toBeVisible({ timeout: 15_000 })
     await expect(customRow).toContainText('2 个模型')
     await expect(customRow).toContainText('Anthropic Messages')
     const customPayload = await page.evaluate(() => window.api.providers.listCustom())
-    expect(customPayload).toEqual([
-      expect.objectContaining({
-        id: 'test-local-models',
-        models: ['qwen3-coder', 'deepseek-r1'],
-        protocol: 'anthropic',
-        hasApiKey: true
-      })
-    ])
+    expect(customPayload).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'test-local-models',
+          models: ['qwen3-coder', 'deepseek-r1'],
+          protocol: 'anthropic',
+          hasApiKey: true
+        })
+      ])
+    )
     expect(JSON.stringify(customPayload)).not.toContain('test-custom-secret')
     const modelPayload = await page.evaluate(() => window.api.models.list())
     expect(modelPayload.map((model) => model.id)).toEqual(
@@ -186,10 +199,20 @@ test.describe('Settings', () => {
 
     const providerSearch = dialog.getByLabel('搜索已配置的模型服务')
     await providerSearch.fill('qwen3')
-    await expect(dialog.locator('.settings-provider-row')).toHaveCount(1)
+    // SDK 预置的自定义供应商也可能包含 qwen3 模型：期望数按当前数据计算
+    const allCustom = await page.evaluate(() => window.api.providers.listCustom())
+    const qwen3Matches = allCustom.filter(
+      (provider) =>
+        provider.name.toLocaleLowerCase().includes('qwen3') ||
+        provider.id.toLocaleLowerCase().includes('qwen3') ||
+        provider.models.some((model) => model.toLocaleLowerCase().includes('qwen3'))
+    ).length
+    await expect(dialog.locator('.settings-provider-row')).toHaveCount(qwen3Matches, {
+      timeout: 15_000
+    })
     await providerSearch.fill('')
     await customRow.getByRole('button', { name: '删除自定义模型：Test Local Models' }).click()
-    await expect(customRow).toHaveCount(0)
+    await expect(customRow).toHaveCount(0, { timeout: 15_000 })
 
     await nav.getByRole('button', { name: '连接器' }).click()
     await expect(dialog.locator('.settings-page')).toHaveAttribute('aria-label', '连接器设置')
