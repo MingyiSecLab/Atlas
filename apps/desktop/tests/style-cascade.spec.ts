@@ -104,13 +104,22 @@ test.describe('assistant 消息列宽度锁', () => {
 
   test('块容器被显式锁定为 100% 宽度', () => {
     const stripped = stripComments(css)
-    const pattern =
-      /\.chat-message\s*>\s*\[data-slot="aui-assistant-message-blocks"\]\s*\{([^}]*)\}/
-    const match = pattern.exec(stripped)
+    // 规则允许引号风格差异与多选择器合并（blocks 与 footer 可能共用一条规则）
+    const slotRule = (slot: string): RegExp =>
+      new RegExp(`\\.chat-message\\s*>\\s*\\[data-slot=['"]${slot}['"]\\]([^{}]*)\\{([^}]*)\\}`)
+
+    const blocks = slotRule('aui-assistant-message-blocks').exec(stripped)
     expect(
-      match,
+      blocks,
       '缺少 .chat-message > [data-slot="aui-assistant-message-blocks"] 规则'
     ).toBeTruthy()
-    expect(match![1]).toMatch(/(^|[;\s])width:\s*100%\s*;?/)
+    expect(blocks![2]).toMatch(/(^|[;\s])width:\s*100%\s*;?/)
+
+    const footer = slotRule('aui-assistant-message-footer').exec(stripped)
+    expect(
+      footer,
+      '缺少 .chat-message > [data-slot="aui-assistant-message-footer"] 规则'
+    ).toBeTruthy()
+    expect(footer![2]).toMatch(/(^|[;\s])width:\s*100%\s*;?/)
   })
 })

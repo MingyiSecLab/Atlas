@@ -20,9 +20,11 @@
 
 /* 全局重置放在 @layer base（对齐 Tailwind preflight 的做法，参考 tests/linkcode）：
    之前是无层 `* { margin: 0; padding: 0 }`，按级联层规则优先级高于 @layer utilities，
-   导致全应用所有 Tailwind 间距工具类（px-*/py-*/p-*/m-*）静默失效、内容贴边。
+   导致全应用所有 Tailwind 间距工具类（px-、py-、p-、m- 系列）静默失效、内容贴边。
    移入 @layer base 后 utilities 正常生效；无层规则仍高于 utilities，
-   因此本文件其余「无层」规则（.topheader 等）行为不变。 */
+   因此本文件其余「无层」规则（.topheader 等）行为不变。
+   注意：注释里不要出现 `px-*/` 这类字面量 —— `*/` 会提前终止注释，
+   让后续中文说明裸露成非法 CSS（本次整理前的写法就踩了这个坑）。 */
 @layer base {
   * {
     box-sizing: border-box;
@@ -5415,7 +5417,8 @@ button.tree-row {
    它自己那层 overflow-x-auto 因此没有可滚区域 —— 也就是没有横向滚动条。
    给块容器显式 width: 100% 锁回消息列宽度，滚动条与换行随即恢复。
    （MessageView 里另有 w-full 工具类，这条是无层兜底，防止以后被改回。） */
-.chat-message > [data-slot="aui-assistant-message-blocks"] {
+.chat-message > [data-slot='aui-assistant-message-blocks'],
+.chat-message > [data-slot='aui-assistant-message-footer'] {
   width: 100%;
 }
 

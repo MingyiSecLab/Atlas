@@ -261,46 +261,48 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
         <ThinkingIndicator running={running} blocks={blocks} />
       </div>
       {!running || metadata.messageEnded ? (
-        <div
-          data-slot="aui-assistant-message-footer"
-          className="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground select-none"
-        >
-          <div className="flex items-center gap-1">
-            <BranchPicker />
-            <MessageActions
-              copied={copied}
-              reaction={thumbState}
-              regenerating={running}
-              onCopy={() => copy(content)}
-              onReactionChange={(next) => {
-                setThumbState(next)
-                if (next === 'down') {
-                  setFeedbackOpen(true)
-                }
-              }}
-              onRegenerate={() => {
-                try {
-                  aui.message?.reload?.()
-                } catch (err) {
-                  console.warn('Failed to regenerate message:', err)
-                }
-              }}
-              onMore={() => setFeedbackOpen(true)}
-            />
-          </div>
+        <>
           <div
-            data-slot="aui-assistant-message-provenance"
-            className="chat-turn-provenance flex items-center gap-1.5 text-[11px] text-muted-foreground/70"
+            data-slot="aui-assistant-message-footer"
+            className="mt-1 flex w-full flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground select-none"
           >
-            <time>{timestamp}</time>
-            {metadata.modelName ? (
-              <>
-                <ModelBrandIcon model={metadata.modelName} size={12} />
-                <span title={metadata.modelName}>{metadata.modelName}</span>
-              </>
-            ) : (
-              <Bot size={13} />
-            )}
+            <div className="flex items-center gap-1">
+              <BranchPicker />
+              <MessageActions
+                copied={copied}
+                reaction={thumbState}
+                regenerating={running}
+                onCopy={() => copy(content)}
+                onReactionChange={(next) => {
+                  setThumbState(next)
+                  if (next === 'down') {
+                    setFeedbackOpen(true)
+                  }
+                }}
+                onRegenerate={() => {
+                  try {
+                    aui.message?.reload?.()
+                  } catch (err) {
+                    console.warn('Failed to regenerate message:', err)
+                  }
+                }}
+                onMore={() => setFeedbackOpen(true)}
+              />
+            </div>
+            <div
+              data-slot="aui-assistant-message-provenance"
+              className="chat-turn-provenance ml-auto flex shrink-0 items-center gap-1.5 text-[11px] text-muted-foreground/70"
+            >
+              <time>{timestamp}</time>
+              {metadata.modelName ? (
+                <>
+                  <ModelBrandIcon model={metadata.modelName} size={12} />
+                  <span title={metadata.modelName}>{metadata.modelName}</span>
+                </>
+              ) : (
+                <Bot size={13} />
+              )}
+            </div>
           </div>
           <FeedbackDialog
             messageId={anchorId}
@@ -310,7 +312,7 @@ export function AssistantMessage({ message }: { message: ThreadMessage }): React
               console.log('Feedback submitted:', data)
             }}
           />
-        </div>
+        </>
       ) : null}
     </article>
   )
