@@ -63,6 +63,6 @@ export const SettingsNav: React.FC<SettingsNavProps> = ({ activePage, onSelect }
         </div>
       ))}
     </nav>
-    <div className="settings-nav-version">Mingyi v1.0.0</div>
+    <div className="settings-nav-version">Mingyi {__APP_VERSION__}</div>
   </aside>
 )

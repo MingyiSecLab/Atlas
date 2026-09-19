@@ -53,6 +53,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 版本一致性门禁：tag 必须与 apps/desktop/package.json 的 version 一致。
+      # 渲染层版本号（__APP_VERSION__）与安装包命名都来自该字段，放行漂移的 tag
+      # 会产出"界面 v1.0.0、安装包 1.0.0、Release 却叫 v0.2.0"的错位发布。
+      - name: Validate release tag matches desktop version
+        env:
+          RELEASE_TAG: ${{ github.event.inputs.tag_name }}
+        run: node .github/scripts/validate-release-tag.mjs
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
@@ -145,8 +153,12 @@ jobs:
 
       # 根 build 脚本即「runtime → desktop(typecheck + electron-vite build)」，
       # 用一条命令代替原来拆开的两步，避免脚本链两处漂移。
+      # GIT_COMMIT 会被 electron.vite.config.ts 注入渲染层（__BUILD_COMMIT__），
+      # 悬停在侧边栏版本号上即可定位安装包对应的提交。
       - name: Build Runtime and Desktop
         run: npm run build
+        env:
+          GIT_COMMIT: ${{ github.sha }}
 
       - name: Package with electron-builder
         working-directory: apps/desktop

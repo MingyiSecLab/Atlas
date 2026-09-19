@@ -27,7 +27,7 @@ const INITIAL_NOTIFICATIONS: SidebarNotification[] = [
 ]
 
 const READ_NOTIFICATIONS_KEY = 'mingyi_sidebar_read_notifications'
-const APP_VERSION = 'v1.0.0'
+const VERSION_TITLE = `Mingyi ${__APP_VERSION__}${__BUILD_COMMIT__ ? ` (${__BUILD_COMMIT__})` : ''}`
 
 const getInitialNotifications = (): SidebarNotification[] => {
   try {
@@ -120,8 +120,8 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isCollapsed, onOpe
             )}
           </button>
         </div>
-        <span className="sidebar-footer-version" title={`Mingyi ${APP_VERSION}`}>
-          {APP_VERSION}
+        <span className="sidebar-footer-version" title={VERSION_TITLE}>
+          {__APP_VERSION__}
         </span>
       </div>
 

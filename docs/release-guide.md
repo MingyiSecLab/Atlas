@@ -32,6 +32,18 @@ Atlas 遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本命�
 - **修订号 (PATCH)**：向下兼容的问题修复、安全热补丁、轻微 UI 细节修正（如 `v0.1.1`）。
 - **预发布版本**：如 `v0.2.0-beta.1`、`v0.2.0-rc.1`。
 
+### 版本号的单一来源与自动注入
+
+`apps/desktop/package.json` 的 `version` 字段是**唯一版本源**，发布时无需手工改界面文案：
+
+| 版本出现位置 | 来源 |
+| :--- | :--- |
+| 安装包文件名（`Atlas-<version>-*.dmg` 等） | electron-builder 读取上述字段 |
+| 应用内显示（侧边栏底部 / 设置导航底部） | electron-vite 构建时以 `__APP_VERSION__` 注入渲染层 |
+| Release tag | 发布时在 Workflow Dispatch 表单填写 |
+
+Release 流水线的 **preflight 门禁**会用 [`.github/scripts/validate-release-tag.mjs`](../.github/scripts/validate-release-tag.mjs) 校验 tag 与该字段一致，不一致直接拒绝打包，避免"tag 是 v0.2.0、安装包却叫 1.0.0"的三方漂移。发版流程因此是：改 `apps/desktop/package.json` 的 `version` → 提交 → 触发流水线并填入同版本 tag。构建机的提交短 SHA 也会一并注入（`__BUILD_COMMIT__`），悬停在侧边栏版本号上即可看到。
+
 ---
 
 ## 3. GitHub Actions 自动化发布流水线

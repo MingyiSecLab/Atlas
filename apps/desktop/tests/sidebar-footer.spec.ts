@@ -1,7 +1,13 @@
 import { expect, test, _electron as electron } from '@playwright/test'
 import type { ElectronApplication, Page } from '@playwright/test'
+import { readFileSync } from 'node:fs'
 import * as path from 'node:path'
 import { runtimeTestEnv } from './runtime-env'
+
+/** 侧边栏展示的版本 = __APP_VERSION__（构建期从 apps/desktop/package.json 注入）。 */
+const expectedVersion = `v${
+  JSON.parse(readFileSync(path.resolve(__dirname, '../package.json'), 'utf8')).version as string
+}`
 
 test.describe('Sidebar footer', () => {
   let electronApp: ElectronApplication
@@ -33,7 +39,8 @@ test.describe('Sidebar footer', () => {
 
     const footer = page.getByTestId('sidebar-footer')
     await expect(footer).toBeVisible()
-    await expect(footer.getByText('v1.0.0', { exact: true })).toBeVisible()
+    // 端到端验证构建期版本注入：若 define 失效这里会渲染不出版本或值不对
+    await expect(footer.getByText(expectedVersion, { exact: true })).toBeVisible()
     await expect(footer.getByRole('button')).toHaveCount(2)
 
     const buttons = footer.getByRole('button')
