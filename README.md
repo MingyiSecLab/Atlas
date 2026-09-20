@@ -1,5 +1,11 @@
 # Atlas (Mingyi)
 
+<div align="right">
+
+简体中文 | [English](./README_EN.md)
+
+</div>
+
 Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化本地 AI Agent 的 AgentController、统一模型路由、多工作模式、扩展中心与插件、安全工具、MCP 及会话状态流封装成本地通用 Runtime，并通过类型完备的 IPC 协议暴露给桌面端。支持多任务与项目空间的分组管理、多厂商模型服务无缝切换、多步工具流水线执行、内置集成终端以及面向授权安全评估的渗透测试（Pentest）可视化工作流。
 
 > [!WARNING]
