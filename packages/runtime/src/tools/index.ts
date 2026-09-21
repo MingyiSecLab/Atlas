@@ -17,6 +17,8 @@ export {
   truncateToolOutput,
   withToolTimeout
 } from './runtime-tools/execution-policy.js'
+export { runSpawnBounded } from './runtime-tools/bounded-process.js'
+export type { BoundedSpawnInput, BoundedSpawnResult } from './runtime-tools/bounded-process.js'
 export { createRuntimeToolExecutor, RuntimeToolExecutor } from './runtime-tools/executor.js'
 export { RuntimeToolRegistry } from './runtime-tools/registry.js'
 export { RuntimeToolError } from './runtime-tools/types.js'

@@ -106,7 +106,7 @@ describe('modes configuration', () => {
   it('exposes every security-domain tool in the pentest allowlist', () => {
     // 新增安全工具后忘记同步白名单 = 工具注册了但模型看不见
     const securityToolNames = Object.keys(createSecurityMastraTools({ sandbox: stubSandbox() }))
-    expect(securityToolNames.length).toBe(17)
+    expect(securityToolNames.length).toBe(20)
     for (const name of securityToolNames) {
       expect(pentestMode.availableTools).toContain(name)
     }

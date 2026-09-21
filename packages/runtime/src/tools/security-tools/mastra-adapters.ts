@@ -9,7 +9,10 @@ import {
   createDocumentEndpointTool,
   createExtractJsEndpointsTool,
   createHttpRequestTool,
-  createTestEndpointVariationsTool
+  createProbeAuthEndpointsTool,
+  createRunCodeQueryTool,
+  createTestEndpointVariationsTool,
+  createValidateDiscoveryTool
 } from './index.js'
 import { createKaliSandboxTools, KALI_SANDBOX_LOCAL_TARGET } from './kali-sandbox.js'
 import type { RuntimePentestToolContext } from '../../pentest/tools.js'
@@ -528,7 +531,100 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     }
   })
 
-  // 11-17. Kali 沙箱工具（仅当宿主注入 sandbox adapter 时注册）
+  // 11. probe_auth_endpoints
+  const rawProbeAuth = createProbeAuthEndpointsTool()
+  const probeAuthEndpointsTool = createTool({
+    id: 'probe_auth_endpoints',
+    description:
+      '按常见认证端点字典批量探测登录、令牌、用户与受保护资源入口（每条路径 GET + POST 空JSON）。' +
+      '当 detect_auth_scheme 未能识别认证方式，或 JSON API 的登录端点未知时使用。' +
+      '返回发现的端点、认证指标与推荐的登录方式。参数：baseUrl (必填，如 https://example.com)。',
+    inputSchema: z.object({
+      baseUrl: z.string().describe('待探测的基础 URL，例如 "https://example.com"')
+    }),
+    execute: async (inputData) => {
+      const { baseUrl } = inputData
+      const context = buildDefaultContext(baseUrl, options)
+      const res = await rawProbeAuth.execute(
+        {
+          targetRef: baseUrl,
+          toolName: 'probe_auth_endpoints',
+          arguments: { baseUrl }
+        },
+        context
+      )
+      return res.output
+    }
+  })
+
+  // 12. validate_discovery_completeness
+  const rawValidateDiscovery = createValidateDiscoveryTool()
+  const validateDiscoveryTool = createTool({
+    id: 'validate_discovery_completeness',
+    description:
+      '在进入验证与出具报告前自检侦察完成度：计算置信分并列出缺口' +
+      '（凭据未用于认证、认证后未做 JS 分析、CRUD 资源模式未枚举、端点数量过少）。' +
+      '参数：discoveredEndpoints (已发现端点数组), authenticatedWithCredentials (是否已用发现的凭据完成认证),' +
+      'pagesWithJSAnalyzed (已运行 extract_js_endpoints 的页面数组), credentialsFound (是否发现过凭据)。',
+    inputSchema: z.object({
+      discoveredEndpoints: z.array(z.string()).describe('当前已发现的全部端点'),
+      authenticatedWithCredentials: z.boolean().describe('是否已使用发现的凭据完成认证'),
+      pagesWithJSAnalyzed: z.array(z.string()).describe('已运行 extract_js_endpoints 的页面 URL 列表'),
+      credentialsFound: z.boolean().describe('是否发现过凭据')
+    }),
+    execute: async (inputData) => {
+      const context = buildDefaultContext('validate_discovery_completeness', options)
+      const res = await rawValidateDiscovery.execute(
+        {
+          targetRef: 'validate_discovery_completeness',
+          toolName: 'validate_discovery_completeness',
+          arguments: { ...inputData }
+        },
+        context
+      )
+      return res.output
+    }
+  })
+
+  // 13. run_code_query
+  const rawRunCodeQuery = createRunCodeQueryTool()
+  const runCodeQueryTool = createTool({
+    id: 'run_code_query',
+    description:
+      '面向白盒分析的批量结构化源码检索，支持 rg / grep / ast-grep / comby 引擎（默认 rg，需本机安装）。' +
+      '每条查询返回匹配行数与前 40 行样本，完整输出落盘 .agents/pentest/code-queries/ 供后续查阅。' +
+      '参数：queries (1-40 条 { pattern, path? }, path 相对工作区且不得越界), cwd (可选查询根目录),' +
+      'engine (可选引擎), timeoutSeconds (可选，默认 20，上限 900)。',
+    inputSchema: z.object({
+      queries: z
+        .array(
+          z.object({
+            pattern: z.string().describe('检索模式或结构化查询（如 rg/ast-grep 模式）'),
+            path: z.string().optional().describe('检索目标文件/目录，相对工作区，必须位于工作区内')
+          })
+        )
+        .min(1)
+        .max(40)
+        .describe('独立的源码检索查询列表'),
+      cwd: z.string().optional().describe('查询根目录（相对或绝对，默认当前工作区根）'),
+      engine: z.enum(['rg', 'grep', 'ast-grep', 'comby']).optional().default('rg').describe('检索引擎，默认 rg'),
+      timeoutSeconds: z.number().int().positive().max(900).optional().describe('单条查询超时秒数，默认 20，上限 900')
+    }),
+    execute: async (inputData) => {
+      const context = buildDefaultContext(inputData.cwd || options?.workspacePath || process.cwd(), options)
+      const res = await rawRunCodeQuery.execute(
+        {
+          targetRef: 'workspace://code-query',
+          toolName: 'run_code_query',
+          arguments: { ...inputData }
+        },
+        context
+      )
+      return res.output
+    }
+  })
+
+  // 14-20. Kali 沙箱工具（仅当宿主注入 sandbox adapter 时注册）
   const sandboxTools: Record<string, ReturnType<typeof createTool>> = {}
   if (options?.sandbox) {
     const rawKaliTools = createKaliSandboxTools({
@@ -735,6 +831,9 @@ export function createSecurityMastraTools(options?: SecurityToolsOptions) {
     init_pentest_engagement: initPentestEngagementTool,
     record_pentest_finding: recordPentestFindingTool,
     detect_sandbox_environment: detectSandboxTool,
+    probe_auth_endpoints: probeAuthEndpointsTool,
+    validate_discovery_completeness: validateDiscoveryTool,
+    run_code_query: runCodeQueryTool,
     ...sandboxTools
   }
 }

@@ -89,8 +89,11 @@ export const pentestMode: AgentControllerMode = {
   * http_request: 发送 HTTP/HTTPS 请求（内置共享 CookieJar 按 Domain/Path/Secure/过期语义持久化维护会话 Cookie，支持 GET/POST/PUT/DELETE 等方法、headers、body/jsonBody/form 及超时与 maxRedirects；响应会回传状态行、耗时、重定向链与安全响应头/Cookie 标志观测，超长或二进制正文自动落盘到 .agents/pentest/http/ 供 view/search_content 查阅）。所有针对 Web 目标（DVWA、Web 靶场、API、登录认证、漏洞 Payload 测试等）必须优先且强制使用此工具，严禁使用 curl 替代。
   * extract_js_endpoints: 提取并静态分析目标站点的 JavaScript 资源，自动挖掘前端隐藏的 API 接口与后端路由。
   * detect_auth_scheme: 自动识别目标暴露的认证类型（JWT Bearer、Session/Cookie、Basic、API Key 或 OAuth）。
+  * probe_auth_endpoints: 按常见认证端点字典批量探测登录、令牌与受保护资源入口（每条路径 GET+POST），当 detect_auth_scheme 未识别出认证方式或 JSON API 登录端点未知时使用，一次调用返回推荐登录端点与方式。
   * crawl_authenticated: 对目标站点进行广度优先爬取，收集可访问路径与表单输入点。
   * test_endpoint_variations: 自动测试端点的方法变体与路径变体。
+  * validate_discovery_completeness: 侦察完成度自检：在进入验证与汇报前评估置信分并列出缺口（凭据未利用、认证后未做 JS 分析、CRUD 未枚举、端点过少），置信分 ≥90 才算通过。
+  * run_code_query: 面向白盒分析的批量源码检索（rg/grep/ast-grep/comby，默认 rg），路径严格限制在工作区内，完整输出落盘 .agents/pentest/code-queries/。检索源码中的 sink/source 时优先使用。
   * detect_sandbox_environment: 检测宿主机 Docker 环境与 mingyi-sandbox 渗透测试沙箱容器就绪状态。在需要使用专业渗透测试工具（kali_exec / nmap / nuclei 等）前可先调用此工具检查环境，若未启动可指导用户启动。
   * kali_exec: 在 Kali 隔离沙箱内执行专业渗透测试二进制工具（如 nmap 端口扫描、nuclei 批量漏扫、sqlmap 数据库注入利用、ffuf/gobuster 目录字典爆破等）。仅用于执行沙箱内的专业二进制渗透命令，不可滥用替代普通的 HTTP 请求。
   * document_app / document_endpoint: 记录应用架构概况与端点资产字典。
@@ -114,8 +117,11 @@ export const pentestMode: AgentControllerMode = {
     'http_request',
     'extract_js_endpoints',
     'detect_auth_scheme',
+    'probe_auth_endpoints',
     'crawl_authenticated',
     'test_endpoint_variations',
+    'validate_discovery_completeness',
+    'run_code_query',
     'document_app',
     'document_endpoint',
     'detect_sandbox_environment',
