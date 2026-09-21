@@ -1,6 +1,7 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 import type { ProviderBridge } from '../shared/provider-ipc'
 import type { FileBridge } from '../shared/file-ipc'
+import type { UpdateBridge } from '../shared/update-ipc'
 import type {
   RuntimeExpertBridge,
   RuntimeModelBridge,
@@ -32,6 +33,7 @@ interface MingyiDesktopApi {
   workspace: RuntimeWorkspaceBridge
   projects: RuntimeProjectBridge
   files: FileBridge
+  update: UpdateBridge
   models: RuntimeModelBridge
   modes: RuntimeModeBridge
   experts: RuntimeExpertBridge

@@ -5,6 +5,7 @@ import { MemorySettingsPage } from './memory/memory-settings-page'
 import { NotificationsSettingsPage } from './notifications/notifications-settings-page'
 import { ProviderSettingsPage } from './providers/provider-settings-page'
 import { TerminalSettingsPage } from './terminal/terminal-settings-page'
+import { AboutSettingsPage } from './about/about-settings-page'
 import { AcknowledgementsSettingsPage } from './acknowledgements/acknowledgements-settings-page'
 import type { SettingsPage, SettingsPreferences } from '../types'
 
@@ -46,6 +47,8 @@ export const SettingsPageContent: React.FC<SettingsPageContentProps> = ({
       return <ConnectorsSettingsPage preferences={preferences} onChange={onChange} />
     case 'memory':
       return <MemorySettingsPage modelIds={modelIds} />
+    case 'about':
+      return <AboutSettingsPage />
     case 'acknowledgements':
       return <AcknowledgementsSettingsPage />
   }

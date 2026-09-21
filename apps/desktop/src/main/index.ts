@@ -9,6 +9,7 @@ import { DesktopRuntimeManager } from './runtime-manager'
 import { registerRuntimeService } from './runtime-service'
 import { registerTerminalService, watchTerminalOwner } from './terminal-service'
 import { registerFileService } from './file-service'
+import { registerUpdateService } from './update-service'
 
 // 应用级数据统一落盘 ~/.atlas（desktop 动态计算，无需 .env 配置）：
 //   atlas.db（SQLite：任务/会话历史/消息流/状态机）、vectors.db（向量记忆与检索索引）、
@@ -27,6 +28,7 @@ let disposeProviderService = (): void => undefined
 let disposeRuntimeService = (): void => undefined
 let disposePentestService = (): void => undefined
 let disposeFileService = (): void => undefined
+let disposeUpdateService = (): void => undefined
 const defaultWorkspace = process.env.MINGYI_WORKSPACE_PATH || join(atlasHome, 'workspace')
 const runtimeManager = new DesktopRuntimeManager(defaultWorkspace, atlasHome)
 let shutdownStarted = false
@@ -34,6 +36,7 @@ let servicesStopped = false
 
 async function shutdownServices(): Promise<void> {
   disposeFileService()
+  disposeUpdateService()
   disposeProviderService()
   disposeRuntimeService()
   disposePentestService()
@@ -138,6 +141,8 @@ app
       onSessionDeleted: (sessionId) => pentestService.removeTaskBindings(sessionId)
     })
     disposeFileService = registerFileService(runtimeManager)
+    // 更新检查不依赖 Runtime：注册后延迟自查一次，不阻塞启动流程
+    disposeUpdateService = registerUpdateService()
 
     if (process.platform === 'darwin' && app.dock) {
       app.dock.setIcon(icon)

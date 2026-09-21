@@ -2,11 +2,14 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Bell, Monitor } from 'lucide-react'
 import { DevicePanel } from './DevicePanel'
 import { NotificationsPanel } from './NotificationsPanel'
+import { useUpdateStatus } from '@renderer/state/use-update-status'
 import type { FooterPanel, SidebarNotification } from './types'
+import type { SettingsPage } from '../../overlays/settings/types'
 
 interface SidebarFooterProps {
   isCollapsed?: boolean
-  onOpenSettings?: () => void
+  /** 打开应用设置；传入页面时直接定位（新版本角标跳「关于与更新」）。 */
+  onOpenSettings?: (page?: SettingsPage) => void
 }
 
 const INITIAL_NOTIFICATIONS: SidebarNotification[] = [
@@ -46,6 +49,8 @@ const getInitialNotifications = (): SidebarNotification[] => {
 export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isCollapsed, onOpenSettings }) => {
   const [activePanel, setActivePanel] = useState<FooterPanel | null>(null)
   const [notifications, setNotifications] = useState<SidebarNotification[]>(getInitialNotifications)
+  const updateStatus = useUpdateStatus()
+  const availableRelease = updateStatus.state === 'available' ? updateStatus : null
   const footerRef = useRef<HTMLDivElement>(null)
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null)
   const unreadCount = notifications.filter((notification) => notification.unread).length
@@ -120,9 +125,22 @@ export const SidebarFooter: React.FC<SidebarFooterProps> = ({ isCollapsed, onOpe
             )}
           </button>
         </div>
-        <span className="sidebar-footer-version" title={VERSION_TITLE}>
-          {__APP_VERSION__}
-        </span>
+        <div className="sidebar-footer-meta">
+          {availableRelease && (
+            <button
+              className="sidebar-update-badge"
+              type="button"
+              aria-label={`有新版本 v${availableRelease.latestVersion} 可用，打开关于与更新`}
+              title={`有新版本 v${availableRelease.latestVersion} 可用`}
+              onClick={() => onOpenSettings?.('about')}
+            >
+              <span className="sidebar-update-dot" aria-hidden="true" />
+            </button>
+          )}
+          <span className="sidebar-footer-version" title={VERSION_TITLE}>
+            {__APP_VERSION__}
+          </span>
+        </div>
       </div>
 
       {effectiveActivePanel === 'notifications' && (

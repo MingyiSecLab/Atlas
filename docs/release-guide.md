@@ -44,6 +44,18 @@ Atlas 遵循 [SemVer 2.0.0](https://semver.org/lang/zh-CN/) 语义化版本命�
 
 Release 流水线的 **preflight 门禁**会用 [`.github/scripts/validate-release-tag.mjs`](../.github/scripts/validate-release-tag.mjs) 校验 tag 与该字段一致，不一致直接拒绝打包，避免"tag 是 v0.2.0、安装包却叫 1.0.0"的三方漂移。发版流程因此是：改 `apps/desktop/package.json` 的 `version` → 提交 → 触发流水线并填入同版本 tag。构建机的提交短 SHA 也会一并注入（`__BUILD_COMMIT__`），悬停在侧边栏版本号上即可看到。
 
+### 老版本客户端如何发现新版本
+
+客户端**不需要**接入任何自建服务：GitHub 的 Release 公开接口就是版本发现通道。
+
+- **检测通道**：主进程请求 `GET https://api.github.com/repos/MingyiSecLab/Atlas/releases/latest`（公开只读、无需认证，未认证配额 60 次/小时/IP），取回 `tag_name` 后与本地 `app.getVersion()` 做语义化版本比对。
+- **触发时机**：启动后延迟 3 秒自查一次（不阻塞启动），外加「设置 → 关于与更新」中的手动检查按钮。
+- **呈现方式**：发现新版本时，侧栏版本号左侧出现绿点角标，点击直接进入「关于与更新」页；页面展示最新版本号、发布时间与 Release notes 摘要，并由 `shell.openExternal` 打开 Release 页下载。
+- **检测可靠性的前提**：Release tag 必须与 `apps/desktop/package.json` 的 `version` 严格一致。preflight 门禁已经保证这一点——若 tag 漂移，老客户端会把同版本误判成"有新版本"并反复提示。
+- **只发 Pre-release 时客户端不会收到提示**：GitHub 的 `releases/latest` 只返回**正式 Release**；仓库里只有 Pre-release（或 Draft）时该接口返回 404，客户端按"已是最新"处理。需要让老客户端感知某个版本时，请以正式 Release（不勾选 Pre-release/Draft）发布。
+- **为什么是「引导下载」而不是自动更新**：macOS 产物未签名未公证（`CSC_IDENTITY_AUTO_DISCOVERY: false`、electron-builder `notarize: false`），electron-updater 所需的依赖、`publish` 配置与 Release 中的 `latest.yml` 三项均不具备，且未签名应用即使自动下载也无法通过 Gatekeeper。待接入 Apple 开发者账号后再单独立项做静默自更新。
+- **关停方式**：`MINGYI_DISABLE_UPDATE_CHECK=1`（e2e 测试默认注入，保证断言不依赖外网与配额）。
+
 ---
 
 ## 3. GitHub Actions 自动化发布流水线

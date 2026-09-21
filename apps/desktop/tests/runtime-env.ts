@@ -16,6 +16,8 @@ export function runtimeTestEnv(suite: string): NodeJS.ProcessEnv {
     MINGYI_PROJECTS_DATA_DIR: path.join(tmpdir(), `${id}-projects-data`),
     MASTRA_APP_DATA_DIR: path.join(tmpdir(), `${id}-app-data`),
     MASTRA_DB_URL: `file:${path.join(tmpdir(), `${id}.db`)}`,
-    MASTRA_OBSERVABILITY_DB_PATH: path.join(tmpdir(), `${id}-observability.db`)
+    MASTRA_OBSERVABILITY_DB_PATH: path.join(tmpdir(), `${id}-observability.db`),
+    // 更新检查默认联网打 GitHub API：e2e 一律关停，保证断言不依赖外网与配额
+    MINGYI_DISABLE_UPDATE_CHECK: '1'
   }
 }

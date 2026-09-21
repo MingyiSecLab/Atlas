@@ -42,6 +42,8 @@ test.describe('Sidebar footer', () => {
     // 端到端验证构建期版本注入：若 define 失效这里会渲染不出版本或值不对
     await expect(footer.getByText(expectedVersion, { exact: true })).toBeVisible()
     await expect(footer.getByRole('button')).toHaveCount(2)
+    // e2e 关停了更新检查（MINGYI_DISABLE_UPDATE_CHECK）：状态停在 idle，不应出现新版本角标
+    await expect(footer.locator('.sidebar-update-badge')).toHaveCount(0)
 
     const buttons = footer.getByRole('button')
     await expect(buttons.nth(0)).toHaveAccessibleName('打开本机运行环境')

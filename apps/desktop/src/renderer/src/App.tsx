@@ -17,6 +17,7 @@ import type { HubTab, ExpertItem, SkillItem } from './components/hub/hub-types'
 import type { RuntimeSkillInfo } from '@mingyi/runtime'
 import { useWorkspace } from './state/WorkspaceProvider'
 import { readSettings } from './components/overlays/settings/persistence'
+import type { SettingsPage } from './components/overlays/settings/types'
 import { ErrorBoundary } from './components/common/ErrorBoundary'
 import { formatSessionAsMarkdown, downloadMarkdownFile } from './components/chat/export-chat'
 import './assets/main.css'
@@ -62,6 +63,8 @@ export const App: React.FC = () => {
   const [connectorConfigRequest, setConnectorConfigRequest] = useState(0)
   const [isSearchOpen, setIsSearchOpen] = useState<boolean>(false)
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false)
+  // 打开设置时定位到的页面；侧栏新版本角标据此直接跳到「关于与更新」
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>('general')
   const [isBottomPanelOpen, setIsBottomPanelOpen] = useState<boolean>(false)
   const [isRightPanelOpen, setIsRightPanelOpen] = useState<boolean>(() => {
     try {
@@ -149,6 +152,7 @@ export const App: React.FC = () => {
         setIsSearchOpen((prev) => !prev)
       } else if ((e.metaKey || e.ctrlKey) && e.key === ',') {
         e.preventDefault()
+        setSettingsPage('general')
         setIsSettingsOpen((prev) => !prev)
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault()
@@ -158,6 +162,11 @@ export const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+  const openSettings = (page?: SettingsPage): void => {
+    setSettingsPage(page ?? 'general')
+    setIsSettingsOpen(true)
+  }
 
   const handleNewTask = (projectId?: string): void => {
     setCurrentTaskId(null)
@@ -424,7 +433,7 @@ export const App: React.FC = () => {
             onToggleTaskPin={handleToggleTaskPin}
             onDeleteTask={handleDeleteTask}
             onOpenSearch={() => setIsSearchOpen(true)}
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={openSettings}
             activeMenu={activeNavMenu}
             onSelectMenu={(menuId) => {
               setActiveNavMenu(menuId)
@@ -534,9 +543,12 @@ export const App: React.FC = () => {
         />
 
         {/* Linkcode style: Settings Modal (⌘,) */}
+        {/* key 含 isOpen：每次打开都按 settingsPage 重挂载，直接落在目标设置页 */}
         <SettingsModal
+          key={`${settingsPage}-${isSettingsOpen}`}
           isOpen={isSettingsOpen}
           modelIds={modelIds}
+          initialPage={settingsPage}
           onClose={() => setIsSettingsOpen(false)}
         />
       </div>

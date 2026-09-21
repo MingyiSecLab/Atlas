@@ -9,11 +9,20 @@ import './settings/settings.css'
 interface SettingsModalProps {
   isOpen: boolean
   modelIds: string[]
+  /** 打开时定位的设置页；侧栏新版本角标跳转「关于与更新」时传入。 */
+  initialPage?: SettingsPage
   onClose: () => void
 }
 
-export const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, modelIds, onClose }) => {
-  const [activePage, setActivePage] = useState<SettingsPage>('general')
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  isOpen,
+  modelIds,
+  initialPage,
+  onClose
+}) => {
+  // initialPage 在每次打开时由调用方（App）经 key 重挂载生效，
+  // 这里只在挂载时读一次，避免在 effect 里同步 setState 触发级联渲染
+  const [activePage, setActivePage] = useState<SettingsPage>(initialPage ?? 'general')
   const [preferences, setPreferences] = useState<SettingsPreferences>(() => readSettings())
   const closeButtonRef = useRef<HTMLButtonElement>(null)
 

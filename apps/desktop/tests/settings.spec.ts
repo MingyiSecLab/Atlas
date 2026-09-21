@@ -38,8 +38,8 @@ test.describe('Settings', () => {
     await expect(nav.getByText('个人', { exact: true })).toBeVisible()
     await expect(nav.getByText('集成', { exact: true })).toBeVisible()
     await expect(nav.getByText('关于', { exact: true })).toBeVisible()
-    // 个人(基础/记忆/终端/通知) + 集成(模型服务/连接器) + 关于(致谢) = 7 个导航项
-    await expect(nav.getByRole('button')).toHaveCount(7)
+    // 个人(基础/记忆/终端/通知) + 集成(模型服务/连接器) + 关于(关于与更新/致谢) = 8 个导航项
+    await expect(nav.getByRole('button')).toHaveCount(8)
     await expect(dialog.locator('.settings-page')).toHaveAttribute('aria-label', '基础设置')
     await expect(dialog.getByRole('heading', { name: '模型配置' })).toBeVisible()
     await expect(dialog.getByRole('heading', { name: '安全中心' })).toBeVisible()
@@ -220,6 +220,10 @@ test.describe('Settings', () => {
     await expect(dialog.getByRole('switch', { name: 'MCP 工具连接器' })).toBeVisible()
     await page.waitForTimeout(200)
     await page.screenshot({ path: 'test-results/settings-connectors.png' })
+
+    await nav.getByRole('button', { name: '关于与更新' }).click()
+    await expect(dialog.locator('.settings-page')).toHaveAttribute('aria-label', '关于与更新')
+    await expect(dialog.getByRole('heading', { name: '版本信息' })).toBeVisible()
 
     await nav.getByRole('button', { name: '致谢' }).click()
     await expect(dialog.locator('.settings-page')).toHaveAttribute('aria-label', '致谢')

@@ -9,6 +9,7 @@ import {
   type TestCustomModelInput
 } from '../shared/provider-ipc'
 import { FILE_IPC } from '../shared/file-ipc'
+import { UPDATE_IPC, type UpdateStatus } from '../shared/update-ipc'
 import {
   RUNTIME_IPC,
   type DesktopPentestCreateInput,
@@ -124,6 +125,17 @@ const api = {
     readFile: (filePath: string) => ipcRenderer.invoke(FILE_IPC.readFile, filePath),
     writeFile: (filePath: string, content: string) =>
       ipcRenderer.invoke(FILE_IPC.writeFile, filePath, content)
+  },
+  update: {
+    check: () => ipcRenderer.invoke(UPDATE_IPC.check),
+    getStatus: () => ipcRenderer.invoke(UPDATE_IPC.getStatus),
+    openRelease: (url: string) => ipcRenderer.invoke(UPDATE_IPC.openRelease, url),
+    onStateChanged: (listener: (status: UpdateStatus) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus): void =>
+        listener(status)
+      ipcRenderer.on(UPDATE_IPC.stateChanged, handler)
+      return () => ipcRenderer.removeListener(UPDATE_IPC.stateChanged, handler)
+    }
   },
   models: {
     list: () => ipcRenderer.invoke(RUNTIME_IPC.modelList)

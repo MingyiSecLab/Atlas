@@ -5,6 +5,7 @@ export type SettingsPage =
   | 'providers'
   | 'connectors'
   | 'memory'
+  | 'about'
   | 'acknowledgements'
 
 export interface SettingsPreferences {

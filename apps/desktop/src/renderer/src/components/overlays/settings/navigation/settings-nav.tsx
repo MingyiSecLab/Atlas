@@ -1,5 +1,5 @@
 import React from 'react'
-import { Bell, Brain, Heart, KeyRound, Plug, Settings, TerminalSquare } from 'lucide-react'
+import { Bell, Brain, Heart, Info, KeyRound, Plug, Settings, TerminalSquare } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { SettingsPage } from '../types'
 
@@ -33,7 +33,10 @@ const SETTINGS_NAV_GROUPS: Array<{ label: string; items: NavItem[] }> = [
   },
   {
     label: '关于',
-    items: [{ id: 'acknowledgements', label: '致谢', icon: Heart }]
+    items: [
+      { id: 'about', label: '关于与更新', icon: Info },
+      { id: 'acknowledgements', label: '致谢', icon: Heart }
+    ]
   }
 ]
 

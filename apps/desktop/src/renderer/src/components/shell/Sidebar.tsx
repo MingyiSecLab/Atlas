@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react'
 import { SidebarFooter } from './sidebar-footer'
+import type { SettingsPage } from '../overlays/settings/types'
 
 export interface SidebarTask {
   id: string
@@ -44,7 +45,8 @@ interface SidebarProps {
   onToggleTaskPin: (id: string) => void
   onDeleteTask: (id: string) => void
   onOpenSearch?: () => void
-  onOpenSettings?: () => void
+  /** 打开应用设置；传入页面时直接定位（侧栏新版本角标跳「关于与更新」）。 */
+  onOpenSettings?: (page?: SettingsPage) => void
   activeMenu?: string
   onSelectMenu?: (menuId: string) => void
   projects?: SidebarProject[]

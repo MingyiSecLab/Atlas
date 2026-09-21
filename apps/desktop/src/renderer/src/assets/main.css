@@ -4580,12 +4580,51 @@ button.tree-row {
   justify-content: space-between;
 }
 
+.sidebar-footer-meta {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+
 .sidebar-footer-version {
   color: #929298;
   font-size: 10px;
   font-variant-numeric: tabular-nums;
   line-height: 24px;
   user-select: text;
+}
+
+/* 检测到新版本时出现在版本号左侧的提示点：点击进入「关于与更新」 */
+.sidebar-update-badge {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sidebar-update-badge:hover {
+  background: rgba(47, 168, 102, 0.14);
+}
+
+.sidebar-update-badge:focus-visible {
+  outline: 2px solid rgba(47, 168, 102, 0.45);
+  outline-offset: 1px;
+}
+
+.sidebar-update-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #2fa866;
+  box-shadow: 0 0 0 3px rgba(47, 168, 102, 0.16);
 }
 
 .sidebar-footer-button,
