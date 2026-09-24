@@ -7,11 +7,10 @@
 # Orphaned tests referencing a nonexistent root src/; pending relocation to ptcore
 /test/
 
-# Development-stage documentation and changelog (publish later)
+# Development-stage documentation (publish later)；CHANGELOG.md 已转为随仓库发布
 /docs/**/*.md
 !/docs/release-guide.md
 !/docs/README.md
-/CHANGELOG.md
 
 # 公众号等内容生产工作目录，不进仓库
 /docs/wechat/
@@ -28,6 +27,11 @@ apps/desktop/out/
 playwright-report/
 test-results/
 .mingyi/
+# tests/ 下参考工程跑测试时落在仓库根的产物（lancedb / fastembed 模型缓存 / agentfs / mastra CLI）
+/local_cache/
+/lancedb-vector/
+/.agentfs/
+/.mastra/
 # electron-vite 转译 electron.vite.config.ts 时在同目录生成的临时配置副本
 apps/desktop/electron.vite.config.*.mjs
 
