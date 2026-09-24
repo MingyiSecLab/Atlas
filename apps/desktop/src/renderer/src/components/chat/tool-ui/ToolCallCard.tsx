@@ -5,6 +5,7 @@ import { DefaultToolUI } from './DefaultToolUI'
 import { FileOpToolUI } from './FileOpToolUI'
 import { PentestToolUI } from './PentestToolUI'
 import { SearchToolUI } from './SearchToolUI'
+import { SubagentToolUI } from './SubagentToolUI'
 import { TaskToolUI } from './TaskToolUI'
 import { TerminalToolUI } from './TerminalToolUI'
 import { analyzeToolCall, formatElapsedMs } from './types'
@@ -52,6 +53,8 @@ export function ToolCallCard({
         return <SearchToolUI block={block} parsed={parsed} />
       case 'security':
         return <PentestToolUI block={block} parsed={parsed} />
+      case 'subagent':
+        return <SubagentToolUI block={block} parsed={parsed} />
       case 'task':
         return (
           <TaskToolUI

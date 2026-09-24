@@ -33,6 +33,7 @@ export const RUNTIME_IPC = {
   workspaceChanged: 'runtime:workspace:changed',
   modelList: 'runtime:model:list',
   modeList: 'runtime:mode:list',
+  subagentList: 'runtime:subagent:list',
   skillList: 'runtime:skill:list',
   skillSearch: 'runtime:skill:search',
   skillInvoke: 'runtime:skill:invoke',
@@ -228,6 +229,19 @@ export type { RuntimeModeInfo }
 
 export interface RuntimeModeBridge {
   list(): Promise<RuntimeModeInfo[]>
+}
+
+/** subagent 目录条目（静态定义，供 UI 把事件的 agentType 解析为可读名称）。 */
+export interface RuntimeSubagentInfo {
+  id: string
+  name: string
+  description?: string
+  /** 是否为 SDK 内置（explore/plan/execute），UI 可据此区分展示。 */
+  builtin: boolean
+}
+
+export interface RuntimeSubagentBridge {
+  list(): Promise<RuntimeSubagentInfo[]>
 }
 
 export interface RuntimeExpertBridge {

@@ -11,6 +11,7 @@ import type {
   RuntimeProjectBridge,
   RuntimeSkillBridge,
   RuntimeSessionBridge,
+  RuntimeSubagentBridge,
   RuntimeWorkspaceBridge,
   RuntimeMcpBridge
 } from '../shared/runtime-ipc'
@@ -36,6 +37,7 @@ interface MingyiDesktopApi {
   update: UpdateBridge
   models: RuntimeModelBridge
   modes: RuntimeModeBridge
+  subagents: RuntimeSubagentBridge
   experts: RuntimeExpertBridge
   om: RuntimeOmBridge
   skills: RuntimeSkillBridge

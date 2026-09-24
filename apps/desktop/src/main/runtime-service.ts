@@ -12,6 +12,7 @@ import type {
   RuntimeMcpServerConfig,
   RuntimeMcpProjectConfig
 } from '@mingyi/runtime'
+import { allSubagents, builtinSubagents } from '@mingyi/runtime'
 import type { WebContents } from 'electron'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
 import { mkdir, stat } from 'node:fs/promises'
@@ -484,6 +485,17 @@ export function registerRuntimeService(
       metadata: mode.metadata
     }))
   })
+  // subagent 目录是 Runtime 包的静态定义（不随工作区/会话变化），
+  // 故不取 runtime 实例；与 runtime-manager 传出的 allSubagents 同一来源。
+  ipcMain.handle(RUNTIME_IPC.subagentList, () => {
+    const builtinIds = new Set(builtinSubagents.map((subagent) => subagent.id))
+    return allSubagents.map((subagent) => ({
+      id: subagent.id,
+      name: subagent.name,
+      description: subagent.description,
+      builtin: builtinIds.has(subagent.id)
+    }))
+  })
   ipcMain.handle(RUNTIME_IPC.expertList, async (event) => {
     const runtime = await getRuntime(event.sender)
     return runtime.experts.scan()
@@ -657,6 +669,7 @@ export function registerRuntimeService(
       RUNTIME_IPC.projectRemove,
       RUNTIME_IPC.modelList,
       RUNTIME_IPC.modeList,
+      RUNTIME_IPC.subagentList,
       RUNTIME_IPC.expertList,
       RUNTIME_IPC.expertSave,
       RUNTIME_IPC.expertDelete,

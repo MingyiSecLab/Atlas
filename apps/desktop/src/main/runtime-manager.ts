@@ -1,4 +1,4 @@
-import { createLocalRuntime, createRuntimeVectorStore } from '@mingyi/runtime'
+import { allSubagents, createLocalRuntime, createRuntimeVectorStore } from '@mingyi/runtime'
 import type { DockerSandboxConfig, LocalRuntimeInstance } from '@mingyi/runtime'
 import { app } from 'electron'
 import { homedir } from 'node:os'
@@ -76,6 +76,9 @@ export class DesktopRuntimeManager {
         workspacePath: this.workspacePath,
         pentestDataDir: this.getPentestDataDir(),
         projectsDataDir: this.getProjectsDataDir(),
+        // subagents 显式传入会整体替换 SDK 内置的 explore/plan/execute，
+        // 故传合并后的 allSubagents（内置 3 + 自定义 5），而非 customSubagents。
+        subagents: allSubagents,
         // atlas 数据根（~/.atlas）：settings.json / 用户级 agents / 向量库 / blobs 分流
         ...(this.dataRoot
           ? {

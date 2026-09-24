@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test'
 import {
+  analyzeToolCall,
   calculateToolGroupSummary,
   groupChatBlocks
 } from '../src/renderer/src/components/chat/tool-ui/types'
@@ -178,5 +179,34 @@ test.describe('ToolGroup aggregation and status calculation', () => {
       expect(step.parsed.displayName).toBe('更新任务')
       expect(step.parsed.primaryParam).toBe('2/3 步骤完成')
     }
+  })
+
+  test('classifies the subagent tool and keeps agentType as the collapsed label', () => {
+    const parsed = analyzeToolCall({
+      name: 'subagent',
+      input: JSON.stringify({
+        agentType: 'security-auditor',
+        task: '审计 packages/runtime/src/pentest 下的命令执行路径'
+      }),
+      status: 'running',
+      type: 'tool'
+    })
+
+    expect(parsed.category).toBe('subagent')
+    expect(parsed.chip).toBe('security-auditor')
+    expect(parsed.verb).toBe('Delegated')
+    expect(parsed.primaryParam).toBe('审计 packages/runtime/src/pentest 下的命令执行路径')
+  })
+
+  test('subagent classification is exact-name only, not a substring match', () => {
+    // 分支顺序依赖精确匹配：早期的 includes 类分支（如 name.includes('task')）
+    // 不能把 `subagent` 名字吞掉，反之 `subagent` 也不该命中其它工具。
+    const parsed = analyzeToolCall({
+      name: 'subagent-runner',
+      input: '{}',
+      status: 'success',
+      type: 'tool'
+    })
+    expect(parsed.category).not.toBe('subagent')
   })
 })

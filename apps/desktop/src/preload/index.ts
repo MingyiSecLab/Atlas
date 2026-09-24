@@ -143,6 +143,9 @@ const api = {
   modes: {
     list: () => ipcRenderer.invoke(RUNTIME_IPC.modeList)
   },
+  subagents: {
+    list: () => ipcRenderer.invoke(RUNTIME_IPC.subagentList)
+  },
   experts: {
     list: () => ipcRenderer.invoke(RUNTIME_IPC.expertList),
     save: (input: RuntimeExpertSaveInput) => ipcRenderer.invoke(RUNTIME_IPC.expertSave, input),

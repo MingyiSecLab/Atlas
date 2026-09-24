@@ -1,6 +1,7 @@
 import type { ChatBlock, ReasoningBlock, ToolBlock } from '../types'
 
-export type ToolCategory = 'terminal' | 'file_op' | 'search' | 'security' | 'task' | 'general'
+export type ToolCategory =
+  'terminal' | 'file_op' | 'search' | 'security' | 'subagent' | 'task' | 'general'
 
 export interface TimelineStat {
   fileName: string
@@ -352,7 +353,26 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
     }
   }
 
-  // 5. 通用工具
+  // 5. Subagent 委派（Mastra 内置 `subagent` 工具，精确名匹配；参数为
+  //    { agentType, task, modelId?, forked? }）。必须精确匹配：早期分支用了
+  //    includes，未来放宽时可能误吞该名字。
+  if (name === 'subagent') {
+    const agentType = typeof args?.agentType === 'string' ? args.agentType : undefined
+    const task = typeof args?.task === 'string' ? args.task : undefined
+    return {
+      category: 'subagent',
+      // 折叠态标签用 agentType（事件与参数里唯一稳定可得的标识）；
+      // 可读 name 由 SubagentToolUI 从 subagent 目录解析后展示在正文里。
+      displayName: agentType ? `Subagent · ${agentType}` : 'Subagent 委派',
+      verb: 'Delegated',
+      chip: agentType || 'subagent',
+      primaryParam: truncateSubagentTask(task),
+      parsedArgs: args,
+      isJsonArgs
+    }
+  }
+
+  // 6. 通用工具
   return {
     category: 'general',
     displayName: block.name,
@@ -362,6 +382,13 @@ export function analyzeToolCall(block: ToolBlock): ParsedToolCall {
     parsedArgs: args,
     isJsonArgs
   }
+}
+
+/** subagent task 的展示摘要（单行、限长），供 primaryParam 使用。 */
+function truncateSubagentTask(task: string | undefined): string | undefined {
+  if (!task) return undefined
+  const single = task.replace(/\s+/g, ' ').trim()
+  return single.length > 60 ? `${single.slice(0, 60)}...` : single
 }
 
 /**
