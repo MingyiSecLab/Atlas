@@ -71,10 +71,7 @@ export { createHostedPentestDriver } from './pentest/index.js'
 export { createPentestExplorer, createPentestPlanner } from './pentest/index.js'
 export type { PentestToolCatalogEntry } from './pentest/index.js'
 export { createPentestCreationParser } from './pentest/index.js'
-export type {
-  PentestCreationParserOptions,
-  RuntimePentestCreationIntent
-} from './pentest/index.js'
+export type { PentestCreationParserOptions, RuntimePentestCreationIntent } from './pentest/index.js'
 export { createRuntimeExpertService } from './experts/index.js'
 export type { RuntimeExpertService } from './experts/index.js'
 export {
@@ -131,11 +128,11 @@ export {
   DestructiveActionError,
   isTargetInScope
 } from './pentest/index.js'
-export { createSecurityMastraTools, resolvePentestArtifactsRoot } from './tools/security-tools/index.js'
 export {
-  createKaliSandboxTools,
-  KALI_SANDBOX_LOCAL_TARGET
+  createSecurityMastraTools,
+  resolvePentestArtifactsRoot
 } from './tools/security-tools/index.js'
+export { createKaliSandboxTools, KALI_SANDBOX_LOCAL_TARGET } from './tools/security-tools/index.js'
 
 // Kali 沙箱执行层（SPI + docker CLI 实现 + mock）
 export {
@@ -189,10 +186,7 @@ export {
   digestPentestEvidence,
   InMemoryPentestEvidenceStore
 } from './pentest/index.js'
-export type {
-  HostedPentestDriverOptions,
-  HostedPentestToolCommand
-} from './pentest/index.js'
+export type { HostedPentestDriverOptions, HostedPentestToolCommand } from './pentest/index.js'
 export type {
   RuntimePentestDriver,
   RuntimePentestDriverOptions,
@@ -360,6 +354,8 @@ export {
   auditMode,
   ATLAS_BRAND_PREAMBLE,
   customSubagents,
+  builtinSubagents,
+  allSubagents,
   securityAuditorSubagent,
   testGeneratorSubagent,
   perfOptimizerSubagent,

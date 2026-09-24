@@ -30,7 +30,7 @@ export {
 export type { RuntimeModeInfo } from './modes.js'
 
 // 导出自定义 subagents
-export { customSubagents } from './subagents/index.js'
+export { customSubagents, builtinSubagents, allSubagents } from './subagents/index.js'
 export {
   securityAuditorSubagent,
   testGeneratorSubagent,
