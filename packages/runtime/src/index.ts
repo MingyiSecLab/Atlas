@@ -66,9 +66,13 @@ export type {
 } from './tools/index.js'
 export { createRuntimePentestService } from './pentest/index.js'
 export { createPentestWorkflow, createRuntimePentestWorkflow } from './pentest/index.js'
-export { createRuntimePentestDriver } from './pentest/index.js'
+export { createRuntimePentestDriver, shouldSkipPlan } from './pentest/index.js'
 export { createHostedPentestDriver } from './pentest/index.js'
-export { createPentestExplorer, createPentestPlanner } from './pentest/index.js'
+export {
+  createPentestConcluder,
+  createPentestExplorer,
+  createPentestPlanner
+} from './pentest/index.js'
 export type { PentestToolCatalogEntry } from './pentest/index.js'
 export { createPentestCreationParser } from './pentest/index.js'
 export type { PentestCreationParserOptions, RuntimePentestCreationIntent } from './pentest/index.js'
@@ -193,7 +197,8 @@ export type {
   RuntimePentestDriverResumeInput,
   RuntimePentestDriverStartOptions,
   RuntimePentestDriverState,
-  RuntimePentestDriverStatus
+  RuntimePentestDriverStatus,
+  RuntimePentestWorkerConfig
 } from './pentest/index.js'
 export type {
   PentestAgentModel,
