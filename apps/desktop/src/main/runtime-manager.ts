@@ -123,6 +123,11 @@ export class DesktopRuntimeManager {
       await runtime.shutdown()
     })
     this.lifecycle = operation.catch(() => undefined)
-    await operation
+    // Runtime 关闭链路（sessions.shutdown → mcp.disconnect → controller.destroy）
+    // 在 MCP 子进程不退出或会话仍在收尾时可能永不结束。这里限时 2.5s 返回：
+    // 否则 before-quit 的 preventDefault 会吊住退出流程，进程成为"关不掉"的
+    // 僵尸，且 IPC handler 已被注销，重开窗口只会得到 "No handler registered"。
+    // 预算对齐 before-quit 的 3s 强退兜底（2.5s 清理 + 0.5s 余量）。
+    await Promise.race([operation, new Promise<void>((resolve) => setTimeout(resolve, 2_500))])
   }
 }

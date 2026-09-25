@@ -155,6 +155,9 @@ app
     createWindow()
 
     app.on('activate', function () {
+      // 退出清理进行中（shutdownStarted）不再重建窗口：此时 IPC handler 已被
+      // 注销，新窗口只会得到 "No handler registered"。进程随即强制退出。
+      if (shutdownStarted) return
       // On macOS it's common to re-create a window in the app when the
       // dock icon is clicked and there are no other windows open.
       if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -177,7 +180,11 @@ app.on('before-quit', (event) => {
   event.preventDefault()
   if (shutdownStarted) return
   shutdownStarted = true
+  // 3s 内必须完全退出：runtime 关闭限时 2.5s，这里 3s 强制兜底。
+  // 任何挂起的清理都不允许把进程变成"关不掉"的僵尸。
+  const forceExit = setTimeout(() => app.exit(0), 3_000)
   void shutdownServices().finally(() => {
+    clearTimeout(forceExit)
     servicesStopped = true
     app.quit()
   })
