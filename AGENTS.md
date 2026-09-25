@@ -2,7 +2,7 @@
 
 ## 项目结构与模块组织
 
-本仓库是 Mingyi 的开源 npm workspace。`apps/desktop/` 是 Electron、React 和 TypeScript 应用：Electron 主进程代码放在 `src/main/`，preload API 放在 `src/preload/`，浏览器 UI 放在 `src/renderer/`。`packages/runtime/` 是开源的本地 Agent 核心，模型服务位于 `src/models/`，Controller、Mode 和 Subagent 定义位于 `src/mastra/`。面向授权安全评估的安全工具统一放在 `src/tools/security-tools/`（新工具在该目录追加文件并经 `index.ts` 汇总导出），实现 pentest 的 `RuntimePentestTool` 契约后经 pentest 域的 `DEFAULT_PENTEST_TOOLS` 注册调度；通用工具机制位于 `src/tools/runtime-tools/`，目录布局由 `packages/runtime/test/tool-layout.test.ts` 守护。根 workspace 只维护 Runtime 和 Desktop；根目录下未列入 workspace 的独立项目目录不参与本项目的构建、测试或发布。Runtime 单元测试位于 `packages/runtime/test/`，Desktop 端到端测试位于 `apps/desktop/tests/`。除非任务明确指定，否则顶层 `tests/` 视为调研和参考工程。架构决策与实现说明放在 `docs/`。
+本仓库是 Mingyi 的开源 pnpm workspace。`apps/desktop/` 是 Electron、React 和 TypeScript 应用：Electron 主进程代码放在 `src/main/`，preload API 放在 `src/preload/`，浏览器 UI 放在 `src/renderer/`。`packages/runtime/` 是开源的本地 Agent 核心，模型服务位于 `src/models/`，Controller、Mode 和 Subagent 定义位于 `src/mastra/`。面向授权安全评估的安全工具统一放在 `src/tools/security-tools/`（新工具在该目录追加文件并经 `index.ts` 汇总导出），实现 pentest 的 `RuntimePentestTool` 契约后经 pentest 域的 `DEFAULT_PENTEST_TOOLS` 注册调度；通用工具机制位于 `src/tools/runtime-tools/`，目录布局由 `packages/runtime/test/tool-layout.test.ts` 守护。根 workspace 只维护 Runtime 和 Desktop；根目录下未列入 workspace 的独立项目目录不参与本项目的构建、测试或发布。Runtime 单元测试位于 `packages/runtime/test/`，Desktop 端到端测试位于 `apps/desktop/tests/`。除非任务明确指定，否则顶层 `tests/` 视为调研和参考工程。架构决策与实现说明放在 `docs/`。
 
 ## Runtime 架构约束
 
@@ -30,20 +30,20 @@ Runtime 基于 Mastra SDK 构建，核心依赖为 `@mastra/code-sdk`、`@mastra
 
 ## 构建、测试与开发命令
 
-执行以下命令前，先在仓库根目录运行 `npm install`。
+本仓库使用 pnpm 工作区。执行以下命令前，先在仓库根目录运行 `pnpm install`。
 
-- `npm run dev` 通过 electron-vite 启动 Electron 应用。
-- `npm run build` 执行类型检查并构建 Desktop 应用。
-- `npm run typecheck` 检查 Desktop 主进程、preload 和 renderer 的 TypeScript。
-- `npm run lint` 在 Desktop workspace 中运行 ESLint。
-- `npm test` 无头运行 Desktop Playwright 测试。
-- `npm run test:headed -w mingyi-app` 以可见 UI 运行 Playwright。
-- `npm run test -w @mingyi/runtime` 运行 Runtime Vitest 测试。
-- `npm run build -w @mingyi/runtime` 将 Runtime 编译到 `dist/`。
+- `pnpm dev` 通过 electron-vite 启动 Electron 应用（先构建 Runtime）。
+- `pnpm build` 执行类型检查并构建 Desktop 应用。
+- `pnpm typecheck` 检查 Desktop 主进程、preload 和 renderer 的 TypeScript。
+- `pnpm lint` 在 Desktop workspace 中运行 ESLint。
+- `pnpm test` 无头运行 Desktop Playwright 测试。
+- `pnpm --filter mingyi-app test:headed` 以可见 UI 运行 Playwright。
+- `pnpm --filter @mingyi/runtime test` 运行 Runtime Vitest 测试。
+- `pnpm --filter @mingyi/runtime build` 将 Runtime 编译到 `dist/`。
 
 ## 编码风格与命名约定
 
-生产代码使用 TypeScript，缩进为两个空格。Prettier 配置为单引号、不使用分号、每行最多 100 列且不使用尾随逗号；修改 Desktop 后运行 `npm run format -w mingyi-app`。遵循 ESLint 的 TypeScript、React、Hooks 和 refresh 规则。React 组件及导出类型使用 `PascalCase`，函数和变量使用 `camelCase`，文件名使用 kebab-case，例如 `security-auditor.ts`。Runtime 的公开导出应在 `packages/runtime/src/index.ts` 中显式维护。
+生产代码使用 TypeScript，缩进为两个空格。Prettier 配置为单引号、不使用分号、每行最多 100 列且不使用尾随逗号；修改 Desktop 后运行 `pnpm --filter mingyi-app format`。遵循 ESLint 的 TypeScript、React、Hooks 和 refresh 规则。React 组件及导出类型使用 `PascalCase`，函数和变量使用 `camelCase`，文件名使用 kebab-case，例如 `security-auditor.ts`。Runtime 的公开导出应在 `packages/runtime/src/index.ts` 中显式维护。
 
 ## 测试指南
 

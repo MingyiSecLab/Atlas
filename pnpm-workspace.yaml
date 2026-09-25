@@ -1,3 +1,27 @@
 packages:
   - 'apps/*'
   - 'packages/runtime'
+
+# 允许这些依赖执行安装脚本（pnpm 12 的写法，替代已废弃的 pnpm.onlyBuiltDependencies）。
+# electron 必须放行，否则不会下载/解压 Electron 二进制。
+allowBuilds:
+  '@google/genai': true
+  agent-browser: true
+  bufferutil: true
+  edgedriver: true
+  electron: true
+  electron-winstaller: true
+  esbuild: true
+  geckodriver: true
+  node-pty: true
+  onnxruntime-node: true
+  protobufjs: true
+
+# apps/desktop 依赖 @mingyi/runtime 的普通版本号 "0.1.0"，
+# 新版 pnpm 默认不链接工作区内的同名包，会去 npm registry 拉取并 404。
+linkWorkspacePackages: true
+
+# patch-package 需要能在根 node_modules/@mastra/* 找到被 patch 的包，
+# 而 pnpm 默认把它们折叠在 node_modules/.pnpm 下。
+publicHoistPattern:
+  - '@mastra/*'

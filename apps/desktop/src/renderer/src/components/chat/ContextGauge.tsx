@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion, AnimatePresence } from 'motion/react'
 import type { RuntimeTokenUsage } from '@mingyi/runtime'
 import { cn } from '@renderer/lib/utils'
 import { formatTokenCount, getModelContextLimit } from './token-counter'

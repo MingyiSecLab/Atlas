@@ -13,30 +13,30 @@ Runtime 是所有 apps 共用的 Harness 层，应用层不应复制引擎逻辑
 
 ## 构建与开发命令
 
-在仓库根目录运行 `npm install` 后，使用以下命令：
+在仓库根目录运行 `pnpm install` 后，使用以下命令：
 
 ```bash
 # 开发
-npm run dev                              # 构建 Runtime 并启动 Electron 开发模式
+pnpm dev                                  # 构建 Runtime 并启动 Electron 开发模式
 
 # 构建
-npm run build                            # 构建 Runtime 和 Desktop
-npm run build -w @mingyi/runtime         # 仅构建 Runtime
-npm run build -w mingyi-app              # 仅构建 Desktop
+pnpm build                                # 构建 Runtime 和 Desktop
+pnpm --filter @mingyi/runtime build       # 仅构建 Runtime
+pnpm --filter mingyi-app build            # 仅构建 Desktop
 
 # 类型检查
-npm run typecheck                        # 检查 Desktop
-npm run typecheck -w @mingyi/runtime     # 检查 Runtime
+pnpm typecheck                            # 检查 Desktop
+pnpm --filter @mingyi/runtime typecheck   # 检查 Runtime
 
 # 测试
-npm test                                 # 运行 Desktop Playwright 测试（无头）
-npm run test:headed -w mingyi-app        # 运行 Desktop 测试（可见 UI）
-npm run test -w @mingyi/runtime          # 运行 Runtime Vitest 单元测试
-npm run test:watch -w @mingyi/runtime    # Watch 模式运行 Runtime 测试
+pnpm test                                 # 运行 Desktop Playwright 测试（无头）
+pnpm --filter mingyi-app test:headed      # 运行 Desktop 测试（可见 UI）
+pnpm --filter @mingyi/runtime test        # 运行 Runtime Vitest 单元测试
+pnpm --filter @mingyi/runtime test:watch  # Watch 模式运行 Runtime 测试
 
 # 代码质量
-npm run lint                             # Lint Desktop 代码
-npm run format -w mingyi-app             # 格式化 Desktop 代码
+pnpm lint                                 # Lint Desktop 代码
+pnpm --filter mingyi-app format           # 格式化 Desktop 代码
 ```
 
 ## 核心架构约束

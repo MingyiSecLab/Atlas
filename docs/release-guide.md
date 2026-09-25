@@ -85,16 +85,16 @@ macOS / Windows 矩阵机之前被拦下：
 
 | 阶段 | Runner | 超时 | 职责 |
 | :--- | :--- | :--- | :--- |
-| **1. Preflight** | `ubuntu-latest` | 20 min | `npm ci` → 编译 `@mingyi/runtime` → Desktop 类型检查 → 运行不依赖 Electron 的纯逻辑用例。**门禁**：不通过则终止流水线，不消耗 mac/win 额度。 |
+| **1. Preflight** | `ubuntu-latest` | 20 min | `pnpm install --frozen-lockfile` → 编译 `@mingyi/runtime` → Desktop 类型检查 → 运行不依赖 Electron 的纯逻辑用例。**门禁**：不通过则终止流水线，不消耗 mac/win 额度。 |
 | **2. Build** | `macos-latest` / `windows-latest`（并行） | 75 / 60 min | 并行编译 `@mingyi/runtime` 与 `mingyi-app`，再用 electron-builder 打包：macOS 产出 arm64 + x64 的 DMG 与 ZIP，Windows 产出 amd64 的 EXE 与 ZIP。 |
 | **3. Publish** | `ubuntu-latest` | 20 min | 汇总所有产物 → 生成全局 `SHA256SUMS.txt` → 创建 GitHub Release 并附带公告与附件。 |
 
 流水线的性能与稳定性设计：
 
 - **二进制缓存**：缓存 Electron 发行包（`~/Library/Caches/electron` / `%LOCALAPPDATA%\electron\Cache`）
-  与 electron-builder 工具链（winCodeSign、nsis、dmg 等），键值绑定 `package-lock.json` 哈希。
+  与 electron-builder 工具链（winCodeSign、nsis、dmg 等），键值绑定 `pnpm-lock.yaml` 哈希。
   缓存命中后无需重复下载，冷启动与热启动差异明显。
-- **锁定式安装**：使用 `npm ci` 严格按 `package-lock.json` 安装，保证发布产物与本地验证一致。
+- **锁定式安装**：使用 `pnpm install --frozen-lockfile` 严格按 `pnpm-lock.yaml` 安装，保证发布产物与本地验证一致。
 - **互斥与超时**：发布流水线全局串行（同一时刻只允许一次 Release 运行，且不静默取消进行中的
   发布）；每个 job 均设有 `timeout-minutes`，避免渲染层构建卡死时持续占用高系数额度。
 - **产物校验**：安装包收集阶段只匹配 `.dmg` / `.zip` / `.exe` 等最终产物（自动排除
@@ -199,10 +199,10 @@ Fork 仓库 ──> 创建特性分支 ──> 遵循规范编码 ──> 本地
 3. **提交前本地验证**：
    在提交 PR 之前，请确保本地通过全部质量把关命令：
    ```bash
-   npm run typecheck       # 检查 TypeScript 类型
-   npm run lint            # 运行代码规范检查
-   npm test -w @mingyi/runtime  # 运行 Runtime 单元测试
-   npm run build           # 验证桌面端与内核构建
+   pnpm typecheck                     # 检查 TypeScript 类型
+   pnpm lint                          # 运行代码规范检查
+   pnpm --filter @mingyi/runtime test # 运行 Runtime 单元测试
+   pnpm build                         # 验证桌面端与内核构建
    ```
 4. **致谢机制与贡献者名单**：
    - 凡贡献被合并的代码，均会自动列入 GitHub Release 的贡献者鸣谢名单；

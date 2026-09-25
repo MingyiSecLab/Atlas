@@ -99,7 +99,7 @@ Mingyi 是一个基于 Electron 的本地 AI Agent 桌面应用：将现代化�
   docker build -t mingyi-sandbox:latest ./container
   ```
   *(镜像内置完整 Kali 安全工具链、离线 PoC 库及 HackTricks/PayloadsAllTheThings 知识库)*
-- **启动常驻沙箱容器**（亦可通过 `npm run container:run` 跨平台一键启动）：
+- **启动常驻沙箱容器**（亦可通过 `pnpm run container:run` 跨平台一键启动）：
   ```bash
   # macOS / Linux (工作区默认映射至 ~/.atlas/sandbox_workspace)
   docker run -d \
@@ -153,31 +153,29 @@ Atlas 具备高度开放的双轨扩展能力，支持安全研究员和开发�
 
 ## 快速开始
 
-先在仓库根目录安装依赖：
+先在仓库根目录安装依赖（本仓库使用 pnpm 工作区，要求 Node.js >= 22.19）：
 
 ```bash
-npm install
+pnpm install
 ```
 
 常用命令：
 
 ```bash
 # 启动 Electron 应用（开发模式）
-npm run dev
+pnpm dev
 
 # 构建与类型检查
-npm run build
-npm run typecheck
+pnpm build
+pnpm typecheck
 
 # 测试
-npm test                          # Desktop Playwright E2E（无头）
-npm run test -w @mingyi/runtime   # Runtime Vitest 单测
+pnpm test                              # Desktop Playwright E2E（无头）
+pnpm --filter @mingyi/runtime test     # Runtime Vitest 单测
 
 # Lint 与格式化
-npm run lint
+pnpm lint
 ```
-
-要求 Node.js >= 22.19。
 
 ## Runtime 使用示例
 

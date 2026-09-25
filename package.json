@@ -2,17 +2,18 @@
   "name": "mingyi",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@12.6.0",
   "workspaces": [
     "apps/desktop",
     "packages/runtime"
   ],
   "scripts": {
     "postinstall": "patch-package",
-    "build": "npm run build -w @mingyi/runtime && npm run build -w mingyi-app",
-    "typecheck": "npm run typecheck -w mingyi-app",
-    "test": "npm run test -w mingyi-app",
-    "lint": "npm run lint -w mingyi-app",
-    "dev": "npm run build -w @mingyi/runtime && npm run dev -w mingyi-app",
+    "build": "pnpm --filter @mingyi/runtime build && pnpm --filter mingyi-app build",
+    "typecheck": "pnpm --filter mingyi-app typecheck",
+    "test": "pnpm --filter mingyi-app test",
+    "lint": "pnpm --filter mingyi-app lint",
+    "dev": "pnpm --filter @mingyi/runtime build && pnpm --filter mingyi-app dev",
     "container:build": "docker build --platform linux/amd64 -t mingyi-sandbox:latest ./container",
     "container:run": "node scripts/run-container.mjs",
     "container:smoke": "bash scripts/sandbox-smoke.sh"

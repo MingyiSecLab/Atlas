@@ -61,35 +61,39 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag_name }}
         run: node .github/scripts/validate-release-tag.mjs
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      # preflight 的 npm ci 会触发 apps/desktop 的 install-app-deps（原生模块重建），
+      # preflight 的 pnpm install 会触发 apps/desktop 的 install-app-deps（原生模块重建），
       # 过程中需要下载 Linux 版 Electron 发行包，缓存后免去重复下载。
       - name: Restore Electron cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/electron
-          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-electron-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Runtime package
-        run: npm run build -w @mingyi/runtime
+        run: pnpm --filter @mingyi/runtime build
 
       - name: Typecheck Desktop
-        run: npm run typecheck -w mingyi-app
+        run: pnpm --filter mingyi-app typecheck
 
       - name: Run pure-logic desktop specs
         working-directory: apps/desktop
         run: |
-          npx playwright test \
+          pnpm exec playwright test \
             tests/tool-group.spec.ts \
             tests/chat-aui-converter.spec.ts \
             tests/chat-tool-timing.spec.ts \
@@ -132,31 +136,35 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'npm'
+          cache: 'pnpm'
+          cache-dependency-path: pnpm-lock.yaml
 
-      # 必须放在 npm ci 之前：electron 的 postinstall 会从这里取发行包，
+      # 必须放在 pnpm install 之前：electron 的 postinstall 会从这里取发行包，
       # 命中缓存就不再走网络下载。
       - name: Restore Electron / electron-builder cache
         uses: actions/cache@v4
         with:
           path: ${{ matrix.cachePaths }}
-          key: ${{ runner.os }}-electron-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-electron-${{ hashFiles('pnpm-lock.yaml') }}
           restore-keys: |
             ${{ runner.os }}-electron-
 
       - name: Install dependencies
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       # 根 build 脚本即「runtime → desktop(typecheck + electron-vite build)」，
       # 用一条命令代替原来拆开的两步，避免脚本链两处漂移。
       # GIT_COMMIT 会被 electron.vite.config.ts 注入渲染层（__BUILD_COMMIT__），
       # 悬停在侧边栏版本号上即可定位安装包对应的提交。
       - name: Build Runtime and Desktop
-        run: npm run build
+        run: pnpm run build
         env:
           GIT_COMMIT: ${{ github.sha }}
 

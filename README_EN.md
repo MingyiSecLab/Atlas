@@ -99,7 +99,7 @@ To prevent automated penetration testing from accidentally damaging the host or 
   docker build -t mingyi-sandbox:latest ./container
   ```
   *(The image bundles the full Kali security toolchain, an offline PoC library, and the HackTricks / PayloadsAllTheThings knowledge bases.)*
-- **Start a persistent sandbox container** (or launch it cross-platform in one command via `npm run container:run`):
+- **Start a persistent sandbox container** (or launch it cross-platform in one command via `pnpm run container:run`):
   ```bash
   # macOS / Linux (workspace is mounted at ~/.atlas/sandbox_workspace by default)
   docker run -d \
@@ -153,31 +153,29 @@ Security researchers, ML engineers, and full-stack developers are all welcome to
 
 ## Getting Started
 
-Install dependencies at the repository root first:
+Install dependencies at the repository root first (this repo is a pnpm workspace, requires Node.js >= 22.19):
 
 ```bash
-npm install
+pnpm install
 ```
 
 Common commands:
 
 ```bash
 # Start the Electron app (development mode)
-npm run dev
+pnpm dev
 
 # Build and typecheck
-npm run build
-npm run typecheck
+pnpm build
+pnpm typecheck
 
 # Tests
-npm test                          # Desktop Playwright E2E (headless)
-npm run test -w @mingyi/runtime   # Runtime Vitest unit tests
+pnpm test                              # Desktop Playwright E2E (headless)
+pnpm --filter @mingyi/runtime test     # Runtime Vitest unit tests
 
 # Lint and format
-npm run lint
+pnpm lint
 ```
-
-Requires Node.js >= 22.19.
 
 ## Runtime Usage Example
 
