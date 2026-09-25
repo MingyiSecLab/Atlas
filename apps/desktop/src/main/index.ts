@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow } from 'electron'
+import { mkdirSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -19,6 +20,9 @@ import { registerUpdateService } from './update-service'
 // 以下均为 code-sdk 原生环境变量，必须在 runtime 首次 boot 之前设置；
 // 用 ||= 保留外部显式设置（调试用途），正常使用零配置。
 const atlasHome = join(homedir(), '.atlas')
+// 数据根必须先于 runtime 首次 boot 创建：runtime-manager 注入的 LibSQLVector 打开
+// vectors.db 时 libsql 只建库文件、不建父目录，目录缺失会报 SQLITE_CANTOPEN(14)。
+mkdirSync(atlasHome, { recursive: true })
 process.env.MASTRA_APP_DATA_DIR ||= atlasHome
 process.env.MASTRA_DB_PATH ||= join(atlasHome, 'atlas.db')
 process.env.MASTRA_OBSERVABILITY_DB_PATH ||= join(atlasHome, 'observability.duckdb')
