@@ -63,6 +63,14 @@ function customProviderInput(value: unknown): UpsertRuntimeCustomProviderInput {
   ) {
     throw new Error('Custom provider protocol must be openai-chat, openai-responses, or anthropic.')
   }
+  if (
+    input.maxOutputTokens !== undefined &&
+    (typeof input.maxOutputTokens !== 'number' ||
+      !Number.isFinite(input.maxOutputTokens) ||
+      input.maxOutputTokens <= 0)
+  ) {
+    throw new Error('Custom provider maxOutputTokens must be a positive number.')
+  }
   return {
     name: input.name.slice(0, 120),
     url: input.url.slice(0, 2048),
@@ -71,6 +79,9 @@ function customProviderInput(value: unknown): UpsertRuntimeCustomProviderInput {
     ...(input.previousId !== undefined ? { previousId: providerId(input.previousId) } : {}),
     ...(input.protocol !== undefined
       ? { protocol: input.protocol as UpsertRuntimeCustomProviderInput['protocol'] }
+      : {}),
+    ...(input.maxOutputTokens !== undefined
+      ? { maxOutputTokens: Math.floor(input.maxOutputTokens) }
       : {})
   }
 }

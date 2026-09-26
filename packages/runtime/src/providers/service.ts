@@ -61,6 +61,7 @@ function customProviderInfo(provider: {
   apiKey?: string;
   models: string[];
   protocol?: 'openai-chat' | 'openai-responses' | 'anthropic';
+  maxOutputTokens?: number;
 }): RuntimeCustomProviderInfo {
   return {
     id: getCustomProviderId(provider.name),
@@ -68,6 +69,9 @@ function customProviderInfo(provider: {
     url: provider.url,
     models: [...provider.models],
     protocol: normalizeProtocol(provider.protocol),
+    ...(typeof provider.maxOutputTokens === 'number' && provider.maxOutputTokens > 0
+      ? { maxOutputTokens: Math.floor(provider.maxOutputTokens) }
+      : {}),
     hasApiKey: Boolean(provider.apiKey),
   };
 }
@@ -253,6 +257,15 @@ export function createRuntimeProviderService({
         input.protocol,
         input.protocol === undefined ? existing?.protocol : undefined
       );
+      // maxOutputTokens：显式传入正数 → 生效；省略 → 继承既有值
+      const existingMaxOutputTokens =
+        typeof existing?.maxOutputTokens === 'number' && existing.maxOutputTokens > 0
+          ? existing.maxOutputTokens
+          : undefined;
+      const maxOutputTokens =
+        typeof input.maxOutputTokens === 'number' && input.maxOutputTokens > 0
+          ? Math.floor(input.maxOutputTokens)
+          : existingMaxOutputTokens;
       upsertCustomProviderInSettings(
         settings,
         {
@@ -261,6 +274,7 @@ export function createRuntimeProviderService({
           ...(apiKey ? { apiKey } : {}),
           models: customProviderModels(input.models),
           protocol,
+          ...(maxOutputTokens ? { maxOutputTokens } : {}),
         },
         previousId,
       );

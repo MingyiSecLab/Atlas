@@ -50,6 +50,8 @@ export interface RuntimeCustomProviderInfo {
   models: string[];
   /** 接口协议；缺省 `openai-chat`。 */
   protocol: RuntimeCustomProviderProtocol;
+  /** 该 Provider 的默认最大输出 token 数（调用未指定时生效，缺省 32768）。 */
+  maxOutputTokens?: number;
   /** 自定义 Provider 是否保存了 API Key；不包含 Key 明文。 */
   hasApiKey: boolean;
 }
@@ -64,6 +66,12 @@ export interface UpsertRuntimeCustomProviderInput {
   models: string[];
   /** 接口协议；编辑时省略则保留原值，缺省 `openai-chat`。 */
   protocol?: RuntimeCustomProviderProtocol;
+  /**
+   * 该 Provider 的默认最大输出 token 数；模型调用未指定 maxOutputTokens 时生效
+   * （缺省 32768）。修复小默认值网关把长回答截断（finish reason "length"）的问题。
+   * 编辑时省略则保留原值。
+   */
+  maxOutputTokens?: number;
 }
 
 export interface LoginRuntimeProviderInput {

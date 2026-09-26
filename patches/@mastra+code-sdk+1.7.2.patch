@@ -1,8 +1,7 @@
 diff --git a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
-index 15ffc67..04bb793 100644
 --- a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
 +++ b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.d.ts
-@@ -11,6 +11,11 @@ export type MastraCodeCustomProvider = {
+@@ -11,6 +11,17 @@ export type MastraCodeCustomProvider = {
      url: string;
      apiKey?: string;
      models?: string[];
@@ -11,14 +10,19 @@ index 15ffc67..04bb793 100644
 +     * Defaults to `openai-chat` when omitted.
 +     */
 +    protocol?: 'openai-chat' | 'openai-responses' | 'anthropic';
++    /**
++     * Mingyi patch (max output tokens): per-provider default output token cap,
++     * applied when a model call does not specify `maxOutputTokens`.
++     * Defaults to 32768 when omitted.
++     */
++    maxOutputTokens?: number;
  };
  export type MastraCodeGatewayOptions = {
      mastraGatewayBaseUrl: string;
 diff --git a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
-index e3c5b50..0aa56c7 100644
 --- a/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
 +++ b/node_modules/@mastra/code-sdk/dist/agents/mastracode-gateway.js
-@@ -305,12 +305,31 @@ var MastraCodeGateway = class MastraCodeGateway extends MastraModelGateway {
+@@ -305,12 +305,43 @@ var MastraCodeGateway = class MastraCodeGateway extends MastraModelGateway {
  	}
  	resolveLanguageModel(args) {
  		const customProvider = this.#getCustomProviders().find((provider) => args.providerId === getCustomProviderId(provider.name));
@@ -29,38 +33,49 @@ index e3c5b50..0aa56c7 100644
 -			headers: args.headers
 -		}).chatModel(args.modelId);
 +		if (customProvider) {
++			// Mingyi patch (max output tokens): when the caller does not specify
++			// maxOutputTokens, apply the provider-configured cap (default 32768).
++			// Without this, gateways with small server defaults truncate long
++			// answers mid-turn (finish reason "length"). A wrapper keeps the
++			// prototype chain intact so version checks still pass.
++			const defaultMaxOutputTokens = typeof customProvider.maxOutputTokens === "number" && customProvider.maxOutputTokens > 0 ? customProvider.maxOutputTokens : 32768;
++			const withDefaultMaxOutputTokens = (model) => {
++				const wrapped = Object.create(model);
++				wrapped.doGenerate = (options) => model.doGenerate({ ...options, maxOutputTokens: options.maxOutputTokens ?? defaultMaxOutputTokens });
++				wrapped.doStream = (options) => model.doStream({ ...options, maxOutputTokens: options.maxOutputTokens ?? defaultMaxOutputTokens });
++				return wrapped;
++			};
 +			// Mingyi patch (protocol selection): let custom providers choose the
 +			// wire protocol — default remains OpenAI-compatible chat completions.
 +			if (customProvider.protocol === "openai-responses") {
-+				return createOpenAI({
++				return withDefaultMaxOutputTokens(createOpenAI({
 +					name: args.providerId,
 +					baseURL: customProvider.url,
 +					apiKey: args.apiKey,
 +					headers: args.headers
-+				}).responses(args.modelId);
++				}).responses(args.modelId));
 +			}
 +			if (customProvider.protocol === "anthropic") {
-+				return createAnthropic({
++				return withDefaultMaxOutputTokens(createAnthropic({
 +					apiKey: args.apiKey,
 +					baseURL: customProvider.url,
 +					headers: args.headers
-+				})(args.modelId);
++				})(args.modelId));
 +			}
-+			return createOpenAICompatible({
++			return withDefaultMaxOutputTokens(createOpenAICompatible({
 +				name: args.providerId,
 +				baseURL: customProvider.url,
 +				apiKey: args.apiKey,
 +				headers: args.headers
-+			}).chatModel(args.modelId);
++			}).chatModel(args.modelId));
 +		}
  		if (args.providerId === "github-copilot") return githubCopilotProvider(args.modelId, {
  			headers: args.headers,
  			authStorage: this.#credentials
 diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js b/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
-index d9dd796..b8df0ae 100644
 --- a/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
 +++ b/node_modules/@mastra/code-sdk/dist/onboarding/custom-providers.js
-@@ -4,13 +4,21 @@ import { getCustomProviderId } from "./settings.js";
+@@ -4,13 +4,24 @@ import { getCustomProviderId } from "./settings.js";
  * Pure `GlobalSettings` mutation helpers for custom OpenAI-compatible
  * providers. Shared by the TUI `/custom-providers` command and the web
  * settings routes — no UI dependencies.
@@ -73,21 +88,23 @@ index d9dd796..b8df0ae 100644
 +const CUSTOM_PROVIDER_PROTOCOLS = ["openai-chat", "openai-responses", "anthropic"];
  function normalizeProvider(input) {
 +	const protocol = input.protocol;
++	const maxOutputTokens = typeof input.maxOutputTokens === "number" && Number.isFinite(input.maxOutputTokens) && input.maxOutputTokens > 0 ? Math.floor(input.maxOutputTokens) : void 0;
  	return {
  		name: input.name.trim(),
  		url: input.url.trim(),
  		apiKey: input.apiKey?.trim() || void 0,
 -		models: [...new Set(input.models.map((model) => model.trim()).filter(Boolean))]
 +		models: [...new Set(input.models.map((model) => model.trim()).filter(Boolean))],
-+		...(CUSTOM_PROVIDER_PROTOCOLS.includes(protocol) ? { protocol } : {})
++		...(CUSTOM_PROVIDER_PROTOCOLS.includes(protocol) ? { protocol } : {}),
++		// Mingyi patch (max output tokens): optional per-provider output cap override.
++		...maxOutputTokens ? { maxOutputTokens } : {}
  	};
  }
  function upsertCustomProviderInSettings(settings, provider, previousProviderId) {
 diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
-index 9b6c883..ba2a7f2 100644
 --- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
 +++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.d.ts
-@@ -20,6 +20,13 @@ export interface CustomProviderSetting {
+@@ -20,6 +20,20 @@ export interface CustomProviderSetting {
      url: string;
      apiKey?: string;
      models: string[];
@@ -98,25 +115,34 @@ index 9b6c883..ba2a7f2 100644
 +     * `anthropic` — Anthropic Messages API.
 +     */
 +    protocol?: 'openai-chat' | 'openai-responses' | 'anthropic';
++    /**
++     * Mingyi patch (max output tokens): per-provider default output token cap.
++     * Applied when a model call does not specify `maxOutputTokens`, so
++     * gateways with small server defaults stop truncating long answers.
++     * Defaults to 32768 when omitted.
++     */
++    maxOutputTokens?: number;
  }
  /** Storage backend type. */
  export type StorageBackend = 'libsql' | 'pg';
 diff --git a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
-index c04fff4..05890ec 100644
 --- a/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
 +++ b/node_modules/@mastra/code-sdk/dist/onboarding/settings.js
-@@ -288,11 +288,13 @@ function parseCustomProviders(rawProviders) {
+@@ -288,11 +288,16 @@ function parseCustomProviders(rawProviders) {
  			return model;
  		}))].filter((model) => model.length > 0) : [];
  		const apiKey = typeof candidate.apiKey === "string" && candidate.apiKey.trim().length > 0 ? candidate.apiKey.trim() : void 0;
 +		const protocol = candidate.protocol;
++		const maxOutputTokens = typeof candidate.maxOutputTokens === "number" && Number.isFinite(candidate.maxOutputTokens) && candidate.maxOutputTokens > 0 ? Math.floor(candidate.maxOutputTokens) : void 0;
  		parsedProviders.push({
  			name,
  			url,
  			...apiKey ? { apiKey } : {},
 -			models
 +			models,
-+			...(protocol === "openai-chat" || protocol === "openai-responses" || protocol === "anthropic" ? { protocol } : {})
++			...(protocol === "openai-chat" || protocol === "openai-responses" || protocol === "anthropic" ? { protocol } : {}),
++			// Mingyi patch (max output tokens): optional per-provider output cap override.
++			...maxOutputTokens ? { maxOutputTokens } : {}
  		});
  	}
  	return parsedProviders;
