@@ -64,6 +64,32 @@ export type {
   RuntimeToolKind,
   RuntimeToolResult
 } from './tools/index.js'
+export { createRuntimeAuditService } from './audit/service.js'
+export { FileAuditStore } from './audit/store.js'
+export { createAuditMastraTools } from './audit/mastra-tools.js'
+export { AUDIT_PHASES } from './audit/types.js'
+export type {
+  RuntimeAuditEvent,
+  RuntimeAuditRunSnapshot
+} from './audit/aliases.js'
+export type {
+  AuditCoverageUnit,
+  AuditEvent,
+  AuditFinding,
+  AuditPhase,
+  AuditProfile,
+  AuditRun,
+  AuditRunSnapshot,
+  AuditRunStatus,
+  AuditSeverity,
+  AuditTraceStep,
+  AuditUnitCheck,
+  AuditUnitStatus,
+  AuditVerdict,
+  RuntimeAuditRunHandle,
+  RuntimeAuditService,
+  RuntimeAuditStore
+} from './audit/types.js'
 export { createRuntimePentestService } from './pentest/index.js'
 export { createPentestWorkflow, createRuntimePentestWorkflow } from './pentest/index.js'
 export { createRuntimePentestDriver, shouldSkipPlan } from './pentest/index.js'

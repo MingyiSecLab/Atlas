@@ -3,6 +3,7 @@ import type { RightPanelSection } from './right-panel-vocabulary'
 import { BrowserView } from './browser'
 import { RightTerminalView } from './terminal'
 import { PentestView } from './pentest'
+import { AuditView } from './audit'
 import { FilesView } from './files/FilesView'
 
 interface RightCapabilityPanelProps {
@@ -104,6 +105,7 @@ export const RightCapabilityPanel: React.FC<RightCapabilityPanelProps> = ({
         {activeSection === 'browser' ? <BrowserView /> : null}
         {activeSection === 'files' ? <FilesView /> : null}
         {activeSection === 'pentest' ? <PentestView taskId={taskId} /> : null}
+        {activeSection === 'audit' ? <AuditView /> : null}
       </div>
     </aside>
   )

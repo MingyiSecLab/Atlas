@@ -7,6 +7,7 @@ import type {
   RuntimeModelBridge,
   RuntimeModeBridge,
   RuntimeOmBridge,
+  RuntimeAuditBridge,
   RuntimePentestBridge,
   RuntimeProjectBridge,
   RuntimeSkillBridge,
@@ -44,6 +45,7 @@ interface MingyiDesktopApi {
   sessions: RuntimeSessionBridge
   mcp: RuntimeMcpBridge
   pentest: RuntimePentestBridge
+  audit: RuntimeAuditBridge
 }
 
 declare global {

@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerProviderService } from './provider-service'
+import { registerAuditService } from './audit-service'
 import { registerPentestService } from './pentest-service'
 import { DesktopRuntimeManager } from './runtime-manager'
 import { registerRuntimeService } from './runtime-service'
@@ -31,6 +32,7 @@ let disposeTerminalService = (): void => undefined
 let disposeProviderService = (): void => undefined
 let disposeRuntimeService = (): void => undefined
 let disposePentestService = (): void => undefined
+let disposeAuditService = (): void => undefined
 let disposeFileService = (): void => undefined
 let disposeUpdateService = (): void => undefined
 const defaultWorkspace = process.env.MINGYI_WORKSPACE_PATH || join(atlasHome, 'workspace')
@@ -44,6 +46,7 @@ async function shutdownServices(): Promise<void> {
   disposeProviderService()
   disposeRuntimeService()
   disposePentestService()
+  disposeAuditService()
   disposeTerminalService()
   try {
     await runtimeManager.shutdown()
@@ -139,7 +142,9 @@ app
     disposeTerminalService = registerTerminalService(join(atlasHome, 'blobs'))
     disposeProviderService = registerProviderService(runtimeManager)
     const pentestService = registerPentestService(runtimeManager)
+    const auditService = registerAuditService(runtimeManager)
     disposePentestService = () => pentestService.dispose()
+    disposeAuditService = () => auditService.dispose()
     disposeRuntimeService = registerRuntimeService(runtimeManager, {
       // 会话删除后清理其 engagement 绑定，避免残留指向已删除会话的映射
       onSessionDeleted: (sessionId) => pentestService.removeTaskBindings(sessionId)

@@ -179,6 +179,7 @@ mingyi-tot/
 - `MINGYI_WORKSPACE_ROOT`: 工作空间根路径
 - `MINGYI_PENTEST_DATA_DIR`: Pentest 数据持久化目录
 - `MINGYI_PROJECTS_DATA_DIR`: 项目空间数据目录
+- `MINGYI_AUDIT_DATA_DIR`: 代码审计 run 持久化目录（默认 `~/.atlas/audit` 或 `<workspace>/.mingyi/audit`）
 - `MINGYI_DISABLE_UPDATE_CHECK`: 设为 `1`/`true` 时关停客户端更新检查（含启动自动检查），e2e 默认注入以保证断言不依赖外网
 - Provider 相关: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `MINGYI_BASE_URL` 等
 

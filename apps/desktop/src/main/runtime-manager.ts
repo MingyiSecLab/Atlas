@@ -41,6 +41,15 @@ export class DesktopRuntimeManager {
       : join(app.getPath('userData'), 'projects')
   }
 
+  /** 代码审计 run 的持久化目录（跨应用重启保留）。 */
+  getAuditDataDir(): string {
+    const override = process.env.MINGYI_AUDIT_DATA_DIR
+    if (override) return resolve(override)
+    return this.dataRoot
+      ? join(this.dataRoot, 'audit')
+      : join(this.workspacePath, '.mingyi', 'audit')
+  }
+
   /**
    * Kali 沙箱工作区在宿主机的持久化挂载目录。
    * 优先读 MINGYI_SANDBOX_WORKSPACE_DIR，未指定时默认集中于 Atlas 数据根（~/.atlas/sandbox_workspace）。
@@ -76,6 +85,7 @@ export class DesktopRuntimeManager {
         workspacePath: this.workspacePath,
         pentestDataDir: this.getPentestDataDir(),
         projectsDataDir: this.getProjectsDataDir(),
+        auditDataDir: this.getAuditDataDir(),
         // subagents 显式传入会整体替换 SDK 内置的 explore/plan/execute，
         // 故传合并后的 allSubagents（内置 3 + 自定义 5），而非 customSubagents。
         subagents: allSubagents,

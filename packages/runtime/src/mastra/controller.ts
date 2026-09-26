@@ -11,10 +11,12 @@ import {
 import type { RuntimeModelConfig } from '../models/types.js';
 import { scanExpertModes } from '../experts/scanner.js';
 import { createSecurityMastraTools } from '../tools/security-tools/index.js';
+import { createAuditMastraTools } from '../audit/mastra-tools.js';
 import { allModes } from './modes.js';
 import { applyOmConfigToInitialState } from './observational-memory.js';
 import type { RuntimeObservationalMemoryConfig } from './observational-memory.js';
 import type { RuntimePentestService } from '../pentest/types.js';
+import type { RuntimeAuditService } from '../audit/types.js';
 import type { RuntimeSandboxAdapter } from '../sandbox/types.js';
 
 export interface ControllerConfigOptions {
@@ -35,6 +37,8 @@ export interface ControllerConfigOptions {
   observationalMemory?: RuntimeObservationalMemoryConfig;
   /** 渗透测试服务实例（供安全工具适配层自动关联任务黑板） */
   pentestService?: RuntimePentestService;
+  /** 审计运行服务实例（供 init_audit_run 等编排工具落库并点亮右侧审计面板） */
+  auditService?: RuntimeAuditService;
   /** Kali 沙箱执行器；提供后注册 kali_* 工具（kali_exec / kali_session_* / kali_file_*） */
   sandbox?: RuntimeSandboxAdapter;
   /** 获取当前活跃会话 ID（对话 UUID），用于沙箱工作目录绑定隔离 */
@@ -90,22 +94,26 @@ export function createControllerConfig(
     config.subagents = subagents;
   }
 
-  // 额外工具（挂载原生安全工具适配层，并合并外部额外工具）
+  // 额外工具（挂载原生安全工具适配层 + 审计编排工具，并合并外部额外工具）
   const securityTools = createSecurityMastraTools({
     workspacePath: options.workspacePath,
     pentestService: options.pentestService,
     getActiveSessionId: options.getActiveSessionId,
     ...(options.sandbox ? { sandbox: options.sandbox } : {})
   });
+  const auditTools = createAuditMastraTools({
+    ...(options.auditService ? { auditService: options.auditService } : {})
+  });
+  const runtimeExtraTools = { ...securityTools, ...auditTools };
   if (typeof options.extraTools === 'function') {
     const customFn = options.extraTools;
     config.extraTools = async (ctx) => {
       const res = await customFn(ctx);
-      return { ...securityTools, ...res };
+      return { ...runtimeExtraTools, ...res };
     };
   } else {
     config.extraTools = {
-      ...securityTools,
+      ...runtimeExtraTools,
       ...(options.extraTools ?? {}),
     };
   }

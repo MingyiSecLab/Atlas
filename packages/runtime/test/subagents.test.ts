@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { allSubagents, builtinSubagents, customSubagents } from '../src/mastra/subagents/index.js'
 
 describe('subagent 目录装配', () => {
-  it('保留 SDK 内置三个并追加自定义五个', () => {
+  it('保留 SDK 内置三个并追加自定义十个', () => {
     expect(builtinSubagents.map((subagent) => subagent.id)).toEqual(['explore', 'plan', 'execute'])
-    expect(customSubagents).toHaveLength(5)
+    expect(customSubagents).toHaveLength(10)
     expect(allSubagents).toHaveLength(builtinSubagents.length + customSubagents.length)
 
     // SDK 的 config.subagents 是整体替换语义，内置必须在前、自定义追加在后，

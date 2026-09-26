@@ -12,6 +12,7 @@ import { FILE_IPC } from '../shared/file-ipc'
 import { UPDATE_IPC, type UpdateStatus } from '../shared/update-ipc'
 import {
   RUNTIME_IPC,
+  type DesktopAuditEvent,
   type DesktopPentestCreateInput,
   type DesktopPentestEvent,
   type DesktopPentestResumeInput,
@@ -228,6 +229,17 @@ const api = {
       ): void => listener(pentestEvent)
       ipcRenderer.on(RUNTIME_IPC.pentestEvent, handler)
       return () => ipcRenderer.removeListener(RUNTIME_IPC.pentestEvent, handler)
+    }
+  },
+  audit: {
+    list: () => ipcRenderer.invoke(RUNTIME_IPC.auditList),
+    get: (runId: string) => ipcRenderer.invoke(RUNTIME_IPC.auditGet, runId),
+    latest: () => ipcRenderer.invoke(RUNTIME_IPC.auditLatest),
+    onEvent: (listener: (event: DesktopAuditEvent) => void): (() => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, auditEvent: DesktopAuditEvent): void =>
+        listener(auditEvent)
+      ipcRenderer.on(RUNTIME_IPC.auditEvent, handler)
+      return () => ipcRenderer.removeListener(RUNTIME_IPC.auditEvent, handler)
     }
   }
 }

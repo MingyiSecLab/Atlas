@@ -8,6 +8,7 @@ import {
   auditMode,
   ATLAS_BRAND_PREAMBLE,
   createControllerConfig,
+  createAuditMastraTools,
   createSecurityMastraTools,
   type RuntimeSandboxAdapter
 } from '../src/index.js'
@@ -48,7 +49,8 @@ function realToolNames(): Set<string> {
     ...Object.values(TOOL_NAME_OVERRIDES).map((config) => config.name),
     ...Object.values(MC_TOOLS),
     ...CONTROLLER_BUILTIN_TOOLS,
-    ...Object.keys(createSecurityMastraTools({ sandbox: stubSandbox() }))
+    ...Object.keys(createSecurityMastraTools({ sandbox: stubSandbox() })),
+    ...Object.keys(createAuditMastraTools())
   ])
 }
 

@@ -12000,3 +12000,641 @@ html.dark .workspace-code-editor-statusbar {
   font-size: 12px;
   line-height: 1;
 }
+
+/* ============================================================
+   右侧审计工作视图（audit mode）
+   ============================================================ */
+.audit-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  font-size: 12px;
+  color: #3f3f46;
+  overflow: hidden;
+}
+
+.audit-empty {
+  padding: 24px 16px;
+  color: #a1a1aa;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.audit-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 8px 12px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 12px;
+}
+
+.audit-error button {
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Run 头部 */
+.audit-run-header {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid #f4f4f5;
+}
+
+.audit-run-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.audit-run-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #18181b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-run-status {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+.audit-run-status.is-complete {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.audit-run-status.is-incomplete {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.audit-run-status.is-in_progress {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.audit-run-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  color: #a1a1aa;
+  font-size: 11px;
+  overflow: hidden;
+}
+
+.audit-run-select {
+  max-width: 140px;
+  border: 1px solid #e4e4e7;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 11px;
+  color: #52525b;
+  padding: 1px 4px;
+}
+
+.audit-run-incomplete {
+  margin-top: 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: #fffbeb;
+  color: #b45309;
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 阶段步进条 */
+.audit-phase-stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  overflow-x: auto;
+}
+
+.audit-phase {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fafafa;
+  border: 1px solid #f4f4f5;
+  color: #a1a1aa;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.audit-phase.is-done {
+  background: #ecfdf5;
+  border-color: #d1fae5;
+  color: #047857;
+}
+
+.audit-phase.is-active {
+  background: #f59e0b;
+  border-color: #f59e0b;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Tabs */
+.audit-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 8px 12px 0;
+  border-bottom: 1px solid #f4f4f5;
+}
+
+.audit-tab {
+  border: none;
+  background: none;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #71717a;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.audit-tab.is-active {
+  color: #b45309;
+  font-weight: 600;
+  border-bottom-color: #f59e0b;
+}
+
+.audit-tab-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* 覆盖矩阵 */
+.audit-coverage {
+  padding: 8px 0 16px;
+}
+
+.audit-coverage-counts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 14px 8px;
+}
+
+.audit-count-chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  background: #f4f4f5;
+  color: #52525b;
+}
+
+.audit-count-chip.is-candidate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.audit-count-chip.is-covered {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.audit-count-chip.is-blocked {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.audit-count-chip.is-deferred {
+  background: #fffbeb;
+  color: #b45309;
+}
+
+.audit-count-total {
+  margin-left: auto;
+  color: #a1a1aa;
+  font-size: 11px;
+}
+
+.audit-coverage-group {
+  margin: 0 8px 6px;
+  border: 1px solid #f4f4f5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.audit-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: #fafafa;
+  cursor: pointer;
+  text-align: left;
+}
+
+.audit-group-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #3f3f46;
+}
+
+.audit-group-meta {
+  font-size: 11px;
+  color: #a1a1aa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-unit-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.audit-unit {
+  padding: 7px 10px;
+  border-top: 1px solid #f4f4f5;
+}
+
+.audit-unit-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.audit-unit-chip {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+.audit-unit-chip.is-candidate {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.audit-unit-chip.is-covered {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.audit-unit-chip.is-blocked {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.audit-unit-chip.is-in_progress {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.audit-unit-text {
+  min-width: 0;
+  flex: 1;
+}
+
+.audit-unit-surface {
+  font-size: 12px;
+  color: #27272a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-unit-class {
+  color: #a1a1aa;
+}
+
+.audit-unit-boundary {
+  font-size: 11px;
+  color: #a1a1aa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-unit-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+  padding-left: 46px;
+  font-size: 11px;
+  color: #a1a1aa;
+}
+
+.audit-unit-agent {
+  color: #6d28d9;
+}
+
+.audit-unit-fp {
+  color: #92400e;
+}
+
+.audit-unit-unresolved {
+  color: #b91c1c;
+}
+
+.audit-unit-reason {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+/* 发现列表 */
+.audit-findings {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.audit-findings-toolbar {
+  padding: 8px 12px 4px;
+}
+
+.audit-filter-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: #f4f4f5;
+}
+
+.audit-filter-tab {
+  border: none;
+  background: none;
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #71717a;
+  cursor: pointer;
+}
+
+.audit-filter-tab.is-active {
+  background: #fff;
+  color: #18181b;
+  font-weight: 600;
+}
+
+.audit-findings-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-bottom: 16px;
+}
+
+.audit-finding-group-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+}
+
+.audit-finding-group-header.is-critical,
+.audit-finding-group-header.is-high {
+  color: #b91c1c;
+}
+
+.audit-finding-group-header.is-medium {
+  color: #b45309;
+}
+
+.audit-finding-group-header.is-needs_validation {
+  color: #1d4ed8;
+}
+
+.audit-finding-group-header.is-rejected {
+  color: #a1a1aa;
+}
+
+.audit-finding-group-count {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #f4f4f5;
+  color: #52525b;
+  font-weight: 400;
+}
+
+.audit-finding-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px;
+}
+
+.audit-finding {
+  border: 1px solid #f4f4f5;
+  border-radius: 8px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+
+.audit-finding-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+}
+
+.audit-finding-severity {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+.audit-finding-severity.is-critical {
+  background: #7f1d1d;
+  color: #fff;
+}
+
+.audit-finding-severity.is-high {
+  background: #fecaca;
+  color: #b91c1c;
+}
+
+.audit-finding-severity.is-medium {
+  background: #fde68a;
+  color: #92400e;
+}
+
+.audit-finding-severity.is-needs_validation {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.audit-finding-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: #27272a;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-finding-detail {
+  padding: 0 10px 10px;
+  border-top: 1px solid #f4f4f5;
+}
+
+.audit-finding-fp {
+  margin-top: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: #a1a1aa;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-finding-desc {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #52525b;
+}
+
+.audit-trace {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0 0 0 8px;
+  border-left: 2px solid #e4e4e7;
+}
+
+.audit-trace-step {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 0;
+  font-size: 11px;
+}
+
+.audit-trace-kind {
+  flex: none;
+  padding: 0 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  background: #f4f4f5;
+  color: #71717a;
+}
+
+.audit-trace-step.is-entrypoint .audit-trace-kind {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.audit-trace-step.is-sink .audit-trace-kind {
+  background: #fecaca;
+  color: #b91c1c;
+}
+
+.audit-trace-path {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #3f3f46;
+}
+
+.audit-trace-detail {
+  color: #a1a1aa;
+}
+
+.audit-finding-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #52525b;
+}
+
+.audit-row-label {
+  flex: none;
+  width: 64px;
+  color: #a1a1aa;
+}
+
+.audit-blockers {
+  list-style: disc;
+  margin: 0;
+  padding-left: 16px;
+}
+
+/* 待验证 */
+.audit-validation {
+  padding: 8px 8px 16px;
+}
+
+.audit-validation-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.audit-validation-item {
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  background: #f8fbff;
+}
+
+.audit-validation-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #1e3a8a;
+}
+
+.audit-validation-trace {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.audit-validation-step {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

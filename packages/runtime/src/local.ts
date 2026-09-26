@@ -19,6 +19,8 @@ import {
 } from './pentest/store.js'
 import { createFileProjectStore, createMemoryProjectStore } from './projects/store.js'
 import { createRuntimePentestService } from './pentest/service.js'
+import { createRuntimeAuditService } from './audit/service.js'
+import { FileAuditStore } from './audit/store.js'
 import { createRuntimeProjectService } from './projects/service.js'
 import { createRuntimeExpertService } from './experts/service.js'
 import { createDockerSandboxAdapter } from './sandbox/docker.js'
@@ -84,6 +86,12 @@ export async function createLocalRuntime(
       : {})
   })
 
+  // auditDataDir 提供时启用审计 run（覆盖台账 + 发现）的跨重启持久化。
+  const auditDataDir = config.auditDataDir ? resolve(config.auditDataDir) : undefined
+  const audit = createRuntimeAuditService(
+    auditDataDir ? { store: new FileAuditStore({ directory: auditDataDir }) } : {}
+  )
+
   // 1.5 Kali 沙箱执行器（可选）：提供 config.sandbox 时创建，容器按需拉起（ensure 惰性）。
   const sandbox = config.sandbox
     ? createDockerSandboxAdapter({ ...config.sandbox })
@@ -106,6 +114,7 @@ export async function createLocalRuntime(
     ...(config.userAgentsDir ? { userAgentsDir: config.userAgentsDir } : {}),
     observationalMemory: config.observationalMemory,
     pentestService: pentest,
+    auditService: audit,
     ...(sandbox ? { sandbox } : {}),
     getActiveSessionId: () => activeSessionId
   })
@@ -230,6 +239,7 @@ export async function createLocalRuntime(
     stateSearch,
     om,
     pentest,
+    audit,
     experts,
     projects,
     // 沙箱容器保持常驻（README 语义：现场与证据保留，ensure 幂等复用）；

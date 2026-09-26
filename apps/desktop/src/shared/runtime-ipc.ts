@@ -1,4 +1,6 @@
 import type {
+  RuntimeAuditEvent,
+  RuntimeAuditRunSnapshot,
   CreateRuntimeSessionInput,
   InvokeRuntimeSkillInput,
   ListRuntimeSkillsInput,
@@ -72,6 +74,10 @@ export const RUNTIME_IPC = {
   pentestBindings: 'runtime:pentest:bindings',
   pentestBind: 'runtime:pentest:bind',
   pentestEvent: 'runtime:pentest:event',
+  auditList: 'runtime:audit:list',
+  auditGet: 'runtime:audit:get',
+  auditLatest: 'runtime:audit:latest',
+  auditEvent: 'runtime:audit:event',
   expertList: 'runtime:expert:list',
   expertSave: 'runtime:expert:save',
   expertDelete: 'runtime:expert:delete',
@@ -223,6 +229,18 @@ export interface RuntimePentestBridge {
   /** 把已有 engagement 挂接到指定会话（幂等；后挂接的排最后，作为该会话默认视图）。 */
   bind(input: { taskId: string; engagementId: string }): Promise<void>
   onEvent(listener: (event: DesktopPentestEvent) => void): () => void
+}
+
+export interface DesktopAuditEvent {
+  runId: string
+  event?: RuntimeAuditEvent
+}
+
+export interface RuntimeAuditBridge {
+  list(): Promise<string[]>
+  get(runId: string): Promise<RuntimeAuditRunSnapshot | null>
+  latest(): Promise<RuntimeAuditRunSnapshot | null>
+  onEvent(listener: (event: DesktopAuditEvent) => void): () => void
 }
 
 export type { RuntimeModeInfo }

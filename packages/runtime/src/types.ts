@@ -14,6 +14,7 @@ import type { RuntimeMcpService } from './mcp/types.js'
 import type { RuntimeStateSearchService } from './state-search/types.js'
 import type { RuntimeOmService } from './om/service.js'
 import type { RuntimePentestService } from './pentest/types.js'
+import type { RuntimeAuditService } from './audit/types.js'
 import type { RuntimeProjectService } from './projects/types.js'
 import type { DockerSandboxConfig, RuntimeSandboxAdapter } from './sandbox/types.js'
 import type { RuntimeExpertService } from './experts/service.js'
@@ -72,6 +73,12 @@ export interface LocalRuntimeConfig {
   projectsDataDir?: string
 
   /**
+   * 代码审计 run 持久化目录；提供后审计 run（覆盖台账 + 发现）跨进程重启保留
+   * （`<dir>/<runId>.json`）。
+   */
+  auditDataDir?: string
+
+  /**
    * Kali 沙箱配置；提供后创建 Docker 沙箱执行器并注册 kali_* 工具
    * （kali_exec / kali_session_* / kali_file_*）。缺省不启用沙箱能力。
    */
@@ -120,6 +127,9 @@ export interface LocalRuntimeInstance {
 
   /** Authorized penetration-testing engagement and evidence service. */
   pentest: RuntimePentestService
+
+  /** 代码审计 run 服务（覆盖台账 + 结构化发现，audit mode 父编排器写入）。 */
+  audit: RuntimeAuditService
 
   /** Workspace expert files (`<configDir>/agents/*.md`) scan and save service. */
   experts: RuntimeExpertService

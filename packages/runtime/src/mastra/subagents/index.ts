@@ -4,6 +4,11 @@ import type { AgentControllerSubagent } from '@mastra/core/agent-controller'
 import { executeSubagent } from '@mastra/code-sdk/agents/subagents/execute'
 import { exploreSubagent } from '@mastra/code-sdk/agents/subagents/explore'
 import { planSubagent } from '@mastra/code-sdk/agents/subagents/plan'
+import { auditCoverageCriticSubagent } from './audit/audit-coverage-critic.js'
+import { auditHunterSubagent } from './audit/audit-hunter.js'
+import { auditReconSubagent } from './audit/audit-recon.js'
+import { auditReportWriterSubagent } from './audit/audit-report-writer.js'
+import { auditVerifierSubagent } from './audit/audit-verifier.js'
 import { docWriterSubagent } from './documentation-writer.js'
 import { perfOptimizerSubagent } from './performance-optimizer.js'
 import { refactorAssistantSubagent } from './refactor-assistant.js'
@@ -11,6 +16,11 @@ import { securityAuditorSubagent } from './security-auditor.js'
 import { testGeneratorSubagent } from './test-generator.js'
 
 export {
+  auditCoverageCriticSubagent,
+  auditHunterSubagent,
+  auditReconSubagent,
+  auditReportWriterSubagent,
+  auditVerifierSubagent,
   docWriterSubagent,
   perfOptimizerSubagent,
   refactorAssistantSubagent,
@@ -18,13 +28,26 @@ export {
   testGeneratorSubagent
 }
 
+/**
+ * 安全审计流水线 subagents（audit mode 专用，提炼自 security-audit skill）。
+ * 依赖 audit mode 作为父编排器按阶段调度；也可被其他模式单独复用。
+ */
+export const auditSubagents: AgentControllerSubagent[] = [
+  auditReconSubagent,
+  auditHunterSubagent,
+  auditCoverageCriticSubagent,
+  auditVerifierSubagent,
+  auditReportWriterSubagent
+]
+
 /** 默认自定义 subagents 列表。 */
 export const customSubagents: AgentControllerSubagent[] = [
   securityAuditorSubagent,
   testGeneratorSubagent,
   perfOptimizerSubagent,
   refactorAssistantSubagent,
-  docWriterSubagent
+  docWriterSubagent,
+  ...auditSubagents
 ]
 
 /**
