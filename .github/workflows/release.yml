@@ -266,6 +266,22 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "title=$TITLE" >> "$GITHUB_OUTPUT"
 
+      # 防覆盖守卫：同 tag 的已发布 Release 存在时直接失败，避免 CI 产物无声
+      # 覆盖公开版本（action-gh-release 对已存在 tag 是原地更新，draft 参数不生效）。
+      # Draft 不拦：草稿未占用 tag 引用，且重跑草稿流程属正常操作。
+      - name: Guard against overwriting a published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${{ steps.get_tag.outputs.tag }}"
+          if gh release view "$TAG" --json isDraft -q '.isDraft == false' >/dev/null 2>&1; then
+            echo "::error::Release $TAG 已发布过，拒绝覆盖。请先 bump apps/desktop/package.json 的 version，再用新 tag 触发。"
+            exit 1
+          fi
+          echo "Release $TAG 未发布过，允许继续。"
+
       - name: Generate release notes
         shell: bash
         run: |
