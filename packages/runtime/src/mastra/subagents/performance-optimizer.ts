@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller';
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names';
 
 /**
  * 性能优化专家
@@ -27,7 +28,15 @@ export const perfOptimizerSubagent: AgentControllerSubagent = {
 - 使用 Benchmark 验证优化效果
 - 提供优化前后对比数据`,
 
-  allowedControllerTools: ['read', 'bash', 'grep'],
+  allowedWorkspaceTools: [
+    MC_TOOLS.VIEW,
+    MC_TOOLS.SEARCH_CONTENT,
+    MC_TOOLS.FIND_FILES,
+    MC_TOOLS.FILE_STAT,
+    MC_TOOLS.WRITE_FILE,
+    MC_TOOLS.STRING_REPLACE_LSP,
+    MC_TOOLS.EXECUTE_COMMAND,
+  ],
 
   defaultModelId: 'anthropic/claude-sonnet-4',
 
