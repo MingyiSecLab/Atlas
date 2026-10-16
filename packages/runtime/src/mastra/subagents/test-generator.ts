@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller';
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names';
 
 /**
  * 测试生成器
@@ -27,7 +28,15 @@ export const testGeneratorSubagent: AgentControllerSubagent = {
 - 异常情况必须验证`,
 
   // 需要写入权限生成测试文件
-  allowedControllerTools: ['read', 'write', 'edit', 'bash'],
+  allowedWorkspaceTools: [
+    MC_TOOLS.VIEW,
+    MC_TOOLS.SEARCH_CONTENT,
+    MC_TOOLS.FIND_FILES,
+    MC_TOOLS.FILE_STAT,
+    MC_TOOLS.WRITE_FILE,
+    MC_TOOLS.STRING_REPLACE_LSP,
+    MC_TOOLS.EXECUTE_COMMAND,
+  ],
 
   defaultModelId: 'anthropic/claude-sonnet-5',
 

@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller';
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names';
 
 /**
  * 重构助手（Fork 模式）
@@ -28,7 +29,14 @@ export const refactorAssistantSubagent: AgentControllerSubagent = {
   // Fork 模式：继承父 Agent 的对话历史和工具
   forked: true,
 
-  allowedControllerTools: ['read', 'edit', 'write'],
+  allowedWorkspaceTools: [
+    MC_TOOLS.VIEW,
+    MC_TOOLS.SEARCH_CONTENT,
+    MC_TOOLS.FIND_FILES,
+    MC_TOOLS.FILE_STAT,
+    MC_TOOLS.WRITE_FILE,
+    MC_TOOLS.STRING_REPLACE_LSP,
+  ],
 
   defaultModelId: 'anthropic/claude-sonnet-5',
 };

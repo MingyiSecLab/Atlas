@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller';
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names';
 
 /**
  * 安全审计专家
@@ -30,7 +31,12 @@ export const securityAuditorSubagent: AgentControllerSubagent = {
 提供具体的代码位置和修复建议。`,
 
   // 只读权限
-  allowedControllerTools: ['read', 'grep', 'find'],
+  allowedWorkspaceTools: [
+    MC_TOOLS.VIEW,
+    MC_TOOLS.SEARCH_CONTENT,
+    MC_TOOLS.FIND_FILES,
+    MC_TOOLS.FILE_STAT,
+  ],
 
   defaultModelId: 'anthropic/claude-sonnet-4',
 

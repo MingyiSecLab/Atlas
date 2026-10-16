@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller';
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names';
 
 /**
  * 文档生成器
@@ -28,7 +29,14 @@ export const docWriterSubagent: AgentControllerSubagent = {
 - 保持更新
 - 面向读者`,
 
-  allowedControllerTools: ['read', 'write', 'edit'],
+  allowedWorkspaceTools: [
+    MC_TOOLS.VIEW,
+    MC_TOOLS.SEARCH_CONTENT,
+    MC_TOOLS.FIND_FILES,
+    MC_TOOLS.FILE_STAT,
+    MC_TOOLS.WRITE_FILE,
+    MC_TOOLS.STRING_REPLACE_LSP,
+  ],
 
   defaultModelId: 'anthropic/claude-sonnet-5',
 
