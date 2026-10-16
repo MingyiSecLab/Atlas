@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller'
+import { AUDIT_READ_ONLY_TOOLS } from './tools.js'
 
 /**
  * Audit Phase 1 侦察 subagent（源自 security-audit skill RECONNAISSANCE.md）。
@@ -41,6 +42,6 @@ export const auditReconSubagent: AgentControllerSubagent = {
   "gaps": ["无法从源码确立、需父级 needs_validation 的事实"]
 }
 只陈述源码事实；不知道就说不知道，禁止臆测部署行为。`,
-  allowedControllerTools: ['view', 'search_content', 'find_files', 'file_stat'],
+  allowedWorkspaceTools: [...AUDIT_READ_ONLY_TOOLS],
   maxSteps: 30
 }

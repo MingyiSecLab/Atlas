@@ -111,7 +111,7 @@ export function AuditView(): JSX.Element {
                 ['coverage', '覆盖'],
                 [
                   'findings',
-                  `发现 ${snapshot.findings.filter((f) => f.verdict !== 'needs_validation').length}`
+                  `发现 ${snapshot.findings.filter((f) => f.verdict === 'confirmed').length}`
                 ],
                 [
                   'validation',

@@ -97,6 +97,11 @@ describe('modes configuration', () => {
     }
   })
 
+  it('lets the audit orchestrator dispatch its subagents', () => {
+    // 白名单漏掉 subagent = 父编排器看不见派发工具，多 agent 流水线退化为单 agent
+    expect(auditMode.availableTools).toContain('subagent')
+  })
+
   it('keeps the code-sdk workspace tool rename we depend on', () => {
     // 上一条守卫的准确性依赖这张重映射表；SDK 改名会让它失准，这里锁住。
     const remapped = new Set(Object.values(TOOL_NAME_OVERRIDES).map((config) => config.name))

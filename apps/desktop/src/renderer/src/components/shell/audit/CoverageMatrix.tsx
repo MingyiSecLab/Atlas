@@ -147,6 +147,16 @@ export function CoverageMatrix({ units }: { units: readonly AuditCoverageUnit[] 
                               {unit.reviewedPaths.length} 路径
                             </span>
                           ) : null}
+                          {unit.checks.length > 0 ? (
+                            <span
+                              className="audit-unit-paths"
+                              title={unit.checks
+                                .map((check) => `${check.invariant}: ${check.result}`)
+                                .join('\n')}
+                            >
+                              {unit.checks.length} 检查
+                            </span>
+                          ) : null}
                           {unit.unresolved.length > 0 ? (
                             <span
                               className="audit-unit-unresolved"

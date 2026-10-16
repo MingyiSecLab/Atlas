@@ -122,6 +122,8 @@ export interface AuditRun {
   target: string
   profile: AuditProfile
   scopePaths: readonly string[]
+  /** 建立该 run 的会话（对话）ID；工具按会话解析活跃 run，避免并发会话串写。 */
+  sessionId?: string
   phase: AuditPhase
   runStatus: AuditRunStatus
   incompleteReason?: string
@@ -147,7 +149,7 @@ export interface RuntimeAuditStore {
   save(run: AuditRun): Promise<void>
 }
 
-/** 单个 run 的写句柄。 */
+/** 单个 run 的写句柄；run 进入终态（complete / incomplete）后所有写方法抛错。 */
 export interface RuntimeAuditRunHandle {
   readonly id: string
   snapshot(): AuditRunSnapshot
@@ -176,10 +178,18 @@ export interface RuntimeAuditService {
     target: string
     profile?: AuditProfile
     scopePaths?: readonly string[]
+    sessionId?: string
   }): RuntimeAuditRunHandle
   get(id: string): RuntimeAuditRunHandle | undefined
   list(): readonly string[]
   latest(): RuntimeAuditRunHandle | undefined
+  /**
+   * 解析会话的活跃 run：该会话最新的 in_progress run；未给 sessionId 时取全局
+   * 最新的 in_progress run。终态 run 永不作为活跃 run 返回。
+   */
+  active(sessionId?: string): RuntimeAuditRunHandle | undefined
+  /** 等待所有排队中的持久化写入完成（测试与退出清理用）。 */
+  flush(): Promise<void>
   /** 订阅全部 run 的变更事件（Desktop IPC 广播用）。 */
   subscribe(listener: (event: AuditEvent) => void): () => void
   ready: Promise<void>

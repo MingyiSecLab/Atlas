@@ -102,7 +102,8 @@ export function createControllerConfig(
     ...(options.sandbox ? { sandbox: options.sandbox } : {})
   });
   const auditTools = createAuditMastraTools({
-    ...(options.auditService ? { auditService: options.auditService } : {})
+    ...(options.auditService ? { auditService: options.auditService } : {}),
+    getActiveSessionId: options.getActiveSessionId
   });
   const runtimeExtraTools = { ...securityTools, ...auditTools };
   if (typeof options.extraTools === 'function') {

@@ -30,8 +30,9 @@ export interface SecurityToolsOptions {
   getActiveSessionId?: () => string | undefined
 }
 
-function resolveSessionIdFromContext(
-  options?: SecurityToolsOptions,
+/** 从 Mastra 工具执行上下文解析会话 ID，缺省回退到活跃会话（审计工具复用）。 */
+export function resolveSessionIdFromContext(
+  options?: Pick<SecurityToolsOptions, 'getActiveSessionId'>,
   executionContext?: unknown
 ): string | undefined {
   const ctx = executionContext as Record<string, any> | undefined

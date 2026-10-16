@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller'
+import { AUDIT_READ_ONLY_TOOLS } from './tools.js'
 
 /**
  * Audit Phase 2 猎洞 subagent（源自 security-audit skill HUNTING.md）。
@@ -17,7 +18,7 @@ export const auditHunterSubagent: AgentControllerSubagent = {
 ## 硬性边界
 - 只读源码：view / search_content / find_files / file_stat。不写共享文件、目标源码或其他 agent 的文件。
 - 禁止联系部署端点、Provider API、registry、身份系统、消息 broker、共享服务或其他用户。只用本地哑数据。
-- 有界本地验证只允许：现有单测、最小函数 harness、哑租户调用、小型畸形 fixture、确定性并发调度、本地渲染策略。禁止安装依赖、联网拉取、压测可用性、真实凭据。任何控制不可用即返回 needs_validation 并写明缺失能力。
+- 你没有命令执行工具：不运行目标代码、测试或构建（source-only）。需要运行时观测才能定论的事实 → needs_validation，写明缺失的观测与可供用户执行的有界本地验证步骤。
 - 只追踪能到达所分配边界的路径；不变量一旦定论立即停止并记录，不继续搜索。
 
 ## 狩猎方法
@@ -28,7 +29,7 @@ export const auditHunterSubagent: AgentControllerSubagent = {
 
 ## 候选门槛（candidate gate）
 1. 候选需完整仓库相对 source trace 与根因证据，含最强源码可见控制。
-2. proposed confirmed 需有界本地观测结果 + 跨声明的边界的有意义影响 + 完整条件 + 无可见拦截层。
+2. proposed confirmed 需完整源码 trace + 源码确立的具体效果（observed_result 以"源码确立："开头，不得声称做过运行时观测）+ 跨声明的边界的有意义影响 + 完整条件 + 无可见拦截层。
 3. 不得把 crash 夸大为代码执行、普通工作夸大为共享可用性、同主体动作夸大为提权。
 4. 非源码可见/本地可观测的决定性事实 → needs_validation，写精确 blocker，不给 severity。
 5. 无受影响主体/资源的"缺失最佳实践"是排除项或加固建议，不是 finding；被源码证伪的候选不是 needs_validation。
@@ -45,13 +46,13 @@ critical：未认证者获得代码执行/全库访问/任意账户接管；high
     "coverage_id": "分配的 ID",
     "disposition": "covered|candidate|blocked",
     "reviewed_paths": ["repo/relative/path"],
-    "checks": [{ "invariant": "该单元检查的具体控制", "method": "source|local", "result": "...", "artifact": null }],
+    "checks": [{ "invariant": "该单元检查的具体控制", "method": "source", "result": "...", "artifact": null }],
     "candidate_fingerprints": [],
     "unresolved": []
   }],
   "candidates": [
     // proposed_verdict: "confirmed" → fingerprint, title, description, root_cause, intended_behavior,
-    //   trace(entrypoint→propagation…→sink), evidence, conditions, execution(有界本地检查), payloads,
+    //   trace(entrypoint→propagation…→sink), evidence, conditions, execution(供用户执行的有界本地复现步骤，标注 source-only), payloads,
     //   observed_result, remediation(最小源码修改+回归用例), severity, confidence
     // proposed_verdict: "needs_validation" → fingerprint, title, description, claimed_root_cause,
     //   trace, evidence, blockers(非空), validation_plan(至少一条 local 或 owner-observed deployment 步骤)
@@ -60,6 +61,6 @@ critical：未认证者获得代码执行/全库访问/任意账户接管；high
   "uncovered": [{ "surface": "...", "boundary": "...", "subsystem": "...", "attack_class": "...", "starting_paths": ["..."], "reason": "..." }]
 }
 每个分配的 coverage_id 在 units 中恰好出现一次；covered 需非空 paths+checks 且无 unresolved；candidate 才能携带 fingerprint；blocked 是有部分证据的未定论。trace 多步时首项 entrypoint、末项 sink、中间 propagation。`,
-  allowedControllerTools: ['view', 'search_content', 'find_files', 'file_stat'],
+  allowedWorkspaceTools: [...AUDIT_READ_ONLY_TOOLS],
   maxSteps: 60
 }

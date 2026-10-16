@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { allSubagents, builtinSubagents, customSubagents } from '../src/mastra/subagents/index.js'
+import { MC_TOOLS } from '@mastra/code-sdk/tool-names'
+import {
+  allSubagents,
+  auditSubagents,
+  builtinSubagents,
+  customSubagents
+} from '../src/mastra/subagents/index.js'
 
 describe('subagent 目录装配', () => {
   it('保留 SDK 内置三个并追加自定义十个', () => {
@@ -23,6 +29,29 @@ describe('subagent 目录装配', () => {
       expect(subagent.id).toBeTruthy()
       expect(subagent.name).toBeTruthy()
       expect(subagent.description).toBeTruthy()
+    }
+  })
+
+  it('audit subagents 用 allowedWorkspaceTools 收窄工作区工具', () => {
+    // SDK 只按 allowedWorkspaceTools 过滤工作区工具；allowedControllerTools 写
+    // view 等名字既不生效也不限制，subagent 会拿到 write_file / execute_command。
+    const readOnly = new Set<string>([
+      MC_TOOLS.VIEW,
+      MC_TOOLS.SEARCH_CONTENT,
+      MC_TOOLS.FIND_FILES,
+      MC_TOOLS.FILE_STAT
+    ])
+    for (const subagent of auditSubagents) {
+      const tools = subagent.allowedWorkspaceTools
+      expect(tools, `${subagent.id} 缺少 allowedWorkspaceTools`).toBeDefined()
+      expect(subagent.allowedControllerTools).toBeUndefined()
+      const extra = (tools ?? []).filter((name) => !readOnly.has(name))
+      if (subagent.id === 'audit-report-writer') {
+        expect(extra.sort()).toEqual([MC_TOOLS.MKDIR, MC_TOOLS.WRITE_FILE].sort())
+      } else {
+        expect(extra, `${subagent.id} 应只读`).toEqual([])
+      }
+      expect(tools).not.toContain(MC_TOOLS.EXECUTE_COMMAND)
     }
   })
 })

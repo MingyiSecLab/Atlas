@@ -28,6 +28,7 @@ export function useAuditRun(): {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<AuditConsoleError | null>(null)
   const activeIdRef = useRef<string | null>(null)
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const toError = (cause: unknown): AuditConsoleError => ({
     message: cause instanceof Error ? cause.message : String(cause)
@@ -68,20 +69,37 @@ export function useAuditRun(): {
     }
   }, [])
 
-  // 实时事件：覆盖台账/发现/阶段/状态任一变更即刷新当前快照。
+  // 合并突发事件（一次台账更新可能连发几十个 unit_updated），每个窗口只拉一次快照。
+  const scheduleRefresh = useCallback(
+    (runId: string): void => {
+      if (refreshTimerRef.current) return
+      refreshTimerRef.current = setTimeout(() => {
+        refreshTimerRef.current = null
+        if (activeIdRef.current === runId) void refresh(runId)
+      }, 120)
+    },
+    [refresh]
+  )
+
+  // 实时事件：新建 run 自动切换过去；当前 run 的任一变更合并刷新快照。
   useEffect(() => {
     const off = window.api.audit.onEvent((event: DesktopAuditEvent) => {
       setRunIds((prev) => (prev.includes(event.runId) ? prev : [event.runId, ...prev]))
-      if (event.runId === activeIdRef.current) {
-        void refresh(event.runId)
-      } else if (!activeIdRef.current) {
+      const isNewRun = event.event?.type === 'run_created'
+      if (isNewRun || !activeIdRef.current) {
         activeIdRef.current = event.runId
         setActiveRunId(event.runId)
         void refresh(event.runId)
+      } else if (event.runId === activeIdRef.current) {
+        scheduleRefresh(event.runId)
       }
     })
-    return off
-  }, [refresh])
+    return () => {
+      off()
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current)
+      refreshTimerRef.current = null
+    }
+  }, [refresh, scheduleRefresh])
 
   const selectRun = useCallback(
     async (runId: string): Promise<void> => {

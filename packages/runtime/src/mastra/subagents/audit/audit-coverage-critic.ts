@@ -1,4 +1,5 @@
 import type { AgentControllerSubagent } from '@mastra/core/agent-controller'
+import { AUDIT_READ_ONLY_TOOLS } from './tools.js'
 
 /**
  * Audit 覆盖评审 subagent（源自 security-audit skill HUNTING.md coverage-critic waves）。
@@ -37,6 +38,6 @@ export const auditCoverageCriticSubagent: AgentControllerSubagent = {
   "stop": false
 }
 stop 仅当你不接受任何 missing_units 且没有任何 reassign_ids 时为 true；是否再开一轮由父编排器综合判断，你的 stop 不是唯一决定。所有提议必须在评审范围内且有源码依据。`,
-  allowedControllerTools: ['view', 'search_content', 'find_files', 'file_stat'],
+  allowedWorkspaceTools: [...AUDIT_READ_ONLY_TOOLS],
   maxSteps: 25
 }
