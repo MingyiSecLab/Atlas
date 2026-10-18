@@ -61,6 +61,13 @@ jobs:
           RELEASE_TAG: ${{ github.event.inputs.tag_name }}
         run: node .github/scripts/validate-release-tag.mjs
 
+      # 重复发版应在安装依赖和 macOS / Windows 打包之前失败。
+      - name: Guard against overwriting a published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.event.inputs.tag_name }}
+        run: bash .github/scripts/guard-release.sh
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
 
@@ -70,6 +77,9 @@ jobs:
           node-version: 22
           cache: 'pnpm'
           cache-dependency-path: pnpm-lock.yaml
+
+      - name: Test release guard
+        run: node --test .github/scripts/guard-release.test.mjs
 
       # preflight 的 pnpm install 会触发 apps/desktop 的 install-app-deps（原生模块重建），
       # 过程中需要下载 Linux 版 Electron 发行包，缓存后免去重复下载。
@@ -268,19 +278,12 @@ jobs:
 
       # 防覆盖守卫：同 tag 的已发布 Release 存在时直接失败，避免 CI 产物无声
       # 覆盖公开版本（action-gh-release 对已存在 tag 是原地更新，draft 参数不生效）。
-      # Draft 不拦：草稿未占用 tag 引用，且重跑草稿流程属正常操作。
+      # 发布前再次检查，避免打包期间 Release 被外部操作公开。草稿允许重跑。
       - name: Guard against overwriting a published release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG="${{ steps.get_tag.outputs.tag }}"
-          if gh release view "$TAG" --json isDraft -q '.isDraft == false' >/dev/null 2>&1; then
-            echo "::error::Release $TAG 已发布过，拒绝覆盖。请先 bump apps/desktop/package.json 的 version，再用新 tag 触发。"
-            exit 1
-          fi
-          echo "Release $TAG 未发布过，允许继续。"
+          RELEASE_TAG: ${{ steps.get_tag.outputs.tag }}
+        run: bash .github/scripts/guard-release.sh
 
       - name: Generate release notes
         shell: bash

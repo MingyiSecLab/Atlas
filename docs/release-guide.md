@@ -91,6 +91,11 @@ macOS / Windows 矩阵机之前被拦下：
 
 流水线的性能与稳定性设计：
 
+- **防止覆盖已发布版本**：preflight 在安装依赖之前检查 Release 状态，发布前再次检查。
+  同 tag 的草稿允许重跑，已公开的正式版和预发布版均拒绝覆盖；查询失败也会停止发布。
+  若提示“Release v2.1.0 已发布过”，请先把 `apps/desktop/package.json` 的 `version`
+  升级为新的版本（例如 `2.1.1`）并提交，在 Run workflow 中选择包含该提交的分支，
+  填入一致的新 tag（例如 `v2.1.1`），重新发起一次运行。
 - **二进制缓存**：缓存 Electron 发行包（`~/Library/Caches/electron` / `%LOCALAPPDATA%\electron\Cache`）
   与 electron-builder 工具链（winCodeSign、nsis、dmg 等），键值绑定 `pnpm-lock.yaml` 哈希。
   缓存命中后无需重复下载，冷启动与热启动差异明显。
